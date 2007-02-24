@@ -85,5 +85,4 @@ int nfs4_pnfs_get_layout(struct super_block *, struct svc_fh *,
 						struct nfsd4_pnfs_layoutget *);
 int nfs4_pnfs_return_layout(struct super_block *, struct svc_fh *,
 					struct nfsd4_pnfs_layoutreturn *);
-void gen_ds_sessionid(clientid_t *, sessionid_t *);
 
