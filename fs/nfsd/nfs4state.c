@@ -453,9 +453,8 @@ STALE_CLIENTID(clientid_t *clid)
 {
 	if (clid->cl_boot == boot_time)
 		return 0;
-	dprintk("xxx ignore NFSD stale clientid (%08x/%08x) boot_time %08lx\n",
+	dprintk("NFSD stale clientid (%08x/%08x) boot_time %08lx\n",
 			clid->cl_boot, clid->cl_id, boot_time);
-	return 0; //??? temp fix
 	return 1;
 }
 
@@ -1258,16 +1257,6 @@ int nfsd4_create_session(struct svc_rqst *rqstp, struct nfsd4_create_session *se
         unconf = find_unconfirmed_client(&session->clientid);
         conf = find_confirmed_client(&session->clientid);
 
-        if (!conf && !unconf) {
-		/* client records purged
-		status =  nfserr_stale_clientid;
-		goto out;
-		*/
-		/* ??? HACK for connectathon 2007 testing */
-                dprintk("xxx hack a create_session replay!\n");
-		goto hack;
-        }
-
         if (conf) {
 		status = nfs_ok;
                 if (conf->cl_seqid != session->seqid + 1) {
@@ -1312,12 +1301,6 @@ out:
 	nfs4_unlock_state();
 	dprintk("%s returns %d %d\n", __FUNCTION__, status, ntohl(status));
 	return status;
-
-hack:
-	gen_ds_sessionid(&session->clientid, &session->sessionid);
-	session->seqid = 1; /* unused */
-	add_to_sessionid_hashtbl(&session->clientid, &session->sessionid);
-	goto out;
 }
 
 
@@ -2209,8 +2192,7 @@ nfsd4_renew(clientid_t *clid)
 	status = nfserr_expired;
 	if (clp == NULL) {
 		/* We assume the client took too long to RENEW. */
-		dprintk("xxx ignore nfsd4_renew: clientid not found!\n");
-		status = nfs_ok; //???
+		dprintk("nfsd4_renew: clientid not found!\n");
 		goto out;
 	}
 	renew_client(clp);
@@ -2278,10 +2260,15 @@ nfs4_laundromat(void)
 				clientid_val = t;
 			break;
 		}
+#if 1 //???
+		dprintk("NFSD: xxx HACK xxx skip purging unused client (clientid %08x)\n",
+			clp->cl_clientid.cl_id);
+#else
 		dprintk("NFSD: purging unused client (clientid %08x)\n",
 			clp->cl_clientid.cl_id);
 		nfsd4_remove_clid_dir(clp);
 		expire_client(clp);
+#endif
 	}
 	INIT_LIST_HEAD(&reaplist);
 	spin_lock(&recall_lock);

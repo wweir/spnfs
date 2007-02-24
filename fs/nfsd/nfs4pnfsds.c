@@ -285,6 +285,7 @@ nfsv4_ds_get_state(struct svc_fh *cfh, stateid_t *stidp)
 	sb = ino->i_sb;
 	if (sb && sb->s_export_op->get_state)
 		status = sb->s_export_op->get_state(ino, &cfh->fh_handle, &gs);
+		dprintk("pNFSD: %s from MDS status %d\n", __func__, status);
 	if (status)
 		return NULL;
 	/* create new pnfs_ds_stateid */
@@ -318,18 +319,4 @@ nfs4_preprocess_pnfs_ds_stateid(struct svc_fh *cfh, stateid_t *stateid)
 	if (stateid->si_generation < dsp->ds_stid.si_generation)
 		return nfserr_old_stateid;
 	return 0;
-}
-
-/* HACK for Connectathon 2007 testing */
-void
-gen_ds_sessionid(clientid_t *clid, sessionid_t *sid)
-{
-        u32 *p = (u32 *)sid;
-        u64 *q;
-        static u64 sessionid_ctr = 0;
-
-        *p++ = clid->cl_boot;
-        *p++ = clid->cl_id;
-        q = (u64 *)sid[8];
-        *q = sessionid_ctr++;
 }
