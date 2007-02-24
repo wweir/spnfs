@@ -36,8 +36,7 @@ struct nfs4_pnfs_dev_item {
 	u32 ip_addr;
 	u32 port;
 	atomic_t count;
-	struct rpc_clnt *rpc_clnt;
-	struct nfs4_session *session;
+	struct nfs4_client *clp;
 };
 
 struct nfs4_pnfs_dev_hlist {

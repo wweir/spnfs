@@ -97,16 +97,25 @@ _device_add(struct nfs4_pnfs_dev_hlist *hlist, struct nfs4_pnfs_dev_item *dev)
 
 /* Create an rpc to the data server defined in 'dev' */
 static int
-device_create(struct rpc_clnt *mds_rpc, struct nfs4_pnfs_dev_item *dev)
+device_create(struct nfs_server *server, struct nfs4_pnfs_dev_item *dev)
 {
-	struct rpc_clnt      *clnt;
+	struct nfs4_client   *clp;
 	struct rpc_xprt      *xprt;
 	struct sockaddr_in    sin;
+	struct rpc_clnt      *mds_rpc = server->client;
 	int err = 0;
 
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = dev->ip_addr;
 	sin.sin_port = dev->port;
+
+	clp = server->rpc_ops->get_client(&sin.sin_addr);
+	if (!clp) {
+		err = PTR_ERR(clp);
+		dprintk("%s: failed to create NFS4 client err %d\n",
+			__FUNCTION__, err);
+		goto out;
+	}
 
 	dprintk("device_create: dev_id=%u, ip=%x, port=%hu\n", dev->dev_id, ntohl(dev->ip_addr), ntohs(dev->port));
 
@@ -117,15 +126,15 @@ device_create(struct rpc_clnt *mds_rpc, struct nfs4_pnfs_dev_item *dev)
 		goto out;
 	}
 
-	clnt = create_nfs_rpcclient(xprt, "nfs4_pnfs_dserver", mds_rpc->cl_vers, mds_rpc->cl_auth->au_flavor, &err);
-	if (clnt == NULL) {
+	clp->cl_rpcclient = create_nfs_rpcclient(xprt, "nfs4_pnfs_dserver", mds_rpc->cl_vers, mds_rpc->cl_auth->au_flavor, &err);
+	if (clp->cl_rpcclient == NULL) {
 		printk("%s: Can't create nfs rpc client!\n", __FUNCTION__);
 		goto out;
 	}
 
-	dev->rpc_clnt = clnt;
-
- out:
+	dev->clp = clp;
+out:
+	printk("%s: exit err %d clp %p\n", __FUNCTION__, err, clp);
 	return err;
 }
 
@@ -137,12 +146,12 @@ device_destroy(struct nfs4_pnfs_dev_item *dev)
 	if (!dev)
 		return;
 
-	if ((status = _nfs4_proc_destroy_session(&dev->session, dev->rpc_clnt)))
+	if ((status = _nfs4_proc_destroy_session(&dev->clp->cl_session, dev->clp->cl_rpcclient)))
 		printk(KERN_WARNING "destroy session on data server failed with status %d...\
 				 blowing away device anyways!\n", status);
 
 	/*	BUG_ON(!atomic_sub_and_test(0, &dev->count)); */
-	rpc_shutdown_client(dev->rpc_clnt);
+	rpc_shutdown_client(dev->clp->cl_rpcclient);
 
 	kfree(dev);
 }
@@ -201,17 +210,14 @@ nfs4_pnfs_device_add(struct filelayout_mount_type *mt,
 	dprintk("nfs4_pnfs_device_add\n");
 
 	/* Create device */
-	err = device_create(server->client, dev);
-	if (err)
+	err = device_create(server, dev);
+	if (err) {
+		printk(KERN_EMERG "%s: cannot create RPC client. Error = %d\n",
+						__FUNCTION__, err);
 		return err;
+	}
 
-	dev->session = nfs41_alloc_session();
-	if (!dev->session)
-		return -ENOMEM;
-
-	err = _nfs4_proc_create_session(server->nfs4_state,
-				dev->session, dev->rpc_clnt);
-
+	err = server->rpc_ops->setup_session(dev->clp);
 	if (err)
 		return err;
 
@@ -448,8 +454,9 @@ nfs4_pnfs_dserver_get(struct inode *inode,
  * an ioctl on the NFSv4 file layout driver to decrement the device count.
  */
 static void
-nfs4_pnfs_device_put(struct nfs4_pnfs_dev_hlist *hlist, struct nfs4_pnfs_dev_item *dev)
+nfs4_pnfs_device_put(struct nfs_server *server, struct nfs4_pnfs_dev_hlist *hlist, struct nfs4_pnfs_dev_item *dev)
 {
 	dprintk("nfs4_pnfs_device_put: dev_id=%u\n", dev->dev_id);
+	server->rpc_ops->put_client(dev->clp);
 	atomic_dec(&dev->count);
 }

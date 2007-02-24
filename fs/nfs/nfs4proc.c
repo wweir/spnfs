@@ -5202,7 +5202,7 @@ static int nfs4_lock_expired(struct nfs4_state *state, struct file_lock *request
 static int _nfs4_proc_setlk(struct nfs4_state *state, int cmd, struct file_lock *request)
 {
 	struct nfs4_client *clp = state->owner->so_client;
-	unsigned char fl_flags = request->fl_flags;
+	u32 fl_flags = request->fl_flags;
 	int status;
 
 	/* Is this a delegated open? */
@@ -5625,6 +5625,7 @@ struct nfs_rpc_ops	nfs_v41_clientops = {
         .setup_session  = nfs41_proc_setup_session,
         .setup_sequence = nfs41_proc_setup_sequence_call,
         .sequence_done   = nfs41_proc_sequence_done,
+        .get_client     = nfs4_get_client,
 };
 
 struct nfs_rpc_ops	pnfs_v4_clientops = {
@@ -5681,6 +5682,8 @@ struct nfs_rpc_ops	pnfs_v4_clientops = {
         .setup_session  = nfs41_proc_setup_session,
         .setup_sequence = nfs41_proc_setup_sequence_call,
         .sequence_done   = nfs41_proc_sequence_done,
+        .get_client     = nfs4_get_client,
+        .put_client     = nfs4_put_client,
 };
 
 struct nfs_rpc_ops *nfsv4_minorversion_clientops[] = {

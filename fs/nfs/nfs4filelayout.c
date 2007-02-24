@@ -276,8 +276,8 @@ ssize_t filelayout_read_pagelist(
 			status = 0;
 		}
 		else {
-			data->pnfs_client = dserver.dev_item->rpc_clnt;
-			data->session = dserver.dev_item->session;
+			data->pnfs_client = dserver.dev_item->clp->cl_rpcclient;
+			data->session = dserver.dev_item->clp->cl_session;
 			data->args.fh = dserver.fh;
 
 			/* Now get the file offset on the dserver
@@ -353,8 +353,8 @@ ssize_t filelayout_write_pagelist(
 					&dserver);
 	/* ANDROS: XXX should fail if no data server */
 	if(!status) {
-		data->pnfs_client = dserver.dev_item->rpc_clnt;
-		data->session = dserver.dev_item->session;
+		data->pnfs_client = dserver.dev_item->clp->cl_rpcclient;
+		data->session = dserver.dev_item->clp->cl_session;
 		data->args.fh = dserver.fh;
 	}
 	dprintk("%s set wb_devid %d\n", __FUNCTION__,
@@ -564,8 +564,8 @@ filelayout_commit(struct pnfs_layout_type * layoutid, struct inode* ino, struct 
 		dprintk("%s call nfs_commit_rpcsetup i %d devid %d\n",
 						__FUNCTION__, i, dev_id);
 
-		dsdata->pnfs_client = dserver.dev_item->rpc_clnt;
-		dsdata->session =  dserver.dev_item->session;
+		dsdata->pnfs_client = dserver.dev_item->clp->cl_rpcclient;
+		dsdata->session =  dserver.dev_item->clp->cl_session;
 
 		nfs_commit_rpcsetup(dsdata, sync);
 
