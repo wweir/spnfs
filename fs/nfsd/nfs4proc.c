@@ -775,7 +775,7 @@ nfsd4_getdevlist( struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd
 			__FUNCTION__, status, gdlp->gd_type, gdlp->gd_maxcount,
 			gdlp->gd_devlist_len);
 	}
-	if (gdlp->gd_devlist_len <= 0)
+	if (gdlp->gd_devlist_len < 0)
 		status = nfserr_inval;
 out:
 	return status;
