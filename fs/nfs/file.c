@@ -33,6 +33,7 @@
 
 #include "delegation.h"
 #include "iostat.h"
+#include "pnfs.h"
 
 #define NFSDBG_FACILITY		NFSDBG_FILE
 
@@ -44,7 +45,7 @@ static ssize_t nfs_file_sendfile(struct file *, loff_t *, size_t, read_actor_t, 
 static ssize_t nfs_file_read(struct kiocb *, char __user *, size_t, loff_t);
 static ssize_t nfs_file_write(struct kiocb *, const char __user *, size_t, loff_t);
 static int  nfs_file_flush(struct file *, fl_owner_t id);
-static int  nfs_fsync(struct file *, struct dentry *dentry, int datasync);
+int  nfs_fsync(struct file *, struct dentry *dentry, int datasync);
 static int nfs_check_flags(int flags);
 static int nfs_lock(struct file *filp, int cmd, struct file_lock *fl);
 static int nfs_flock(struct file *filp, int cmd, struct file_lock *fl);
@@ -53,13 +54,30 @@ const struct file_operations nfs_file_operations = {
 	.llseek		= nfs_file_llseek,
 	.read		= do_sync_read,
 	.write		= do_sync_write,
+	.fsync		= nfs_fsync,
+	.aio_read	= nfs_file_read,
+	.aio_write	= nfs_file_write,
+	.mmap		= nfs_file_mmap,
+	.open		= nfs_file_open,
+	.flush		= nfs_file_flush,
+	.release	= nfs_file_release,
+	.lock		= nfs_lock,
+	.flock		= nfs_flock,
+	.sendfile	= nfs_file_sendfile,
+	.check_flags	= nfs_check_flags,
+};
+
+const struct file_operations pnfs_file_operations = {
+	.llseek		= nfs_file_llseek,
+	.read           = pnfs_file_read,
+	.write          = pnfs_file_write,
+	.fsync		= pnfs_fsync,
 	.aio_read		= nfs_file_read,
 	.aio_write		= nfs_file_write,
 	.mmap		= nfs_file_mmap,
 	.open		= nfs_file_open,
 	.flush		= nfs_file_flush,
 	.release	= nfs_file_release,
-	.fsync		= nfs_fsync,
 	.lock		= nfs_lock,
 	.flock		= nfs_flock,
 	.sendfile	= nfs_file_sendfile,
@@ -257,7 +275,7 @@ nfs_file_mmap(struct file * file, struct vm_area_struct * vma)
  * The return status from this call provides a reliable indication of
  * whether any write errors occurred for this process.
  */
-static int
+int
 nfs_fsync(struct file *file, struct dentry *dentry, int datasync)
 {
 	struct nfs_open_context *ctx = (struct nfs_open_context *)file->private_data;

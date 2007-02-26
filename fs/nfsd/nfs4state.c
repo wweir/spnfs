@@ -51,11 +51,16 @@
 #include <linux/namei.h>
 #include <linux/mutex.h>
 
+#if defined (CONFIG_PNFS)
+#include <linux/nfsd/pnfsd.h>
+#include <linux/nfs4_pnfs.h>
+#endif /* CONFIG_PNFS */
+
 #define NFSDDBG_FACILITY                NFSDDBG_PROC
 
 /* Globals */
-static time_t lease_time = 90;     /* default lease time */
-static time_t user_lease_time = 90;
+static time_t lease_time = 20;
+static time_t user_lease_time = 20;
 static time_t boot_time;
 static int in_grace = 1;
 static u32 current_clientid = 1;
@@ -75,6 +80,17 @@ static struct nfs4_delegation * find_delegation_stateid(struct inode *ino, state
 static void release_stateid_lockowners(struct nfs4_stateid *open_stp);
 static char user_recovery_dirname[PATH_MAX] = "/var/lib/nfs/v4recovery";
 static void nfs4_set_recdir(char *recdir);
+#if defined(CONFIG_PNFS)
+/*
+ * Layout state - NFSv4.1 pNFS
+ */
+static struct list_head layout_recall_lru;
+static int num_layouts;
+static kmem_cache_t *pnfs_layout_slab = NULL;
+static void release_pnfs_ds_dev_list(struct nfs4_stateid *stp);
+static void nfs4_put_layout(struct nfs4_layout *lp);
+#endif /* CONFIG_PNFS */
+
 
 /* Locking:
  *
@@ -267,8 +283,22 @@ unhash_delegation(struct nfs4_delegation *dp)
 	nfs4_put_delegation(dp);
 }
 
-/* 
- * SETCLIENTID state 
+#if defined(CONFIG_PNFS)
+/* Called under the state lock. */
+static void
+unhash_layout(struct nfs4_layout *lp)
+{
+	list_del_init(&lp->lo_perfile);
+	list_del_init(&lp->lo_perclnt);
+	spin_lock(&recall_lock);
+	list_del_init(&lp->lo_recall_lru);
+	spin_unlock(&recall_lock);
+	nfs4_put_layout(lp);
+}
+#endif
+
+/*
+ * SETCLIENTID state
  */
 
 /* Hash tables for nfs4_clientid state */
@@ -305,6 +335,105 @@ static struct list_head	unconf_id_hashtbl[CLIENT_HASH_SIZE];
 static struct list_head client_lru;
 static struct list_head close_lru;
 
+/* For sessionid -> clientid mapping */
+struct sessionid_hashtbl_element {
+        clientid_t clientid;
+        sessionid_t sessionid;
+        struct list_head hash_list;
+};
+
+static struct list_head sessionid_hashtbl[CLIENT_HASH_SIZE];
+
+static int hash_sessionid(sessionid_t *sessionid)
+{
+
+        u32 *ptr;
+        u32 hashval;
+        int idx;
+        int i;
+
+        ptr = (u32 *)(*sessionid);
+        hashval = 0;
+        for (i = 0; i < sizeof(sessionid_t)/sizeof(u32);++i) {
+                hashval ^= ptr[i];
+        }
+
+        idx = hashval % CLIENT_HASH_SIZE;
+
+        return idx;
+}
+
+void dump_sessionid(char *fn, sessionid_t *sessionid)
+{
+        u32 *ptr;
+
+        ptr = (u32 *)(*sessionid);
+
+        dprintk("%s: %u:%u:%u:%u\n", fn, ptr[0], ptr[1], ptr[2], ptr[3]);
+}
+
+static int add_to_sessionid_hashtbl(clientid_t *clientid, sessionid_t *sessionid)
+{
+        struct sessionid_hashtbl_element *new;
+        int idx;
+
+        //dump_sessionid(__FUNCTION__, sessionid);
+        new = kzalloc(sizeof(*new), GFP_KERNEL);
+
+        if (!new)
+                return -ENOMEM;
+
+        memcpy(&new->clientid, clientid, sizeof(*clientid));
+        memcpy(&new->sessionid, *sessionid, sizeof(sessionid_t));
+
+        idx = hash_sessionid(sessionid);
+        dprintk("%s: idx is %d\n", __FUNCTION__, idx);
+
+        list_add(&new->hash_list, &sessionid_hashtbl[idx]);
+
+        return 0;
+}
+
+struct sessionid_hashtbl_element *find_in_sessionid_hashtbl(sessionid_t *sessionid)
+{
+        struct sessionid_hashtbl_element *elem;
+        int idx;
+        int found = 0;
+
+        dump_sessionid((char *)__FUNCTION__, sessionid);
+        idx = hash_sessionid(sessionid);
+        dprintk("%s: idx is %d\n", __FUNCTION__, idx);
+        /* Search in the appropriate list */
+        list_for_each_entry(elem, &sessionid_hashtbl[idx], hash_list) {
+                dump_sessionid("list traversal", &elem->sessionid);
+                if (!memcmp(elem->sessionid, *sessionid, sizeof(sessionid_t))) {
+                        found = 1;
+                        break;
+                }
+        }
+
+        /* Check if we found the element */
+        dprintk("%s: found %d elem %p\n", __FUNCTION__, found, elem);
+        if (!found)
+                return NULL;
+
+        return elem;
+}
+
+void remove_from_sessionid_hashtbl(sessionid_t *sessionid)
+{
+        struct sessionid_hashtbl_element *elem;
+
+        elem = find_in_sessionid_hashtbl(sessionid);
+
+        if (!elem)
+                BUG();
+
+        list_del(&elem->hash_list);
+
+        kfree(elem);
+}
+
 static inline void
 renew_client(struct nfs4_client *clp)
 {
@@ -324,8 +453,9 @@ STALE_CLIENTID(clientid_t *clid)
 {
 	if (clid->cl_boot == boot_time)
 		return 0;
-	dprintk("NFSD stale clientid (%08x/%08x)\n", 
-			clid->cl_boot, clid->cl_id);
+	dprintk("xxx ignore NFSD stale clientid (%08x/%08x) boot_time %08lx\n",
+			clid->cl_boot, clid->cl_id, boot_time);
+	return 0; //??? temp fix
 	return 1;
 }
 
@@ -387,6 +517,7 @@ expire_client(struct nfs4_client *clp)
 {
 	struct nfs4_stateowner *sop;
 	struct nfs4_delegation *dp;
+	struct nfs4_layout *lp;
 	struct list_head reaplist;
 
 	dprintk("NFSD: expire_client cl_count %d\n",
@@ -412,10 +543,29 @@ expire_client(struct nfs4_client *clp)
 	list_del(&clp->cl_idhash);
 	list_del(&clp->cl_strhash);
 	list_del(&clp->cl_lru);
+#if defined(CONFIG_PNFS)
+	spin_lock(&recall_lock);
+	while (!list_empty(&clp->cl_layouts)) {
+		lp = list_entry(clp->cl_layouts.next, struct nfs4_layout, lo_perclnt);
+		dprintk("NFSD: expire client. lp %p, fp %p\n", lp,
+				lp->lo_file);
+		BUG_ON(lp->lo_client != clp);
+		list_del_init(&lp->lo_perclnt);
+		list_move(&lp->lo_recall_lru, &reaplist);
+	}
+	spin_unlock(&recall_lock);
+	while (!list_empty(&reaplist)) {
+		lp = list_entry(reaplist.next, struct nfs4_layout, lo_recall_lru);
+		list_del_init(&lp->lo_recall_lru);
+		unhash_layout(lp);
+	}
+
+#endif
 	while (!list_empty(&clp->cl_openowners)) {
 		sop = list_entry(clp->cl_openowners.next, struct nfs4_stateowner, so_perclient);
 		release_stateowner(sop);
 	}
+	remove_from_sessionid_hashtbl(&clp->cl_sessionid);
 	put_nfs4_client(clp);
 }
 
@@ -432,6 +582,7 @@ create_client(struct xdr_netobj name, char *recdir) {
 	INIT_LIST_HEAD(&clp->cl_strhash);
 	INIT_LIST_HEAD(&clp->cl_openowners);
 	INIT_LIST_HEAD(&clp->cl_delegations);
+	INIT_LIST_HEAD(&clp->cl_layouts);
 	INIT_LIST_HEAD(&clp->cl_lru);
 out:
 	return clp;
@@ -495,6 +646,19 @@ gen_confirm(struct nfs4_client *clp) {
 	p = (u32 *)clp->cl_confirm.data;
 	*p++ = tv.tv_sec;
 	*p++ = tv.tv_nsec;
+}
+static void
+gen_sessionid(struct nfs4_client *clp)
+{
+        u32 *p = (u32 *)clp->cl_sessionid;
+        u64 *q;
+        static u64 sessionid_ctr = 0;
+
+        *p++ = clp->cl_clientid.cl_boot;
+        *p++ = clp->cl_clientid.cl_id;
+        q = (u64 *)&clp->cl_sessionid[8];
+        *q = sessionid_ctr++;
+	dump_sessionid(__FUNCTION__, &clp->cl_sessionid);
 }
 
 static int
@@ -868,9 +1032,107 @@ out:
 	return status;
 }
 
+void nfsd4_setup_callback_channel(void)
+{
+        return;
+}
+
+int nfsd4_exchange_id(struct svc_rqst *rqstp, struct nfsd4_exchange_id *clid)
+{
+        struct nfs4_client *unconf, *conf, *new;
+        int status;
+        unsigned int            strhashval;
+        char                    dname[HEXDIR_LEN];
+
+        struct xdr_netobj clname = {
+                .len = clid->id_len,
+                .data = clid->id,
+        };
+        nfs4_verifier           verf = clid->verifier;
+        u32                     ip_addr = rqstp->rq_addr.sin_addr.s_addr;
+
+        if (!check_name(clname))
+                return nfserr_inval;
+
+        status = nfs4_make_rec_clidname(dname, &clname);
+
+        if (status)
+                return status;
+
+        strhashval = clientstr_hashval(dname);
+
+        nfs4_lock_state();
+        status = nfserr_clid_inuse;
+
+        conf = find_confirmed_client_by_str(dname, strhashval);
+        if (conf) {
+                if (!cmp_creds(&conf->cl_cred, &rqstp->rq_cred) || (ip_addr != conf->cl_addr)) {
+                        /* Client collision: send nfserr_clid_inuse */
+                        goto out;
+                }
+
+                if (cmp_verf(&verf, &conf->cl_verifier)) {
+                        /* Client reboot: destroy old state */
+                        expire_client(conf);
+			goto out_new;
+                }
+		/* router replay */
+		goto out;
+        }
+
+        unconf  = find_unconfirmed_client_by_str(dname, strhashval);
+        if (unconf) {
+                status = nfs_ok;
+                /* Found an unconfirmed record */
+                if (!cmp_creds(&conf->cl_cred, &rqstp->rq_cred)) {
+                        /* Principal changed: update to the new principal and send
+                         * nfs_ok */
+                        copy_cred(&unconf->cl_cred, &rqstp->rq_cred);
+                }
+
+                if (!cmp_verf(&unconf->cl_verifier, &verf)) {
+                        /* Reboot before confirmation: update the verifier and
+                         * send nfs_ok */
+                        copy_verf(unconf, &verf);
+			new = unconf;
+			goto out_copy;
+                }
+                goto out;
+        }
+
+out_new:
+        /* Normal case */
+        status = nfserr_resource;
+        new = create_client(clname, dname);
+
+        if (new == NULL)
+                goto out;
+
+        copy_verf(new, &verf);
+        copy_cred(&new->cl_cred,&rqstp->rq_cred);
+        new->cl_addr = ip_addr;
+        gen_clid(new);
+        gen_confirm(new);
+        add_to_unconfirmed(new, strhashval);
+
+        nfsd4_setup_callback_channel();
+out_copy:
+        clid->clientid.cl_boot = new->cl_clientid.cl_boot;
+        clid->clientid.cl_id = new->cl_clientid.cl_id;
+
+        new->cl_seqid = clid->seqid = 1;
+
+        status = nfs_ok;
+
+out:
+        nfs4_unlock_state();
+
+        dprintk("nfsd4_exchange_id returns %d\n", status);
+        return status;
+}
 
 /*
- * RFC 3010 has a complex implmentation description of processing a 
+ * RFC 3010 has a complex implmentation description of processing a
  * SETCLIENTID_CONFIRM request consisting of 4 bullets describing
  * processing on a DRC miss, labeled as CASE1 - CASE4 below.
  *
@@ -982,6 +1244,83 @@ out:
 	return status;
 }
 
+
+int nfsd4_create_session(struct svc_rqst *rqstp, struct nfsd4_create_session *session)
+{
+        u32 ip_addr = rqstp->rq_addr.sin_addr.s_addr;
+        struct nfs4_client *conf, *unconf;
+        int status = 0;
+
+        if (STALE_CLIENTID(&session->clientid))
+                return nfserr_stale_clientid;
+
+        nfs4_lock_state();
+        unconf = find_unconfirmed_client(&session->clientid);
+        conf = find_confirmed_client(&session->clientid);
+
+        if (!conf && !unconf) {
+		/* client records purged
+		status =  nfserr_stale_clientid;
+		goto out;
+		*/
+		/* ??? HACK for connectathon 2007 testing */
+                dprintk("xxx hack a create_session replay!\n");
+		goto hack;
+        }
+
+        if (conf) {
+		status = nfs_ok;
+                if (conf->cl_seqid != session->seqid + 1) {
+                        status = nfserr_seq_misordered;
+                        goto out;
+                }
+
+                /* replay... check if principal changed */
+                if (!cmp_creds(&conf->cl_cred, &rqstp->rq_cred) || (ip_addr != conf->cl_addr)) {
+                        status = nfserr_clid_inuse;
+                        goto out;
+                }
+
+                dprintk("Got a create_session replay!\n");
+                goto out_replay;
+
+        }
+        else if (unconf) {
+                if (!cmp_creds(&unconf->cl_cred, &rqstp->rq_cred) || (ip_addr != unconf->cl_addr)) {
+                        status = nfserr_clid_inuse;
+                        goto out;
+                }
+
+                if (unconf->cl_seqid != session->seqid) {
+                        status = nfserr_seq_misordered;
+			goto out;
+		}
+
+                unconf->cl_seqid++;
+                gen_sessionid(unconf);
+
+                move_to_confirmed(unconf);
+                nfsd4_probe_callback(unconf);
+                conf = unconf;
+        }
+	add_to_sessionid_hashtbl(&conf->cl_clientid, &conf->cl_sessionid);
+
+out_replay:
+	memcpy(session->sessionid, conf->cl_sessionid, 16);
+	session->seqid = conf->cl_seqid;
+out:
+	nfs4_unlock_state();
+	dprintk("%s returns %d %d\n", __FUNCTION__, status, ntohl(status));
+	return status;
+
+hack:
+	gen_ds_sessionid(&session->clientid, &session->sessionid);
+	session->seqid = 1; /* unused */
+	add_to_sessionid_hashtbl(&session->clientid, &session->sessionid);
+	goto out;
+}
+
+
 /* OPEN Share state helper functions */
 static inline struct nfs4_file *
 alloc_init_file(struct inode *ino)
@@ -995,6 +1334,7 @@ alloc_init_file(struct inode *ino)
 		INIT_LIST_HEAD(&fp->fi_hash);
 		INIT_LIST_HEAD(&fp->fi_stateids);
 		INIT_LIST_HEAD(&fp->fi_delegations);
+		INIT_LIST_HEAD(&fp->fi_layouts);
 		list_add(&fp->fi_hash, &file_hashtbl[hashval]);
 		fp->fi_inode = igrab(ino);
 		fp->fi_id = current_fileid++;
@@ -1022,6 +1362,9 @@ nfsd4_free_slabs(void)
 	nfsd4_free_slab(&file_slab);
 	nfsd4_free_slab(&stateid_slab);
 	nfsd4_free_slab(&deleg_slab);
+#if defined(CONFIG_PNFS)
+	nfsd4_free_slab(&pnfs_layout_slab);
+#endif /* CONFIG_PNFS */
 }
 
 static int
@@ -1043,6 +1386,13 @@ nfsd4_init_slabs(void)
 			sizeof(struct nfs4_delegation), 0, 0, NULL, NULL);
 	if (deleg_slab == NULL)
 		goto out_nomem;
+#if defined(CONFIG_PNFS)
+	pnfs_layout_slab = kmem_cache_create("pnfs_layouts",
+			sizeof(struct nfs4_layout), 0, 0, NULL, NULL);
+	if (pnfs_layout_slab == NULL)
+		goto out_nomem;
+#endif /* CONFIG_PNFS */
+
 	return 0;
 out_nomem:
 	nfsd4_free_slabs();
@@ -1158,6 +1508,9 @@ init_stateid(struct nfs4_stateid *stp, struct nfs4_file *fp, struct nfsd4_open *
 	INIT_LIST_HEAD(&stp->st_perstateowner);
 	INIT_LIST_HEAD(&stp->st_lockowners);
 	INIT_LIST_HEAD(&stp->st_perfile);
+#if defined(CONFIG_PNFS)
+	INIT_LIST_HEAD(&stp->st_pnfs_ds_id);
+#endif /* CONFIG_PNFS */
 	list_add(&stp->st_hash, &stateid_hashtbl[hashval]);
 	list_add(&stp->st_perstateowner, &sop->so_stateids);
 	list_add(&stp->st_perfile, &fp->fi_stateids);
@@ -1183,6 +1536,9 @@ release_stateid(struct nfs4_stateid *stp, int flags)
 	list_del(&stp->st_hash);
 	list_del(&stp->st_perfile);
 	list_del(&stp->st_perstateowner);
+#if defined(CONFIG_PNFS)
+	release_pnfs_ds_dev_list(stp);
+#endif /* CONFIG_PNFS */
 	if (flags & OPEN_STATE) {
 		release_stateid_lockowners(stp);
 		stp->st_vfs_file = NULL;
@@ -1853,7 +2209,8 @@ nfsd4_renew(clientid_t *clid)
 	status = nfserr_expired;
 	if (clp == NULL) {
 		/* We assume the client took too long to RENEW. */
-		dprintk("nfsd4_renew: clientid not found!\n");
+		dprintk("xxx ignore nfsd4_renew: clientid not found!\n");
+		status = nfs_ok; //???
 		goto out;
 	}
 	renew_client(clp);
@@ -1865,6 +2222,28 @@ nfsd4_renew(clientid_t *clid)
 out:
 	nfs4_unlock_state();
 	return status;
+}
+
+int
+nfsd4_sequence(struct svc_rqst *r, sessionid_t *current_sid, struct nfsd4_sequence *seq)
+{
+        struct sessionid_hashtbl_element *elem;
+        elem = find_in_sessionid_hashtbl(&seq->sessionid);
+
+        if (!elem) {
+                printk(KERN_EMERG "stale clientid supplied to sequence!!\n");
+                dump_sessionid((char *)__FUNCTION__, &seq->sessionid);
+                return nfserr_stale_clientid;
+        }
+
+	memcpy(current_sid, &seq->sessionid, sizeof(sessionid_t));
+        return nfsd4_renew(&elem->clientid);
+}
+
+int
+nfsd4_destroy_session(struct svc_rqst *r, struct nfsd4_destroy_session *sessionid)
+{
+        return 0;
 }
 
 static void
@@ -2000,13 +2379,13 @@ access_permit_write(unsigned long access_bmap)
 }
 
 static
-int nfs4_check_openmode(struct nfs4_stateid *stp, int flags)
+int nfs4_check_openmode(unsigned long st_access_bmap, int flags)
 {
         int status = nfserr_openmode;
 
-	if ((flags & WR_STATE) && (!access_permit_write(stp->st_access_bmap)))
+	if ((flags & WR_STATE) && (!access_permit_write(st_access_bmap)))
                 goto out;
-	if ((flags & RD_STATE) && (!access_permit_read(stp->st_access_bmap)))
+	if ((flags & RD_STATE) && (!access_permit_read(st_access_bmap)))
                 goto out;
 	status = nfs_ok;
 out:
@@ -2068,9 +2447,14 @@ nfs4_preprocess_stateid_op(struct svc_fh *current_fh, stateid_t *stateid, int fl
 	if (ZERO_STATEID(stateid) || ONE_STATEID(stateid))
 		return check_special_stateids(current_fh, stateid, flags);
 
+	if (current_fh->fh_handle.fh_fsid_type >= max_fsid_type) { /* PNFS FH */
+		status = nfs4_preprocess_pnfs_ds_stateid(current_fh, stateid);
+		goto out;
+	}
+
 	/* STALE STATEID */
 	status = nfserr_stale_stateid;
-	if (STALE_STATEID(stateid)) 
+	if (STALE_STATEID(stateid))
 		goto out;
 
 	/* BAD STATEID */
@@ -2100,7 +2484,7 @@ nfs4_preprocess_stateid_op(struct svc_fh *current_fh, stateid_t *stateid, int fl
 	if (stateid->si_generation < stidp->si_generation)
 		goto out;
 	if (stp) {
-		if ((status = nfs4_check_openmode(stp,flags)))
+		if ((status = nfs4_check_openmode(stp->st_access_bmap,flags)))
 			goto out;
 		renew_client(stp->st_stateowner->so_client);
 		if (filpp)
@@ -2183,12 +2567,12 @@ nfs4_preprocess_seqid_op(struct svc_fh *current_fh, u32 seqid, stateid_t *statei
                        if (!cmp_clid(&clp->cl_clientid, lockclid))
 			       return nfserr_bad_stateid;
                        /* stp is the open stateid */
-                       status = nfs4_check_openmode(stp, lkflg);
+                       status = nfs4_check_openmode(stp->st_access_bmap, lkflg);
                        if (status)
 			       return status;
                } else {
                        /* stp is the lock stateid */
-                       status = nfs4_check_openmode(stp->st_openstp, lkflg);
+                       status = nfs4_check_openmode(stp->st_openstp->st_access_bmap, lkflg);
                        if (status)
 			       return status;
                }
@@ -2610,6 +2994,9 @@ alloc_init_lock_stateid(struct nfs4_stateowner *sop, struct nfs4_file *fp, struc
 	INIT_LIST_HEAD(&stp->st_perfile);
 	INIT_LIST_HEAD(&stp->st_perstateowner);
 	INIT_LIST_HEAD(&stp->st_lockowners); /* not used */
+#if defined(CONFIG_PNFS)
+	INIT_LIST_HEAD(&stp->st_pnfs_ds_id);
+#endif /* CONFIG_PNFS */
 	list_add(&stp->st_hash, &lockstateid_hashtbl[hashval]);
 	list_add(&stp->st_perfile, &fp->fi_stateids);
 	list_add(&stp->st_perstateowner, &sop->so_stateids);
@@ -3133,6 +3520,7 @@ nfs4_state_init(void)
 		INIT_LIST_HEAD(&conf_str_hashtbl[i]);
 		INIT_LIST_HEAD(&unconf_str_hashtbl[i]);
 		INIT_LIST_HEAD(&unconf_id_hashtbl[i]);
+		INIT_LIST_HEAD(&sessionid_hashtbl[i]);
 	}
 	for (i = 0; i < FILE_HASH_SIZE; i++) {
 		INIT_LIST_HEAD(&file_hashtbl[i]);
@@ -3156,6 +3544,7 @@ nfs4_state_init(void)
 	for (i = 0; i < CLIENT_HASH_SIZE; i++)
 		INIT_LIST_HEAD(&reclaim_str_hashtbl[i]);
 	reclaim_str_hashtbl_size = 0;
+	nfs4_pnfs_state_init();
 }
 
 static void
@@ -3308,3 +3697,386 @@ nfs4_reset_lease(time_t leasetime)
 	user_lease_time = leasetime;
 	unlock_kernel();
 }
+
+#if defined(CONFIG_PNFS)
+
+/* Called under the state lock. */
+static void
+pnfs_unhash_layout(struct nfs4_layout *lp)
+{
+	list_del_init(&lp->lo_perfile);
+	list_del_init(&lp->lo_perclnt);
+}
+
+static void
+free_nfs4_layout(struct kref *kref)
+{
+	struct nfs4_layout *lp;
+	struct nfs4_file *fp;
+	struct nfsd4_pnfs_layoutreturn lr;
+	struct inode *ino;
+
+	lp = container_of(kref, struct nfs4_layout, lo_ref);
+	pnfs_unhash_layout(lp);
+
+	fp = lp->lo_file;
+	ino = fp->fi_inode;
+
+	dprintk("pNFS %s: lp %p fp %p ino %p\n", __FUNCTION__, lp, fp, ino);
+	lr.lr_reclaim = 0;
+	lr.lr_layout_type = lp->lo_layout_type;
+	lr.lr_iomode = lp->lo_iomode;
+	lr.lr_return_type = LAYOUTRETURN_FILE;
+	lr.lr_offset = lp->lo_offset;
+	lr.lr_length = lp->lo_length;
+	lr.lr_flags = 0; /* last return */
+
+//??? recall layout
+
+	if (ino->i_sb->s_export_op->layout_return)
+		ino->i_sb->s_export_op->layout_return(ino, &lr);
+
+	kmem_cache_free(pnfs_layout_slab, lp);
+	put_nfs4_file(fp);
+}
+
+static void
+nfs4_put_layout(struct nfs4_layout *lp)
+{
+	dprintk("pNFS %s: lo_ref %d fi_ref %d\n", __FUNCTION__,
+				atomic_read(&lp->lo_ref.refcount),
+				atomic_read(&lp->lo_file->fi_ref.refcount));
+	kref_put(&lp->lo_ref, free_nfs4_layout);
+}
+
+static inline void
+get_nfs4_layout(struct nfs4_layout *lp)
+{
+	kref_get(&lp->lo_ref);
+	dprintk("pNFS %s: lo_ref %d fi_ref %d\n", __FUNCTION__,
+				atomic_read(&lp->lo_ref.refcount),
+				atomic_read(&lp->lo_file->fi_ref.refcount));
+}
+
+static void
+pnfs_hash_layoutget(struct nfs4_layout *lp)
+{
+	list_add(&lp->lo_perfile, &lp->lo_file->fi_layouts);
+	list_add(&lp->lo_perclnt, &lp->lo_client->cl_layouts);
+}
+
+static void
+pnfs_hash_cb_layout(struct nfs4_layout *lp)
+{
+	list_add(&lp->lo_recall_lru, &layout_recall_lru);
+}
+
+static struct nfs4_layout *
+pnfs_alloc_init_layout(struct nfs4_file *fp, struct nfs4_client *clp, struct svc_fh *current_fh, struct nfsd4_pnfs_layoutget *lg)
+{
+	struct nfs4_layout *lp;
+	struct nfs4_callback *cb = &clp->cl_callback;
+	struct inode *ino = current_fh->fh_dentry->d_inode;
+
+	dprintk("NFSD alloc_init_layout\n");
+	lp = kmem_cache_alloc(pnfs_layout_slab, GFP_KERNEL);
+	if (lp == NULL)
+		return lp;
+
+	kref_init(&lp->lo_ref);
+	INIT_LIST_HEAD(&lp->lo_perfile);
+	INIT_LIST_HEAD(&lp->lo_perclnt);
+	INIT_LIST_HEAD(&lp->lo_recall_lru);
+
+	lp->lo_file = fp;
+	lp->lo_time = 0;
+	memset(&lp->lo_cb_layout, 0, sizeof(struct nfs4_cb_layout));
+	lp->lo_client = clp;
+	lp->lo_sb = ino->i_sb;
+	lp->lo_ident = cb->cb_ident;
+	lp->lo_fhlen = current_fh->fh_handle.fh_size;
+	memcpy(lp->lo_fhval, &current_fh->fh_handle.fh_base,
+		        current_fh->fh_handle.fh_size);
+	lp->lo_layout_type = lg->lg_type;
+	lp->lo_iomode = lg->lg_iomode;
+	lp->lo_offset = lg->lg_offset;
+	lp->lo_length = lg->lg_length;
+	num_layouts++;
+	pnfs_hash_layoutget(lp);
+	get_nfs4_file(lp->lo_file);
+	dprintk("NFSD alloc_init_layout exit\n");
+	return lp;
+}
+
+/*
+ * get_state() and cb_get_state() are
+ */
+static void
+release_pnfs_ds_dev_list(struct nfs4_stateid *stp)
+{
+	struct pnfs_ds_dev_entry *ddp;
+
+        while (!list_empty(&stp->st_pnfs_ds_id)) {
+                ddp = list_entry(stp->st_pnfs_ds_id.next,
+                                struct pnfs_ds_dev_entry, dd_dev_entry);
+		list_del(&ddp->dd_dev_entry);
+                kfree(ddp);
+        }
+}
+
+static int
+nfs4_add_pnfs_ds_dev(struct nfs4_stateid *stp, u32 devid)
+{
+	struct pnfs_ds_dev_entry *ddp;
+
+	ddp = kmalloc(sizeof(*ddp), GFP_KERNEL);
+	if (!ddp)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&ddp->dd_dev_entry);
+	list_add(&ddp->dd_dev_entry, &stp->st_pnfs_ds_id);
+	ddp->dd_devid = devid;
+	return 0;
+}
+
+static struct nfs4_layout *
+find_layout(struct nfs4_file *fp, struct nfs4_client *clp)
+{
+	struct nfs4_layout *lp;
+
+	list_for_each_entry (lp, &fp->fi_layouts, lo_perfile) {
+	        //??? if the right layout
+		if (lp->lo_client == clp)
+			return lp;
+	}
+	return NULL;
+}
+
+int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
+				struct nfsd4_pnfs_layoutget *lgp)
+{
+	int status = -ENOENT;
+	struct inode *ino = current_fh->fh_dentry->d_inode;
+	struct nfs4_file *fp;
+	struct nfs4_client *clp;
+	struct nfs4_layout *lp;
+	struct nfsd4_pnfs_layoutreturn lr;
+
+	dprintk("NFSD: nfs4_pnfs_get_layout\n");
+
+	fp = find_file(ino);
+	if (!fp) {
+		fp = alloc_init_file(ino);
+		if (fp == NULL)
+			goto out;
+	}
+	clp = find_confirmed_client((clientid_t *)&lgp->lg_clientid);
+	dprintk("pNFS %s: clp %p \n", __FUNCTION__, clp);
+	if (!clp)
+	        goto out;
+
+	lgp->lg_flags = 0;
+	lp = find_layout(fp, clp);
+	if (lp)
+		lgp->lg_flags = 1; /* update layout */
+	if (sb->s_export_op->layout_get) {
+		status = sb->s_export_op->layout_get(current_fh->fh_dentry->d_inode,
+					(void *)lgp);
+
+		dprintk("pNFS %s: status %d type %d maxcount %d \n",
+			__FUNCTION__, status, lgp->lg_type, lgp->lg_mxcnt);
+
+		switch (status) {
+			case 0:
+				break;
+			case -ENOMEM:
+			case -EAGAIN:
+			case -EINTR:
+				status = nfserr_layouttrylater;
+				break;
+			case -ENOENT:
+				status = nfserr_badlayout;
+				break;
+			default:
+				status = nfserr_layoutunavailable;
+		}
+		if (status)
+			goto out;
+
+		if (!lp) {
+			lp = pnfs_alloc_init_layout(fp, clp, current_fh, lgp);
+		}
+		if (lp) {
+			dprintk("pNFS %s: lp %p\n", __FUNCTION__, lp);
+			goto out;
+		}
+		status = nfserr_layouttrylater;
+
+		if (lgp->lg_ops->layout_encode == NULL &&
+				lgp->lg_type == LAYOUT_NFSV4_FILES)
+			filelayout_free_layout(lgp->lg_layout);
+		else
+			lgp->lg_ops->layout_free(lgp->lg_layout);
+
+		lr.lr_reclaim = 0;
+		lr.lr_layout_type = lgp->lg_type;
+		lr.lr_iomode = lgp->lg_iomode;
+		lr.lr_return_type = LAYOUTRETURN_FILE;
+		lr.lr_offset = lgp->lg_offset;
+		lr.lr_length = lgp->lg_length;
+		lr.lr_flags = lgp->lg_flags;
+		if (sb->s_export_op->layout_return)
+			sb->s_export_op->layout_return(ino, &lr);
+	}
+out:
+	if (fp)
+		put_nfs4_file(fp);
+
+	dprintk("pNFS %s: exit status %d \n", __FUNCTION__, status);
+	return status;
+}
+
+int nfs4_pnfs_return_layout(struct super_block *sb, struct svc_fh *current_fh,
+				struct nfsd4_pnfs_layoutreturn *lrp)
+{
+	int status = -ENOENT;
+	struct inode *ino = current_fh->fh_dentry->d_inode;
+	struct nfs4_file *fp;
+	struct nfs4_client *clp;
+	struct nfs4_layout *lp;
+
+	dprintk("NFSD: nfs4_pnfs_return_layout\n");
+
+	fp = find_file(ino);
+	if (!fp)
+		goto out;
+
+	dprintk("pNFS %s: fp %p\n", __FUNCTION__, fp);
+
+	clp = find_confirmed_client((clientid_t *)&lrp->lr_clientid);
+	dprintk("pNFS %s: clp %p \n", __FUNCTION__, clp);
+	if (!clp)
+	        goto out;
+
+	lp = find_layout(fp, clp);
+	dprintk("pNFS %s: lp %p\n", __FUNCTION__, lp);
+
+	if (lp) {
+		nfs4_put_layout(lp);
+		status = 0;
+	}
+	put_nfs4_file(fp);
+out:
+	dprintk("pNFS %s: exit status %d \n", __FUNCTION__, status);
+	return status;
+}
+
+
+/*
+ * PNFS Metadata server export operations callback for get_state
+ *
+ * called by the cluster fs when it receives a get_state() from a data
+ * server.
+ * returns status, or pnfs_get_state* with pnfs_get_state->status set.
+ *
+ */
+int
+nfs4_pnfs_cb_get_state(struct pnfs_get_state *arg)
+{
+	struct nfs4_stateid *stp;
+	int flags = LOCK_STATE | OPEN_STATE; /* search both hash tables */
+	int status = -EINVAL;
+
+	dprintk("NFSD: %s=(%08x/%08x/%08x/%08x)\n\n",
+				__func__,
+				arg->stid.si_boot,
+				arg->stid.si_stateownerid,
+				arg->stid.si_fileid,
+				arg->stid.si_generation);
+
+	stp = find_stateid(&arg->stid, flags);
+	if (!stp)
+		goto out;
+
+	/* XXX ANDROS: marc removed nfs4_check_fh - how come? */
+
+	/* arg->devid is the Data server id, set by the cluster fs */
+	if ((status = nfs4_add_pnfs_ds_dev(stp, arg->devid)) != 0)
+		goto out;
+
+	arg->access = stp->st_access_bmap;
+	arg->clid = stp->st_stateowner->so_client->cl_clientid;
+
+out:
+	return status;
+}
+
+/*
+ * Recall a layout
+ */
+static int
+do_layout_recall(void *__lr)
+{
+	struct nfs4_cb_layout *lr = __lr;
+	struct nfs4_client *clp = NULL;
+        unsigned int i;
+
+	daemonize("nfsv4-layout");
+
+	if (lr->cbl_recall_type == RECALL_ALL) {
+		for (i = 0; i < CLIENT_HASH_SIZE; i++) {
+			list_for_each_entry(clp, &conf_str_hashtbl[i], cl_strhash) {
+				if (clp) {
+					if (!clp->cl_callback.cb_client)
+						continue;
+//??? check if this client has any layouts
+					lr->cbl_client = clp;
+					nfsd4_cb_layout(lr);
+				}
+			}
+		}
+	}
+	if (lr->cbl_recall_type == RECALL_FSID) {
+		for (i = 0; i < CLIENT_HASH_SIZE; i++) {
+			list_for_each_entry(clp, &conf_str_hashtbl[i], cl_strhash) {
+				if (clp) {
+					if (!clp->cl_callback.cb_client)
+						continue;
+//??? check if this client has any layouts for this FSID
+					lr->cbl_client = clp;
+					nfsd4_cb_layout(lr);
+				}
+			}
+		}
+	}
+	if (lr->cbl_recall_type == RECALL_FILE) {
+//??? find layout for this file (given by inode)
+		if (lr->cbl_client)
+			nfsd4_cb_layout(lr);
+	}
+	return 0;
+}
+
+/*
+ * Spawn a thread to perform a recall layout
+ *
+ */
+void nfsd_layout_recall_cb(struct nfs4_cb_layout *lr)
+{
+	struct task_struct *t;
+
+	dprintk("NFSD nfsd_layout_recall_cb: lp %p\n",lr);
+	if (!lr)
+		return;
+
+	t = kthread_run(do_layout_recall, lr, "%s", "nfs4_cb_recall");
+	if (IS_ERR(t)) {
+		struct nfs4_client *clp = lr->cbl_client;
+
+		printk(KERN_INFO "NFSD: Callback thread failed for "
+			"for client (clientid %08x/%08x)\n",
+			clp->cl_clientid.cl_boot, clp->cl_clientid.cl_id);
+	}
+}
+
+#endif /* CONFIG_PNFS */

@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 18
-EXTRAVERSION = .3
+EXTRAVERSION = .3-largeio-pnfs
 NAME=Avast! A bilge rat!
 
 # *DOCUMENTATION*

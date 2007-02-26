@@ -85,3 +85,49 @@ out:
 	dprintk("%s: exit with status = %d\n", __FUNCTION__, ntohl(res));
 	return res;
 }
+
+/*
+ * Layout is not actually returned until the client executes the
+ * LAYOUTRETURN operation.
+ * The general semantics are that once a layout has been recalled,
+ * all in flight I/O ops are completed and then LAYOUTRETURN is called.
+ *
+ * XXX The layout driver needs to choose to write all buffered I/O using:
+ * 	1) the layoutdriver if still available or
+ * 	2) the NFSv4 READ/WRITE ops after the layout is returned
+ */
+unsigned nfs4_callback_pnfs_layoutrecall(struct cb_pnfs_layoutrecallargs *args, void *dummy)
+{
+	struct nfs4_client *clp;
+	struct inode *inode = NULL;
+	unsigned res = -ENOENT;
+
+	res = htonl(NFS4ERR_BADHANDLE);
+	clp = nfs4_find_client(&args->cbl_addr->sin_addr);
+	if (clp == NULL)
+		goto out;
+
+	if (args->cbl_recall_type == RECALL_FILE) {
+		inode = nfs_layout_find_inode(clp, &args->cbl_fh);
+		if (inode == NULL)
+			goto out_putclient;
+	}
+	/* Set up a helper thread to actually return the delegation */
+	switch(nfs_async_return_layout(clp, inode, &args->cbl_fsid)) {
+		case 0:
+			res = 0;
+			break;
+		case -ENOENT:
+			res = htonl(NFS4ERR_NOENT);
+			break;
+		default:
+			res = htonl(NFS4ERR_RESOURCE);
+	}
+	if (inode)
+		iput(inode);
+out_putclient:
+	nfs4_put_client(clp);
+out:
+	dprintk("%s: exit with status = %d\n", __FUNCTION__, ntohl(res));
+	return res;
+}

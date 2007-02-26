@@ -41,6 +41,7 @@
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/nfs_fs.h>
+#include <linux/nfs4_pnfs.h>
 #include <linux/nfs_idmap.h>
 #include <linux/kthread.h>
 #include <linux/module.h>
@@ -50,7 +51,9 @@
 #include "nfs4_fs.h"
 #include "callback.h"
 #include "delegation.h"
+#include "pnfs.h"
 
+#define NFSDBG_FACILITY NFSDBG_VFS
 #define OPENOWNER_POOL_SIZE	8
 
 const nfs4_stateid zero_stateid;
@@ -194,12 +197,25 @@ nfs4_put_client(struct nfs4_client *clp)
 
 static int nfs4_init_client(struct nfs4_client *clp, struct rpc_cred *cred)
 {
-	int status = nfs4_proc_setclientid(clp, NFS4_CALLBACK,
+        int status = 0;
+
+        if (clp->cl_minorversion == 0) {
+                status = nfs4_proc_setclientid(clp, NFS4_CALLBACK,
 			nfs_callback_tcpport, cred);
+                dprintk("setclientid status: %d\n", status);
 	if (status == 0)
 		status = nfs4_proc_setclientid_confirm(clp, cred);
+                dprintk("setclientid_conf status: %d\n", status);
 	if (status == 0)
 		nfs4_schedule_state_renewal(clp);
+        }
+        else {
+                /* We need to re establish a session. Free the previous session
+                 * struct and re establish a session
+                 */
+                status = nfs41_proc_setup_session(clp);
+        }
+
 	return status;
 }
 
@@ -509,8 +525,20 @@ void nfs4_close_state(struct nfs4_state *state, mode_t mode)
 	spin_unlock(&inode->i_lock);
 	spin_unlock(&owner->so_lock);
 
-	if (oldstate != newstate && nfs4_do_close(inode, state) == 0)
+	if (oldstate != newstate) {
+		if (pnfs_enabled_sb(NFS_SERVER(inode))) {
+			if (NFS_I(inode)->layoutcommit_ctx) {
+				pnfs_layoutcommit_inode(inode, 0);
+			}
+			/* TODO: make finer grained returns here */
+			if (NFS_I(inode)->current_layout &&
+			    NFS_I(inode)->current_layout->roc_iomode) {
+				pnfs_return_layout(inode);
+			}
+		}
+		if (nfs4_do_close(inode, state) == 0)
 		return;
+	}
 	nfs4_put_open_state(state);
 	nfs4_put_state_owner(owner);
 }
@@ -923,7 +951,11 @@ restart_loop:
 	cred = nfs4_get_renew_cred(clp);
 	if (cred != NULL) {
 		/* Yes there are: try to renew the old lease */
+                if (clp->cl_minorversion == 0)
 		status = nfs4_proc_renew(clp, cred);
+                else
+                        status = nfs4_proc_sequence(clp, cred);
+
 		switch (status) {
 			case 0:
 			case -NFS4ERR_CB_PATH_DOWN:

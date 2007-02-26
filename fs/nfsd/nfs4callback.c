@@ -59,10 +59,12 @@ static const struct rpc_call_ops nfs4_cb_null_ops;
 enum {
         NFSPROC4_CLNT_CB_NULL = 0,
 	NFSPROC4_CLNT_CB_RECALL,
+	NFSPROC4_CLNT_CB_LAYOUT,
 };
 
 enum nfs_cb_opnum4 {
 	OP_CB_RECALL            = 4,
+	OP_CB_LAYOUT            = 5,
 };
 
 #define NFS4_MAXTAGLEN		20
@@ -81,6 +83,12 @@ enum nfs_cb_opnum4 {
 
 #define NFS4_dec_cb_recall_sz		(cb_compound_dec_hdr_sz  +      \
 					op_dec_sz)
+#define NFS4_enc_cb_layout_sz		(cb_compound_enc_hdr_sz +       \
+					1 + enc_stateid_sz +            \
+					enc_nfs4_fh_sz)
+
+#define NFS4_dec_cb_layout_sz		(cb_compound_dec_hdr_sz  +      \
+					op_dec_sz)
 
 /*
 * Generic encode routines from fs/nfs/nfs4xdr.c
@@ -97,6 +105,10 @@ xdr_writemem(u32 *p, const void *ptr, int nbytes)
 }
 
 #define WRITE32(n)               *p++ = htonl(n)
+#define WRITE64(n)               do {				\
+	*p++ = htonl((u32)((n) >> 32));				\
+	*p++ = htonl((u32)(n));					\
+} while (0)
 #define WRITEMEM(ptr,nbytes)     do {                           \
 	p = xdr_writemem(p, ptr, nbytes);                       \
 } while (0)
@@ -231,6 +243,40 @@ encode_cb_recall(struct xdr_stream *xdr, struct nfs4_cb_recall *cb_rec)
 }
 
 static int
+encode_cb_layout(struct xdr_stream *xdr, struct nfs4_cb_layout *lr)
+{
+	u32 *p;
+	int len = lr->cbl_fhlen;
+
+	RESERVE_SPACE(48 + len);
+
+	WRITE32(OP_CB_LAYOUT);
+	WRITE32(lr->cbl_layout_type);
+	WRITE32(lr->cbl_iomode);
+	WRITE32(lr->cbl_layoutchanged);
+	WRITE32(lr->cbl_recall_type);
+	if (lr->cbl_recall_type == RECALL_FSID) {
+		WRITE64(lr->cbl_fsid.major);
+		WRITE64(lr->cbl_fsid.minor);
+		dprintk("%s: type %d iomode %d changed %d recall_type %d fsid 0x%llx-0x%llx\n",
+			__FUNCTION__, lr->cbl_layout_type, lr->cbl_iomode,
+			lr->cbl_layoutchanged, lr->cbl_recall_type,
+			lr->cbl_fsid.major, lr->cbl_fsid.minor);
+	}
+	else if (lr->cbl_recall_type == RECALL_FILE) {
+		WRITE32(len);
+		WRITEMEM(lr->cbl_fhval, len);
+		WRITE64(lr->cbl_offset);
+		WRITE64(lr->cbl_length);
+		dprintk("%s: type %d iomode %d changed %d recall_type %d offset %lld length %lld\n",
+			__FUNCTION__, lr->cbl_layout_type, lr->cbl_iomode,
+			lr->cbl_layoutchanged, lr->cbl_recall_type,
+			lr->cbl_offset,	lr->cbl_length);
+	}
+	return 0;
+}
+
+static int
 nfs4_xdr_enc_cb_null(struct rpc_rqst *req, u32 *p)
 {
 	struct xdr_stream xdrs, *xdr = &xdrs;
@@ -254,6 +300,21 @@ nfs4_xdr_enc_cb_recall(struct rpc_rqst *req, u32 *p, struct nfs4_cb_recall *args
 	return (encode_cb_recall(&xdr, args));
 }
 
+static int
+nfs4_xdr_enc_cb_layout(struct rpc_rqst *req, u32 *p, struct nfs4_cb_layout *args)
+{
+	struct xdr_stream xdr;
+
+	struct nfs4_cb_compound_hdr hdr = {
+		.ident = args->cbl_ident,
+		.nops   = 1,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_cb_compound_hdr(&xdr, &hdr);
+
+	return (encode_cb_layout(&xdr, args));
+}
 
 static int
 decode_cb_compound_hdr(struct xdr_stream *xdr, struct nfs4_cb_compound_hdr *hdr){
@@ -312,6 +373,22 @@ out:
 	return status;
 }
 
+static int
+nfs4_xdr_dec_cb_layout(struct rpc_rqst *rqstp, u32 *p)
+{
+	struct xdr_stream xdr;
+	struct nfs4_cb_compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_cb_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_cb_op_hdr(&xdr, OP_CB_LAYOUT);
+out:
+	return status;
+}
+
 /*
  * RPC procedure tables
  */
@@ -332,6 +409,7 @@ out:
 static struct rpc_procinfo     nfs4_cb_procedures[] = {
     PROC(CB_NULL,      NULL,     enc_cb_null,     dec_cb_null),
     PROC(CB_RECALL,    COMPOUND,   enc_cb_recall,      dec_cb_recall),
+    PROC(CB_LAYOUT,    COMPOUND,   enc_cb_layout,      dec_cb_layout),
 };
 
 static struct rpc_version       nfs_cb_version4 = {
@@ -544,5 +622,58 @@ out:
 	 * or deleg_return. */
 	dprintk("NFSD: nfs4_cb_recall: dp %p dl_flock %p dl_count %d\n",dp, dp->dl_flock, atomic_read(&dp->dl_count));
 	nfs4_put_delegation(dp);
+	return;
+}
+
+/*
+ * called with dp->dl_count inc'ed.
+ * nfs4_lock_state() may or may not have been called.
+ */
+void
+nfsd4_cb_layout(struct nfs4_cb_layout *cbl)
+{
+	struct nfs4_client *clp = cbl->cbl_client;
+	struct rpc_clnt *clnt = NULL;
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_cb_procedures[NFSPROC4_CLNT_CB_LAYOUT],
+		.rpc_argp = cbl,
+	};
+	int retries = 1;
+	int status = 0;
+
+	if (clp)
+		clnt = clp->cl_callback.cb_client;
+
+	if ((!atomic_read(&clp->cl_callback.cb_set)) || !clnt)
+		return;
+
+	msg.rpc_cred = nfsd4_lookupcred(clp, 0);
+	if (IS_ERR(msg.rpc_cred))
+		goto out;
+
+	status = rpc_call_sync(clnt, &msg, RPC_TASK_SOFT);
+	while (retries--) {
+		switch (status) {
+			case -EIO:
+				/* Network partition? */
+			case -EBADHANDLE:
+				break;
+			default:
+				goto out_put_cred;
+		}
+		ssleep(2);
+		status = rpc_call_sync(clnt, &msg, RPC_TASK_SOFT);
+	}
+
+out_put_cred:
+	put_rpccred(msg.rpc_cred);
+
+out:
+	if (status == -EIO)
+		atomic_set(&clp->cl_callback.cb_set, 0);
+	/* Success or failure, now we're either waiting for lease expiration
+	   or layout_return. */
+	dprintk("NFSD: nfsd4_cb_layout: status %d\n", status);
+
 	return;
 }

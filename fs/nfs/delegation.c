@@ -15,9 +15,13 @@
 #include <linux/nfs4.h>
 #include <linux/nfs_fs.h>
 #include <linux/nfs_xdr.h>
+#include <linux/writeback.h>
 
 #include "nfs4_fs.h"
 #include "delegation.h"
+#include "pnfs.h"
+
+#define NFSDBG_FACILITY NFSDBG_CALLBACK
 
 static struct nfs_delegation *nfs_alloc_delegation(void)
 {
@@ -306,6 +310,15 @@ struct recall_threadargs {
 	int result;
 };
 
+struct recall_layout_threadargs {
+	struct inode *inode;
+	struct nfs4_client *clp;
+	const nfs4_stateid *stateid;
+        struct nfs_fsid fsid;
+	struct completion started;
+	int result;
+};
+
 static int recall_thread(void *data)
 {
 	struct recall_threadargs *args = (struct recall_threadargs *)data;
@@ -345,6 +358,80 @@ static int recall_thread(void *data)
 	module_put_and_exit(0);
 }
 
+static int recall_layout_thread(void *data)
+{
+	struct inode *inode;
+	struct nfs4_client *clp;
+	struct nfs_server *server= NULL;
+	struct super_block *sb = NULL;
+	struct recall_layout_threadargs *args = (struct recall_layout_threadargs *)data;
+	int found = 0;
+
+	daemonize("nfsv4-layoutreturn");
+
+	dprintk("%s: fsid 0x%llx-0x%llx start\n",
+		__FUNCTION__, args->fsid.major, args->fsid.minor);
+
+	clp = args->clp;
+	args->result = 0;
+	complete(&args->started);
+
+//??? commit the files first ???
+
+	if (args->inode != NULL) {
+		pnfs_return_layout(args->inode);
+		goto out;
+	}
+
+	down_read(&clp->cl_sem);
+	list_for_each_entry(server, &clp->cl_superblocks, nfs4_siblings) {
+		dprintk("%s: fsid 0x%llx-0x%llx 0x%llx-0x%llx\n",
+			__FUNCTION__, args->fsid.major, args->fsid.minor,
+			server->fsid.major, server->fsid.minor);
+
+		if (server->fsid.major == args->fsid.major &&
+			server->fsid.minor == args->fsid.minor) {
+			found = 1;
+			break;
+		}
+	}
+
+	up_read(&clp->cl_sem);
+
+        if (found) {
+		sb = server->sb;
+		if (!sb)
+			goto out;
+	}
+	else
+		goto out;
+
+	/* XXX UGLY UGLY hack alert! */
+	do {
+		found = 0;
+		spin_lock(&inode_lock);
+		list_for_each_entry(inode, &sb->s_inodes, i_sb_list) {
+			if (NFS_I(inode)->current_layout) {
+				found = 1;
+				break;
+			}
+		}
+		spin_unlock(&inode_lock);
+
+		if (found) {
+			igrab(inode);
+			pnfs_return_layout(inode);
+			iput(inode);
+		}
+
+	} while(found);
+
+out:
+	module_put_and_exit(0);
+	printk("%s: exit status %d\n", __FUNCTION__, args->result);
+	return 0;
+}
+
 /*
  * Asynchronous delegation recall!
  */
@@ -369,6 +456,30 @@ out_module_put:
 }
 
 /*
+ * Asynchronous layout recall!
+ */
+int nfs_async_return_layout(struct nfs4_client *clp, struct inode *inode, struct nfs_fsid *fsid)
+{
+	struct recall_layout_threadargs data = {
+		.clp = clp,
+		.inode = inode,
+		.fsid = *fsid,
+	};
+	int status;
+
+	init_completion(&data.started);
+	__module_get(THIS_MODULE);
+	status = kernel_thread(recall_layout_thread, &data, CLONE_KERNEL);
+	if (status < 0)
+		goto out_module_put;
+	wait_for_completion(&data.started);
+	return data.result;
+out_module_put:
+	module_put(THIS_MODULE);
+	return status;
+}
+
+/*
  * Retrieve the inode associated with a delegation
  */
 struct inode *nfs_delegation_find_inode(struct nfs4_client *clp, const struct nfs_fh *fhandle)
@@ -383,6 +494,31 @@ struct inode *nfs_delegation_find_inode(struct nfs4_client *clp, const struct nf
 		}
 	}
 	spin_unlock(&clp->cl_lock);
+	return res;
+}
+
+/*
+ * Retrieve the inode associated with a layout
+ */
+struct inode *nfs_layout_find_inode(struct nfs4_client *clp, const struct nfs_fh *fhandle)
+{
+	struct nfs4_state_owner *sp;
+	struct nfs4_state *state;
+	struct inode *res = NULL;
+
+	/* Reset all sequence ids to zero */
+	list_for_each_entry(sp, &clp->cl_state_owners, so_list) {
+		spin_lock(&sp->so_lock);
+		list_for_each_entry(state, &sp->so_states, open_states) {
+			if (nfs_compare_fh(fhandle, &NFS_I(state->inode)->fh) == 0) {
+				res = igrab(state->inode);
+				break;
+			}
+		}
+		spin_unlock(&sp->so_lock);
+		if (res)
+			break;
+	}
 	return res;
 }
 

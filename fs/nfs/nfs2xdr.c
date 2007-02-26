@@ -31,6 +31,8 @@
 /* Mapping from NFS error code to "errno" error code. */
 #define errno_NFSERR_IO		EIO
 
+int nfs_stat_to_errno(int stat);
+
 /*
  * Declare the space requirements for NFS arguments and replies as
  * number of 32bit-words

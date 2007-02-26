@@ -124,6 +124,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 	rqstp->rq_reffh = fh;
 
 	if (!fhp->fh_dentry) {
+		int fsid_type;
 		__u32 *datap=NULL;
 		__u32 tfh[3];		/* filehandle fragment for oldstyle filehandles */
 		int fileid_type;
@@ -145,7 +146,11 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 			case 0: break;
 			default: goto out;
 			}
-			len = key_len(fh->fh_fsid_type) / 4;
+			if  (fh->fh_fsid_type >= max_fsid_type) /* pNFS */
+				fsid_type = fh->fh_fsid_type - max_fsid_type;
+			else
+				fsid_type = fh->fh_fsid_type;
+			len = key_len(fsid_type) / 4;
 			if (len == 0) goto out;
 			if  (fh->fh_fsid_type == 2) {
 				/* deprecated, convert to type 3 */
@@ -155,7 +160,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 				fh->fh_fsid[1] = fh->fh_fsid[2];
 			}
 			if ((data_left -= len)<0) goto out;
-			exp = exp_find(rqstp->rq_client, fh->fh_fsid_type, datap, &rqstp->rq_chandle);
+			exp = exp_find(rqstp->rq_client, fsid_type, datap, &rqstp->rq_chandle);
 			datap += len;
 		} else {
 			dev_t xdev;

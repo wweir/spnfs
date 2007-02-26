@@ -37,6 +37,7 @@
 #include <linux/vfs.h>
 #include <linux/inet.h>
 #include <linux/nfs_xdr.h>
+#include <linux/nfs4_pnfs.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -46,6 +47,7 @@
 #include "delegation.h"
 #include "iostat.h"
 #include "internal.h"
+#include "pnfs.h"
 
 #define NFSDBG_FACILITY		NFSDBG_VFS
 #define NFS_PARANOIA 1
@@ -244,7 +246,7 @@ nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		 */
 		inode->i_op = NFS_SB(sb)->rpc_ops->file_inode_ops;
 		if (S_ISREG(inode->i_mode)) {
-			inode->i_fop = &nfs_file_operations;
+			inode->i_fop = NFS_SB(sb)->rpc_ops->file_ops;
 			inode->i_data.a_ops = &nfs_file_aops;
 			inode->i_data.backing_dev_info = &NFS_SB(sb)->backing_dev_info;
 		} else if (S_ISDIR(inode->i_mode)) {
@@ -903,13 +905,23 @@ static int nfs_update_inode(struct inode *inode, struct nfs_fattr *fattr)
 			&& !nfs_fsid_equal(&server->fsid, &fattr->fsid))
 		server->fsid = fattr->fsid;
 
+#ifdef CONFIG_NFS_V4 /* XXX CONFIG_PNFS */
+	/*
+	 * file needs layout commit, server attributes may be stale
+	 */
+	if (nfsi->layoutcommit_ctx && nfsi->change_attr >= fattr->change_attr) {
+		dprintk("NFS: %s: layoutcommit is needed for file %s/%ld\n",
+		        __FUNCTION__, inode->i_sb->s_id, inode->i_ino);
+		return 0;
+	}
+#endif /* CONFIG_NFS_V4 */
+
 	/*
 	 * Update the read time so we don't revalidate too often.
 	 */
 	nfsi->read_cache_jiffies = fattr->time_start;
 	nfsi->last_updated = jiffies;
 
-	/* Are we racing with known updates of the metadata on the server? */
 	data_stable = nfs_verify_change_attribute(inode, fattr->time_start);
 	if (data_stable)
 		nfsi->cache_validity &= ~(NFS_INO_INVALID_ATTR|NFS_INO_REVAL_PAGECACHE|NFS_INO_INVALID_ATIME);
@@ -925,8 +937,16 @@ static int nfs_update_inode(struct inode *inode, struct nfs_fattr *fattr)
 		if (nfsi->npages == 0) {
 			/* No, but did we race with nfs_end_data_update()? */
 			if (data_stable) {
+#ifdef CONFIG_NFS_V4 /* XXX CONFIG_PNFS */
+				/* File could be have been updated by other pnfs clients */
+				if (!nfsi->layoutcommit_ctx || new_isize > cur_isize) {
 				inode->i_size = new_isize;
 				invalid |= NFS_INO_INVALID_DATA;
+			}
+#else /* CONFIG_NFS_V4 */
+				inode->i_size = new_isize;
+				invalid |= NFS_INO_INVALID_DATA;
+#endif /* CONFIG_NFS_V4 */
 			}
 			invalid |= NFS_INO_INVALID_ATTR;
 		} else if (new_isize > cur_isize) {
@@ -934,8 +954,13 @@ static int nfs_update_inode(struct inode *inode, struct nfs_fattr *fattr)
 			invalid |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA;
 		}
 		nfsi->cache_change_attribute = jiffies;
-		dprintk("NFS: isize change on server for file %s/%ld\n",
-				inode->i_sb->s_id, inode->i_ino);
+		dprintk("NFS: isize change on server for file %s/%ld "
+		        "new=%lld cur=%lld npages=%d data_stable=%d "
+		        "layoutcommit=%d fattr->change_attr %lld nfsi->change_attr %lld\n",
+		        inode->i_sb->s_id, inode->i_ino,
+		        new_isize, cur_isize, nfsi->npages, data_stable,
+		        nfsi->layoutcommit_ctx != NULL,
+		        fattr->change_attr, nfsi->change_attr);
 	}
 
 	/* Check if the mtime agrees */
@@ -1046,6 +1071,10 @@ void nfs4_clear_inode(struct inode *inode)
 	nfs_inode_return_delegation(inode);
 	/* First call standard NFS clear_inode() code */
 	nfs_clear_inode(inode);
+
+	/* Return the layout and free it if this inode has a cached layout */
+	pnfs_return_layout(inode);
+
 	/* Now clear out any remaining state */
 	while (!list_empty(&nfsi->open_states)) {
 		struct nfs4_state *state;
@@ -1077,8 +1106,11 @@ struct inode *nfs_alloc_inode(struct super_block *sb)
 	nfsi->acl_access = ERR_PTR(-EAGAIN);
 	nfsi->acl_default = ERR_PTR(-EAGAIN);
 #endif
-#ifdef CONFIG_NFS_V4
+#ifdef CONFIG_NFS_V4 /* XXX CONFIG_PNFS */
 	nfsi->nfs4_acl = NULL;
+	nfsi->pnfs_layout_state = 0;
+	nfsi->current_layout = NULL;
+	nfsi->layoutcommit_ctx = NULL;
 #endif /* CONFIG_NFS_V4 */
 	return &nfsi->vfs_inode;
 }
@@ -1164,6 +1196,12 @@ static int __init init_nfs_fs(void)
 	if (err)
 		goto out0;
 
+#if defined(CONFIG_NFS_V4)
+	err = pnfs_initialize();
+	if (err)
+                goto out00;
+#endif
+
 #ifdef CONFIG_PROC_FS
 	rpc_proc_register(&nfs_rpcstat);
 #endif
@@ -1173,6 +1211,10 @@ static int __init init_nfs_fs(void)
 out:
 #ifdef CONFIG_PROC_FS
 	rpc_proc_unregister("nfs");
+#endif
+#if defined(CONFIG_NFS_V4) /* XXXX CONFIG_PNFS */
+out00:
+	pnfs_uninitialize();
 #endif
 	nfs_destroy_directcache();
 out0:
@@ -1189,6 +1231,9 @@ out4:
 
 static void __exit exit_nfs_fs(void)
 {
+#if defined(CONFIG_NFS_V4) /* XXX CONFIG_PNFS */
+	pnfs_uninitialize();
+#endif
 	nfs_destroy_directcache();
 	nfs_destroy_writepagecache();
 	nfs_destroy_readpagecache();

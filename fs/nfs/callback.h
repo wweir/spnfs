@@ -20,6 +20,7 @@ enum nfs4_callback_procnum {
 enum nfs4_callback_opnum {
 	OP_CB_GETATTR = 3,
 	OP_CB_RECALL  = 4,
+	OP_CB_LAYOUTRECALL  = 5,
 	OP_CB_ILLEGAL = 10044,
 };
 
@@ -59,8 +60,27 @@ struct cb_recallargs {
 	uint32_t truncate;
 };
 
+enum layout_recall_type {
+	RECALL_FILE = 1,
+	RECALL_FSID = 2,
+	RECALL_ALL  = 3
+};
+
+struct cb_pnfs_layoutrecallargs {
+	struct sockaddr_in	*cbl_addr;
+	struct nfs_fh		cbl_fh;
+	uint64_t		cbl_offset;
+	uint64_t		cbl_length;
+	struct nfs_fsid		cbl_fsid;
+	uint32_t		cbl_recall_type;
+	uint32_t		cbl_layout_type;
+	uint32_t		cbl_iomode;
+	uint32_t		cbl_layoutchanged;
+};
+
 extern unsigned nfs4_callback_getattr(struct cb_getattrargs *args, struct cb_getattrres *res);
 extern unsigned nfs4_callback_recall(struct cb_recallargs *args, void *dummy);
+extern unsigned nfs4_callback_pnfs_layoutrecall(struct cb_pnfs_layoutrecallargs *args, void *dummy);
 
 extern int nfs_callback_up(void);
 extern int nfs_callback_down(void);

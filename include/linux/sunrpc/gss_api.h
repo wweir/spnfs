@@ -8,7 +8,7 @@
  * Bruce Fields <bfields@umich.edu>
  * Copyright (c) 2000 The Regents of the University of Michigan
  *
- * $Id$
+ * $Id: gss_api.h,v 1.1.1.2 2006/12/13 16:12:15 andros Exp $
  */
 
 #ifndef _LINUX_SUNRPC_GSS_API_H
