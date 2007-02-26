@@ -593,14 +593,21 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 		server->namelen = pathinfo.max_namelen;
 
 #ifdef CONFIG_NFS_V4 /* XXX CONFIG_PNFS */
-	/* Set and initialize the layout driver */
-	set_pnfs_layoutdriver(sb, fsinfo.layoutclass);
+	/* XXX: This should probably be in nfs4_fill_super, or some nfsv4 
+	 * specific routine, rather than have such a lame fencing off
+	 */
+	if ((server->nfs4_state) && (server->nfs4_state->cl_minorversion == 1)) {
+		/* Set and initialize the layout driver */
+		set_pnfs_layoutdriver(sb, fsinfo.layoutclass);
 
-	/* Set buffer size for data servers */
-	dssize = pnfs_getiosize(server);
-	if (dssize > 0) {
-		server->ds_rsize = server->ds_wsize = nfs_block_size(dssize, NULL);
-		server->ds_rpages = server->ds_wpages = (server->ds_rsize + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+		/* Set buffer size for data servers */
+		dssize = pnfs_getiosize(server);
+		if (dssize > 0) {
+			server->ds_rsize = server->ds_wsize = 
+					nfs_block_size(dssize, NULL);
+			server->ds_rpages = server->ds_wpages = 
+					(server->ds_rsize + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+		}
 	}
 #else
 	server->pnfs_curr_ld = NULL;

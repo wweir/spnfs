@@ -1702,11 +1702,6 @@ static int nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	};
 	int status;
 
-        if (server->rpc_ops->setup_sequence && (status =
-		server->rpc_ops->setup_sequence(server->nfs4_state->cl_session,
-						&seqargs, &seqres)))
-                        return status;
-
 	/*
 	 * Now we do a separate LOOKUP for each component of the mount path.
 	 * The LOOKUPs are done separately so that we can conveniently
@@ -1731,9 +1726,20 @@ static int nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 
 		do {
 			nfs_fattr_init(fattr);
+        		if (server->rpc_ops->setup_sequence && (status = 
+				server->rpc_ops->setup_sequence(
+				server->nfs4_state->cl_session, 
+				&seqargs, &seqres)))
+	                        return status;
+
 			status = nfs4_handle_exception(server,
 					rpc_call_sync(server->client, &msg, 0),
 					&exception);
+        		if (server->rpc_ops->sequence_done)
+		                server->rpc_ops->sequence_done(
+						server->nfs4_state->cl_session, 
+						&seqres, status);
+			
 		} while (exception.retry);
 		if (status == 0)
 			continue;
@@ -1748,9 +1754,6 @@ static int nfs4_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	if (status == 0)
 		status = nfs4_do_fsinfo(server, fhandle, info);
 out:
-        if (server->rpc_ops->sequence_done)
-                server->rpc_ops->sequence_done(server->nfs4_state->cl_session,
-							&seqres, status);
 
 	return nfs4_map_errors(status);
 }
