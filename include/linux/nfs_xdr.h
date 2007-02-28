@@ -1018,6 +1018,8 @@ struct nfs_rpc_ops {
         int     (*pnfs_layoutreturn)(struct nfs4_pnfs_layoutreturn* layout);
         int     (*pagein_one) (struct list_head *head, struct inode *inode);
         int     (*flush_one) (struct inode *, struct list_head *, int, int);
+	struct nfs4_client *(*get_client) (struct in_addr *addr);
+	void	(*put_client) (struct nfs4_client *);
 };
 
 /*
