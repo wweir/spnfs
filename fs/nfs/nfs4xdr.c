@@ -144,7 +144,8 @@ static int nfs_stat_to_errno(int);
 #define encode_sequence_maxsz 	(op_encode_hdr_maxsz + 4 + 1 + 1 + 1)
 #define decode_sequence_maxsz 	(op_decode_hdr_maxsz + 4 + 1 + 1 + 1 + 1 + 1)
 #define encode_exchange_id_maxsz	(op_encode_hdr_maxsz + 4 + 1 + 6 + 6 + \
-					(NFS4_VERIFIER_SIZE >> 2))
+					(NFS4_VERIFIER_SIZE >> 2)) + 10 + \
+					((3 * NFS4_OPAQUE_LIMIT) >> 2)
 #define decode_exchange_id_maxsz	(op_decode_hdr_maxsz + 2 + 1 + 2 + 1 + \
 						(NFS4_OPAQUE_LIMIT >> 2) + 1 + \
 						(NFS4_OPAQUE_LIMIT >> 2))
@@ -1563,6 +1564,20 @@ static int encode_exchange_id(struct xdr_stream *xdr, struct nfs41_exchange_id_a
 	WRITEMEM(args->verifier->data, sizeof(args->verifier->data));
 
 	encode_string(xdr, args->id_len, args->id);
+
+	RESERVE_SPACE(4);
+	WRITE32(args->flags);
+
+	encode_string(xdr, args->impl_id.domain_len, args->impl_id.domain);
+	encode_string(xdr, args->impl_id.name_len, args->impl_id.name);
+
+	RESERVE_SPACE(12);
+	WRITE64(args->impl_id.date.seconds);
+	WRITE32(args->impl_id.date.nseconds);
+
+	RESERVE_SPACE(12);
+	WRITE64(args->clientid);
+	WRITE32(args->seqid);
 
 	return 0;
 }

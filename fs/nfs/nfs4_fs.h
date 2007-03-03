@@ -94,6 +94,8 @@ struct nfs4_client {
 	 */
 	char			cl_ipaddr[16];
 	unsigned char		cl_id_uniquifier;
+	u32                     cl_session_flags;
+	u32                     cl_exchange_flags;
 };
 
 /*

@@ -335,12 +335,28 @@ struct nfsd4_write {
 	nfs4_verifier	wr_verifier;        /* response */
 };
 
+struct impl_id4 {
+	u32		domain_len;
+	char *		domain;
+	u32		name_len;
+	char *		name;
+	struct nfstime4	date;
+};
+
+#define EXCHGID4_FLAG_SUPP_MOVED_REFER	0x00000001
+#define EXCHGID4_FLAG_SUPP_MOVED_MIGR	0x00000002
+#define EXCHGID4_FLAG_USE_NON_PNFS	0x00010000
+#define EXCHGID4_FLAG_USE_PNFS_MDS	0x00020000
+#define EXCHGID4_FLAG_USE_PNFS_DS	0x00040000
+
 struct nfsd4_exchange_id {
-        nfs4_verifier   verifier;
-        u32             id_len;
-        char *          id;
-        clientid_t      clientid;
-        u32             seqid;
+	nfs4_verifier		verifier;
+	u32			id_len;
+	char *			id;
+	u32			flags;
+	struct impl_id4		impl_id;
+	clientid_t		clientid;
+	u32			seqid;
 };
 
 struct nfsd4_channel {

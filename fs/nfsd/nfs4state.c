@@ -1050,6 +1050,7 @@ int nfsd4_exchange_id(struct svc_rqst *rqstp, struct nfsd4_exchange_id *clid)
         nfs4_verifier           verf = clid->verifier;
         u32                     ip_addr = rqstp->rq_addr.sin_addr.s_addr;
 
+	dprintk("nfsd4_exchange_id flgas %x\n", clid->flags);
         if (!check_name(clname))
                 return nfserr_inval;
 
@@ -1120,7 +1121,10 @@ out_copy:
         clid->clientid.cl_id = new->cl_clientid.cl_id;
 
         new->cl_seqid = clid->seqid = 1;
+        new->cl_exchange_flags = clid->flags;
 
+	dprintk("nfsd4_exchange_id seqid %d flags %x\n",
+				new->cl_seqid, new->cl_exchange_flags);
         status = nfs_ok;
 
 out:
@@ -2260,15 +2264,12 @@ nfs4_laundromat(void)
 				clientid_val = t;
 			break;
 		}
-#if 1 //???
-		dprintk("NFSD: xxx HACK xxx skip purging unused client (clientid %08x)\n",
-			clp->cl_clientid.cl_id);
-#else
-		dprintk("NFSD: purging unused client (clientid %08x)\n",
-			clp->cl_clientid.cl_id);
+		if (clp->cl_exchange_flags & EXCHGID4_FLAG_USE_PNFS_DS)
+			break;
+		dprintk("NFSD: purging unused client(clientid %08x flags %x)\n",
+			clp->cl_clientid.cl_id, clp->cl_exchange_flags);
 		nfsd4_remove_clid_dir(clp);
 		expire_client(clp);
-#endif
 	}
 	INIT_LIST_HEAD(&reaplist);
 	spin_lock(&recall_lock);

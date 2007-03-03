@@ -110,6 +110,8 @@ nfs4_alloc_client(struct in_addr *addr)
 	clp->cl_rpcclient = ERR_PTR(-EINVAL);
 	clp->cl_boot_time = CURRENT_TIME;
 	clp->cl_state = 1 << NFS4CLNT_LEASE_EXPIRED;
+	clp->cl_session_flags = 0;
+	clp->cl_exchange_flags = 0;
 	return clp;
 }
 

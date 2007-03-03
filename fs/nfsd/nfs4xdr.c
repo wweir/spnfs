@@ -880,18 +880,41 @@ nfsd4_decode_setclientid(struct nfsd4_compoundargs *argp, struct nfsd4_setclient
 static int
 nfsd4_decode_exchange_id(struct nfsd4_compoundargs *argp, struct nfsd4_exchange_id *clid)
 {
-        DECODE_HEAD;
+	DECODE_HEAD;
 
-        READ_BUF(NFS4_VERIFIER_SIZE);
-        COPYMEM(clid->verifier.data, NFS4_VERIFIER_SIZE);
+	READ_BUF(NFS4_VERIFIER_SIZE);
+	COPYMEM(clid->verifier.data, NFS4_VERIFIER_SIZE);
 
-        READ_BUF(4);
-        READ32(clid->id_len);
+	READ_BUF(4);
+	READ32(clid->id_len);
 
-        READ_BUF(clid->id_len);
-        SAVEMEM(clid->id, clid->id_len);
+	READ_BUF(clid->id_len);
+	SAVEMEM(clid->id, clid->id_len);
 
-        DECODE_TAIL;
+	READ_BUF(4);
+	READ32(clid->flags);
+
+	READ_BUF(4);
+	READ32(clid->impl_id.domain_len);
+
+	READ_BUF(clid->impl_id.domain_len);
+	SAVEMEM(clid->impl_id.domain, clid->impl_id.domain_len);
+
+	READ_BUF(4);
+	READ32(clid->impl_id.name_len);
+
+	READ_BUF(clid->impl_id.name_len);
+	SAVEMEM(clid->impl_id.name, clid->impl_id.name_len);
+
+	READ_BUF(12);
+	READ64(clid->impl_id.date.seconds);
+	READ32(clid->impl_id.date.nseconds);
+
+	READ_BUF(12);
+	COPYMEM(&clid->clientid, 8);
+	READ32(clid->seqid);
+
+	DECODE_TAIL;
 }
 
 static int

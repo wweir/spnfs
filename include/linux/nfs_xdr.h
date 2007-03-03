@@ -750,10 +750,34 @@ struct nfs4_setclientid {
 	u32				sc_cb_ident;      /* request */
 };
 
+struct nfstime4 {
+	u64	seconds;
+	u32	nseconds;
+};
+
+
+struct nfs_impl_id4 {
+	u32		domain_len;
+	char 		domain[NFS4_OPAQUE_LIMIT];
+	u32		name_len;
+	char 		name[NFS4_OPAQUE_LIMIT];
+	struct nfstime4	date;
+};
+
+#define EXCHGID4_FLAG_SUPP_MOVED_REFER	0x00000001
+#define EXCHGID4_FLAG_SUPP_MOVED_MIGR	0x00000002
+#define EXCHGID4_FLAG_USE_NON_PNFS	0x00010000
+#define EXCHGID4_FLAG_USE_PNFS_MDS	0x00020000
+#define EXCHGID4_FLAG_USE_PNFS_DS	0x00040000
+
 struct nfs41_exchange_id_args {
 	nfs4_verifier *			verifier;
 	unsigned int 			id_len;
 	char 				id[NFS4_OPAQUE_LIMIT];
+	u32				flags;
+	struct nfs_impl_id4		impl_id;
+	clientid4			clientid;
+	u32				seqid;
 };
 
 struct server_owner {

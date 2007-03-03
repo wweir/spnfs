@@ -217,6 +217,10 @@ nfs4_pnfs_device_add(struct filelayout_mount_type *mt,
 		return err;
 	}
 
+	/* Set exchange id and create session flags */
+	dev->clp->cl_session_flags = 0;
+	dev->clp->cl_exchange_flags = EXCHGID4_FLAG_USE_PNFS_DS;
+
 	err = server->rpc_ops->setup_session(dev->clp);
 	if (err)
 		return err;

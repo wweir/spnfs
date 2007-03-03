@@ -4344,6 +4344,16 @@ static int nfs4_proc_exchange_id(struct nfs4_client *clp)
 
         args.verifier = &verifier;
 
+	args.flags = clp->cl_exchange_flags;
+	args.impl_id.domain_len = scnprintf(args.impl_id.domain,
+				sizeof(args.impl_id.domain), "%s", "domain");
+	args.impl_id.name_len = scnprintf(args.impl_id.name,
+				sizeof(args.impl_id.name), "%s", "name");
+	args.impl_id.date.seconds = htonl((u32)clp->cl_boot_time.tv_sec);
+	args.impl_id.date.nseconds = htonl((u32)clp->cl_boot_time.tv_nsec);
+	args.clientid = clp->cl_clientid;
+	args.seqid = 0;
+
 	while (1) {
 	        args.id_len = scnprintf(args.id, sizeof(args.id), "%s/%u.%u.%u.%u %s %u",
 		                clp->cl_ipaddr, NIPQUAD(clp->cl_addr.s_addr),

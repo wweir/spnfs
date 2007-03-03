@@ -141,6 +141,8 @@ struct nfs4_client {
         u32                     cl_seqid;               /* seqid from exchange_id */
 	u32 *                   cl_slots;               /* for slotid management */
 	sessionid_t             cl_sessionid;
+	u32                     cl_session_flags;
+	u32                     cl_exchange_flags;
 };
 
 enum layout_recall_type {
