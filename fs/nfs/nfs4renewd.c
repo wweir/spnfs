@@ -79,15 +79,26 @@ nfs4_renew_state(void *data)
 	/* Are we close to a lease timeout? */
 	if (time_after(now, last + lease/3)) {
 		cred = nfs4_get_renew_cred(clp);
-		if (cred == NULL) {
-			set_bit(NFS4CLNT_LEASE_EXPIRED, &clp->cl_state);
+                if (clp->cl_minorversion == 0) {
+			if (cred == NULL)
+				goto no_cred;
+			dprintk("got renew creds!\n");
 			spin_unlock(&clp->cl_lock);
-			nfs_expire_all_delegations(clp);
-			goto out;
+                        nfs4_proc_async_renew(clp, cred);
+                } else {
+		/* Queue an asynchronous RENEW/SEQUENCE. */
+			if (cred == NULL) {
+				if (IS_ERR(clp->cl_rpcclient))
+					goto no_cred;
+				cred = rpcauth_lookupcred(clp->cl_rpcclient->cl_auth, 0);
+				if (IS_ERR(cred))
+					goto no_cred;
 		}
 		spin_unlock(&clp->cl_lock);
-		/* Queue an asynchronous RENEW. */
-		nfs4_proc_async_renew(clp, cred);
+			if (nfs4_proc_async_sequence(clp, cred))
+				printk(KERN_NOTICE "Could not allocate memory \
+						for SEQUENCE call!\n");
+		}
 		put_rpccred(cred);
 		timeout = (2 * lease) / 3;
 		spin_lock(&clp->cl_lock);
@@ -104,6 +115,13 @@ nfs4_renew_state(void *data)
 out:
 	up_read(&clp->cl_sem);
 	dprintk("%s: done\n", __FUNCTION__);
+	return;
+
+no_cred:
+	printk(KERN_EMERG "couldn't get renew creds!\n");
+	set_bit(NFS4CLNT_LEASE_EXPIRED, &clp->cl_state);
+	nfs_expire_all_delegations(clp);
+	goto out;
 }
 
 /* Must be called with clp->cl_sem locked for writes */
@@ -150,6 +168,7 @@ nfs4_kill_renewd(struct nfs4_client *clp)
 	cancel_delayed_work(&clp->cl_renewd);
 	up_read(&clp->cl_sem);
 	flush_scheduled_work();
+	dprintk("%s: killed renewd\n", __FUNCTION__);
 }
 
 /*

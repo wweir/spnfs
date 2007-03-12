@@ -108,6 +108,41 @@ void nfs_commit_free(struct nfs_write_data *p)
 	mempool_free(p, nfs_commit_mempool);
 }
 
+void nfs4_commit_free(struct nfs_write_data *p)
+{
+        if (p->args.minorversion_info) {
+                kfree(p->args.minorversion_info);
+                kfree(p->res.minorversion_info);
+        }
+        nfs_commit_free(p);
+}
+
+struct nfs_write_data *nfs4_commit_alloc(void)
+{
+        struct nfs_write_data *p;
+
+        p = nfs_commit_alloc();
+
+        if (!p)
+                return NULL;
+
+        p->args.minorversion_info = kzalloc(sizeof(struct nfs41_sequence_args), GFP_KERNEL);
+        if (!p->args.minorversion_info)
+                goto out_free1;
+
+        p->res.minorversion_info = kzalloc(sizeof(struct nfs41_sequence_res), GFP_KERNEL);
+        if (!p->res.minorversion_info)
+                goto out_free2;
+
+        return p;
+
+out_free2:
+        kfree(p->args.minorversion_info);
+out_free1:
+        nfs_commit_free(p);
+        return NULL;
+}
+
 struct nfs_write_data *nfs_writedata_alloc(size_t len)
 {
 	unsigned int pagecount = (len + PAGE_SIZE - 1) >> PAGE_SHIFT;
@@ -137,9 +172,47 @@ static void nfs_writedata_free(struct nfs_write_data *p)
 	mempool_free(p, nfs_wdata_mempool);
 }
 
-void nfs_writedata_release(void *wdata)
+struct nfs_write_data *nfs4_writedata_alloc(size_t len)
 {
-	nfs_writedata_free(wdata);
+        struct nfs_write_data *p;
+
+        p = nfs_writedata_alloc(len);
+
+        if (!p)
+                return NULL;
+
+        p->args.minorversion_info = kzalloc(sizeof(struct nfs41_sequence_args), GFP_KERNEL);
+        if (!p->args.minorversion_info)
+                goto out_free1;
+
+        p->res.minorversion_info = kzalloc(sizeof(struct nfs41_sequence_res), GFP_KERNEL);
+        if (!p->res.minorversion_info)
+                goto out_free2;
+
+        return p;
+
+out_free2:
+        kfree(p->args.minorversion_info);
+out_free1:
+        nfs_writedata_free(p);
+        return NULL;
+}
+
+void nfs_writedata_release(void *data)
+{
+        struct nfs_write_data *wdata = (struct nfs_write_data *)data;
+#ifdef CONFIG_NFS_V4
+        if (wdata->args.minorversion_info) {
+                kfree(wdata->args.minorversion_info);
+                wdata->args.minorversion_info = NULL;
+        }
+
+        if (wdata->res.minorversion_info) {
+                kfree(wdata->res.minorversion_info);
+                wdata->res.minorversion_info = NULL;
+        }
+#endif
+        nfs_writedata_free(wdata);
 }
 
 /* Adjust the file length if we're writing beyond the end */
@@ -1003,7 +1076,12 @@ static int nfs_flush_multi(struct inode *inode, struct list_head *head, int how)
 	do {
 		size_t len = min(nbytes, wsize);
 
-		data = nfs_writedata_alloc(len);
+#ifdef CONFIG_NFS_V4
+                data = nfs4_writedata_alloc(len);
+#else
+                data = nfs_writedata_alloc(len);
+#endif
+
 		if (!data)
 			goto out_bad;
 		list_add(&data->pages, &list);
@@ -1063,7 +1141,11 @@ static int nfs_flush_one(struct inode *inode, struct list_head *head, int how)
 	struct nfs_write_data	*data;
 	unsigned int		count;
 
+#ifdef CONFIG_NFS_V4
+	data = nfs4_writedata_alloc(NFS_SERVER(inode)->wsize);
+#else
 	data = nfs_writedata_alloc(NFS_SERVER(inode)->wsize);
+#endif
 	if (!data)
 		goto out_bad;
 
@@ -1318,7 +1400,11 @@ int nfs_writeback_done(struct rpc_task *task, struct nfs_write_data *data)
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
 void nfs_commit_release(void *wdata)
 {
-	nfs_commit_free(wdata);
+#ifdef CONFIG_NFS_V4
+        nfs4_commit_free(wdata);
+#else
+        nfs_commit_free(wdata);
+#endif
 }
 
 /*

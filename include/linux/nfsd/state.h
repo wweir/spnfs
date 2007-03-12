@@ -47,6 +47,8 @@ typedef struct {
 	u32             cl_id;
 } clientid_t;
 
+typedef unsigned char sessionid_t[16];
+
 typedef struct {
 	u32             so_boot;
 	u32             so_stateownerid;
@@ -132,6 +134,9 @@ struct nfs4_client {
 	struct nfs4_callback	cl_callback;    /* callback info */
 	atomic_t		cl_count;	/* ref count */
 	u32			cl_firststate;	/* recovery dir creation */
+        u32                     cl_seqid;               /* seqid from exchange_id */
+	u32 *                   cl_slots;               /* for slotid management */
+	sessionid_t             cl_sessionid;
 };
 
 /* struct nfs4_client_reset
@@ -273,8 +278,11 @@ struct nfs4_stateid {
 	((err) != nfserr_stale_stateid) &&      \
 	((err) != nfserr_bad_stateid))
 
+struct nfsd4_sequence;
 extern int nfsd4_renew(clientid_t *clid);
-extern int nfs4_preprocess_stateid_op(struct svc_fh *current_fh, 
+extern int nfsd4_sequence(struct svc_rqst *, sessionid_t *,
+		struct nfsd4_sequence *);
+extern int nfs4_preprocess_stateid_op(struct svc_fh *current_fh,
 		stateid_t *stateid, int flags, struct file **filp);
 extern void nfs4_lock_state(void);
 extern void nfs4_unlock_state(void);

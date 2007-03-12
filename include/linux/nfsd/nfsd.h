@@ -27,7 +27,7 @@
  * nfsd version
  */
 #define NFSD_VERSION		"0.5"
-#define NFSD_SUPPORTED_MINOR_VERSION	0
+#define NFSD_SUPPORTED_MINOR_VERSION	1
 
 #ifdef __KERNEL__
 /*
@@ -231,6 +231,17 @@ void		nfsd_lockd_shutdown(void);
 #define	nfserr_badname		__constant_htonl(NFSERR_BADNAME)
 #define	nfserr_cb_path_down	__constant_htonl(NFSERR_CB_PATH_DOWN)
 #define	nfserr_locked		__constant_htonl(NFSERR_LOCKED)
+#define nfserr_seq_misordered	__constant_htonl(NFSERR_SEQ_MISORDERED)
+#define nfserr_bad_session_digest	__constant_htonl(NFSERR_BAD_SESSION_DIGEST)
+#define nfserr_badsession	__constant_htonl(NFSERR_BADSESSION)
+#define nfserr_badslot	__constant_htonl(NFSERR_BADSLOT)
+#define nfserr_complete_already	__constant_htonl(NFSERR_COMPLETE_ALREADY)
+#define nfserr_conn_not_bound_to_session	__constant_htonl(NFSERR_CONN_NOT_BOUND_TO_SESSION)
+#define nfserr_deleg_already_wanted	__constant_htonl(NFSERR_DELEG_ALREADY_WANTED)
+#define nfserr_dirdeleg_unavail	__constant_htonl(NFSERR_DIRDELEG_UNAVAIL)
+#define nfserr_recallconflict	__constant_htonl(NFSERR_RECALLCONFLICT)
+#define nfserr_sequence_pos	__constant_htonl(NFSERR_SEQUENCE_POS)
+
 
 /* error codes for internal use */
 /* if a request fails due to kmalloc failure, it gets dropped.

@@ -1207,6 +1207,7 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 	struct nfs_server *server;
 	struct rpc_timeout timeparms;
 	rpc_authflavor_t authflavour;
+	int i;
 	int err = -EIO;
 
 	sb->s_blocksize_bits = 0;
@@ -1223,8 +1224,6 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 	server->acregmax = data->acregmax*HZ;
 	server->acdirmin = data->acdirmin*HZ;
 	server->acdirmax = data->acdirmax*HZ;
-
-	server->rpc_ops = &nfs_v4_clientops;
 
 	nfs_init_timeout_values(&timeparms, data->proto, data->timeo, data->retrans);
 
@@ -1246,13 +1245,37 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		}
 	}
 
-	server->client = nfs4_create_client(server, &timeparms, data->proto, authflavour);
-	if (IS_ERR(server->client)) {
-		err = PTR_ERR(server->client);
-			dprintk("%s: cannot create RPC client. Error = %d\n",
-					__FUNCTION__, err);
-			goto out_fail;
-	}
+        for (i = NFSV4_MAX_MINORVERSION; i >= 0; --i) {
+                nfs_version4 = *nfs4_minorversions[i];
+                nfs4_procedures = nfs4_minorversion_procedures[i];
+                server->rpc_ops = nfsv4_minorversion_clientops[i];
+
+                server->client = nfs4_create_client(server, &timeparms, data->proto, authflavour);
+                if (IS_ERR(server->client)) {
+                        err = PTR_ERR(server->client);
+                                dprintk("%s: cannot create RPC client. Error = %d\n",
+                                                __FUNCTION__, err);
+                                goto out_fail;
+                }
+                server->nfs4_state->cl_minorversion = i;
+
+                if (server->rpc_ops->setup_session) {
+                        int status;
+
+                        lock_kernel();
+                        down_write(&server->nfs4_state->cl_sem);
+                        status =  server->rpc_ops->setup_session(server->nfs4_state);
+                        up_write(&server->nfs4_state->cl_sem);
+                        unlock_kernel();
+
+                        if (status) {
+                                printk(KERN_EMERG "Couldn't mount using minorversion %d\n", i);
+                                rpc_shutdown_client(server->client);
+                        }
+			else
+				break;
+                }
+        }
 
 	sb->s_time_gran = 1;
 
@@ -1400,7 +1423,14 @@ static void nfs4_kill_super(struct super_block *sb)
 	struct nfs_server *server = NFS_SB(sb);
 
 	nfs_return_all_delegations(sb);
+
 	kill_anon_super(sb);
+
+	if ((server->nfs4_state) && (server->nfs4_state->cl_minorversion == 1)) {
+		dprintk("Destroy session for superblock %p for client %p\n",
+				server, server->nfs4_state);
+		nfs4_proc_destroy_session(server->nfs4_state);
+	}
 
 	nfs4_renewd_prepare_shutdown(server);
 

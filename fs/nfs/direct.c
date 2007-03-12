@@ -242,7 +242,12 @@ static void nfs_direct_read_result(struct rpc_task *task, void *calldata)
 
 static const struct rpc_call_ops nfs_read_direct_ops = {
 	.rpc_call_done = nfs_direct_read_result,
-	.rpc_release = nfs_readdata_release,
+#ifdef CONFIG_NFS_V4
+	.rpc_release = nfs4_readdata_release,
+#else
+        .rpc_release = nfs_readdata_release,
+#endif
+
 };
 
 /*
@@ -271,7 +276,16 @@ static ssize_t nfs_direct_read_schedule(struct nfs_direct_req *dreq, unsigned lo
 		bytes = min(rsize,count);
 
 		result = -ENOMEM;
+
+#ifdef CONFIG_NFS_V4
+               if (NFS_PROTO(inode)->setup_sequence)
+                       data = nfs4_readdata_alloc(pgbase + bytes);
+               else
+                       data = nfs_readdata_alloc(pgbase + bytes);
+#else
 		data = nfs_readdata_alloc(pgbase + bytes);
+#endif
+
 		if (unlikely(!data))
 			break;
 
@@ -282,7 +296,15 @@ static ssize_t nfs_direct_read_schedule(struct nfs_direct_req *dreq, unsigned lo
 		if (unlikely(result < data->npages)) {
 			if (result > 0)
 				nfs_direct_release_pages(data->pagevec, result);
-			nfs_readdata_release(data);
+
+#ifdef CONFIG_NFS_V4
+                       if (NFS_PROTO(inode)->setup_sequence)
+                               nfs4_readdata_release(data);
+                       else
+                               nfs_readdata_release(data);
+#else
+                        nfs_readdata_release(data);
+#endif
 			break;
 		}
 
@@ -495,7 +517,11 @@ static void nfs_direct_write_complete(struct nfs_direct_req *dreq, struct inode 
 		default:
 			nfs_end_data_update(inode);
 			if (dreq->commit_data != NULL)
-				nfs_commit_free(dreq->commit_data);
+#ifdef CONFIG_NFS_V4
+                               nfs4_commit_free(dreq->commit_data);
+#else
+                                nfs_commit_free(dreq->commit_data);
+#endif
 			nfs_direct_free_writedata(dreq);
 			nfs_direct_complete(dreq);
 	}
@@ -503,7 +529,11 @@ static void nfs_direct_write_complete(struct nfs_direct_req *dreq, struct inode 
 
 static void nfs_alloc_commit_data(struct nfs_direct_req *dreq)
 {
-	dreq->commit_data = nfs_commit_alloc();
+#ifdef CONFIG_NFS_V4
+       dreq->commit_data = nfs4_commit_alloc();
+#else
+        dreq->commit_data = nfs_commit_alloc();
+#endif
 	if (dreq->commit_data != NULL)
 		dreq->commit_data->req = (struct nfs_page *) dreq;
 }
@@ -598,7 +628,12 @@ static ssize_t nfs_direct_write_schedule(struct nfs_direct_req *dreq, unsigned l
 		bytes = min(wsize,count);
 
 		result = -ENOMEM;
-		data = nfs_writedata_alloc(pgbase + bytes);
+#ifdef CONFIG_NFS_V4
+               data = nfs4_writedata_alloc(pgbase + bytes);
+#else
+                data = nfs_writedata_alloc(pgbase + bytes);
+#endif
+
 		if (unlikely(!data))
 			break;
 

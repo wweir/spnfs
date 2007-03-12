@@ -813,6 +813,29 @@ nfsd4_decode_renew(struct nfsd4_compoundargs *argp, clientid_t *clientid)
 	DECODE_TAIL;
 }
 
+static int nfsd4_decode_sequence(struct nfsd4_compoundargs *argp, struct nfsd4_sequence *seq)
+{
+        DECODE_HEAD;
+
+        READ_BUF(NFS4_MAX_SESSIONID_LEN + 12);
+        COPYMEM(seq->sessionid, NFS4_MAX_SESSIONID_LEN);
+        READ32(seq->seqid);
+        READ32(seq->slotid);
+        READ32(seq->maxslots);
+
+        DECODE_TAIL;
+}
+
+static int nfsd4_decode_destroy_session(struct nfsd4_compoundargs *argp,
+                       struct nfsd4_destroy_session *destroy_session)
+{
+        DECODE_HEAD;
+        READ_BUF(NFS4_MAX_SESSIONID_LEN);
+        COPYMEM(destroy_session->sessionid, NFS4_MAX_SESSIONID_LEN);
+
+        DECODE_TAIL;
+}
+
 static int
 nfsd4_decode_setattr(struct nfsd4_compoundargs *argp, struct nfsd4_setattr *setattr)
 {
@@ -853,6 +876,23 @@ nfsd4_decode_setclientid(struct nfsd4_compoundargs *argp, struct nfsd4_setclient
 }
 
 static int
+nfsd4_decode_exchange_id(struct nfsd4_compoundargs *argp, struct nfsd4_exchange_id *clid)
+{
+        DECODE_HEAD;
+
+        READ_BUF(NFS4_VERIFIER_SIZE);
+        COPYMEM(clid->verifier.data, NFS4_VERIFIER_SIZE);
+
+        READ_BUF(4);
+        READ32(clid->id_len);
+
+        READ_BUF(clid->id_len);
+        SAVEMEM(clid->id, clid->id_len);
+
+        DECODE_TAIL;
+}
+
+static int
 nfsd4_decode_setclientid_confirm(struct nfsd4_compoundargs *argp, struct nfsd4_setclientid_confirm *scd_c)
 {
 	DECODE_HEAD;
@@ -863,6 +903,145 @@ nfsd4_decode_setclientid_confirm(struct nfsd4_compoundargs *argp, struct nfsd4_s
 
 	DECODE_TAIL;
 }
+
+static int
+nfsd4_decode_create_session(struct nfsd4_compoundargs *argp, struct nfsd4_create_session *sess)
+{
+        DECODE_HEAD;
+
+        u32 dummy;
+        char *machine_name;
+        int i;
+	int nr_secflavs;
+
+        READ_BUF(28);
+
+        COPYMEM(&sess->clientid, 8);
+        READ32(sess->seqid);
+        READ32(dummy);
+        READ32(sess->header_padding);
+        READ32(dummy);
+        READ32(dummy);
+
+        READ_BUF(4);
+        READ32(dummy);
+
+        if (dummy) {
+                printk(KERN_EMERG "cba_enforce = 1 not supported!\n");
+                return -1;
+        }
+
+        /* Fore channel attrs */
+        READ_BUF(20);
+        READ32(sess->fore_channel.maxreq_sz);
+        READ32(sess->fore_channel.maxresp_sz);
+        READ32(sess->fore_channel.maxresp_cached);
+        READ32(sess->fore_channel.maxops);
+        READ32(sess->fore_channel.maxreqs);
+
+        READ_BUF(4);
+        READ32(sess->fore_channel.nr_stream_attrs);
+
+        if (sess->fore_channel.nr_stream_attrs == 1) {
+                READ_BUF(4);
+                READ32(sess->fore_channel.stream_attrs);
+        }
+        else if (sess->fore_channel.nr_stream_attrs > 1) {
+                printk (KERN_NOTICE "Too many channel attr bitmaps!\n");
+                return -1;
+        }
+
+        READ_BUF(4);
+        READ32(sess->fore_channel.nr_rdma_attrs);
+
+        if (sess->fore_channel.nr_rdma_attrs == 1) {
+                READ_BUF(4);
+                READ32(sess->fore_channel.rdma_attrs);
+        }
+        else if (sess->fore_channel.nr_rdma_attrs > 1) {
+                printk (KERN_NOTICE "Too many channel attr bitmaps!\n");
+                return -1;
+        }
+
+        /* Back channel attrs */
+        READ_BUF(20);
+        READ32(sess->back_channel.maxreq_sz);
+        READ32(sess->back_channel.maxresp_sz);
+        READ32(sess->back_channel.maxresp_cached);
+        READ32(sess->back_channel.maxops);
+        READ32(sess->back_channel.maxreqs);
+
+        READ_BUF(4);
+        READ32(sess->back_channel.nr_stream_attrs);
+
+        if (sess->back_channel.nr_stream_attrs == 1) {
+                READ_BUF(4);
+                READ32(sess->back_channel.stream_attrs);
+        }
+        else if (sess->back_channel.nr_stream_attrs > 1) {
+                printk (KERN_NOTICE "Too many channel attr bitmaps!\n");
+                return -1;
+        }
+
+        READ_BUF(4);
+        READ32(sess->back_channel.nr_rdma_attrs);
+
+        if (sess->back_channel.nr_rdma_attrs == 1) {
+                READ_BUF(4);
+                READ32(sess->back_channel.rdma_attrs);
+        }
+        else if (sess->back_channel.nr_rdma_attrs > 1) {
+                printk (KERN_NOTICE "Too many channel attr bitmaps!\n");
+                return -1;
+        }
+
+        READ_BUF(4);
+        READ32(sess->callback_prog);
+
+        READ_BUF(4);
+	READ32(nr_secflavs);
+
+        for (i = 0;i < nr_secflavs; ++i) {
+                READ_BUF(4);
+                READ32(dummy);
+
+                switch(dummy) {
+                        case RPC_AUTH_UNIX:
+			        READ_BUF(8);
+
+			        /* stamp */
+			        READ32(dummy);
+
+			        /* machine name len */
+			        READ32(dummy);
+
+			        READ_BUF(dummy);
+			        SAVEMEM(machine_name, dummy);
+
+			        READ_BUF(8);
+			        READ32(sess->uid);
+			        READ32(sess->gid);
+
+			        /* more gids */
+			        READ_BUF(4);
+			        READ32(dummy);
+
+			        for (i=0;i<dummy;++i) {
+			                READ32(dummy);
+				}
+				break;
+			case RPC_AUTH_NULL:
+				/* Nothing to read */
+				break;
+			default:
+				printk(KERN_NOTICE "Only AUTH_UNIX or AUTH_NONE\
+							supported!\n");
+				return -1;
+		}
+	}
+      DECODE_TAIL;
+}
+
 
 /* Also used for NVERIFY */
 static int
@@ -1144,6 +1323,18 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 		case OP_RELEASE_LOCKOWNER:
 			op->status = nfsd4_decode_release_lockowner(argp, &op->u.release_lockowner);
 			break;
+                case OP_EXCHANGE_ID:
+                        op->status = nfsd4_decode_exchange_id(argp, &op->u.exchange_id);
+                        break;
+                case OP_CREATE_SESSION:
+                        op->status = nfsd4_decode_create_session(argp, &op->u.create_session);
+                        break;
+                case OP_SEQUENCE:
+                        op->status = nfsd4_decode_sequence(argp, &op->u.sequence);
+                        break;
+                case OP_DESTROY_SESSION:
+                        op->status = nfsd4_decode_destroy_session(argp, &op->u.destroy_session);
+                        break;
 		default:
 			op->opnum = OP_ILLEGAL;
 			op->status = nfserr_op_illegal;
@@ -2300,6 +2491,140 @@ nfsd4_encode_setclientid(struct nfsd4_compoundres *resp, int nfserr, struct nfsd
 }
 
 static void
+nfsd4_encode_exchange_id(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_exchange_id *clid)
+{
+        ENCODE_HEAD;
+        char major_id[] = "fixme_please!";
+        char server_scope[] = "fixme_please!";
+        int major_id_sz;
+        int server_scope_sz;
+        uint64_t minor_id = 0;
+
+        /* XXX FIXME We currently use ia dummy  as the major id. Need to change
+         * this to something more meaningful...
+         */
+        if (!nfserr) {
+                major_id_sz = strlen(major_id);
+                server_scope_sz = strlen(server_scope);
+
+                RESERVE_SPACE(8 + 4 + 8 + 4 + major_id_sz + 4 + server_scope_sz);
+                WRITEMEM(&clid->clientid, 8);
+                WRITE32(clid->seqid);
+
+                /* The server_owner struct */
+                WRITE64(minor_id);      /* Minor id */
+                /* major id */
+                WRITE32(major_id_sz);
+                WRITEMEM(major_id, major_id_sz);
+
+                /* Server scope */
+                WRITE32(server_scope_sz);
+                WRITEMEM(server_scope, server_scope_sz);
+                ADJUST_ARGS();
+        }
+
+}
+
+static void
+nfsd4_encode_create_session(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_create_session *sess)
+{
+        ENCODE_HEAD;
+
+        if (!nfserr) {
+                RESERVE_SPACE(40);
+                WRITEMEM(sess->sessionid, sizeof(sess->sessionid));
+                WRITE32(sess->seqid);
+                WRITE32(1);
+                WRITE32(sess->header_padding);
+                WRITE32(1);
+                WRITE32(0);
+                WRITE32(0);
+                ADJUST_ARGS();
+
+                RESERVE_SPACE(20);
+                WRITE32(sess->fore_channel.maxreq_sz);
+                WRITE32(sess->fore_channel.maxresp_sz);
+                WRITE32(sess->fore_channel.maxresp_cached);
+                WRITE32(sess->fore_channel.maxops);
+                WRITE32(sess->fore_channel.maxreqs);
+                ADJUST_ARGS();
+
+                RESERVE_SPACE(4);
+                WRITE32(sess->fore_channel.nr_stream_attrs);
+                ADJUST_ARGS();
+
+                if (sess->fore_channel.nr_stream_attrs) {
+                        RESERVE_SPACE(4);
+                        WRITE32(sess->fore_channel.stream_attrs);
+                        ADJUST_ARGS();
+                }
+
+                RESERVE_SPACE(4);
+                WRITE32(sess->fore_channel.nr_rdma_attrs);
+                ADJUST_ARGS();
+
+                if (sess->fore_channel.nr_rdma_attrs) {
+                        RESERVE_SPACE(4);
+                        WRITE32(sess->fore_channel.rdma_attrs);
+                        ADJUST_ARGS();
+                }
+
+                RESERVE_SPACE(20);
+                WRITE32(sess->back_channel.maxreq_sz);
+                WRITE32(sess->back_channel.maxresp_sz);
+                WRITE32(sess->back_channel.maxresp_cached);
+                WRITE32(sess->back_channel.maxops);
+                WRITE32(sess->back_channel.maxreqs);
+                ADJUST_ARGS();
+
+                RESERVE_SPACE(4);
+                WRITE32(sess->back_channel.nr_stream_attrs);
+                ADJUST_ARGS();
+
+                if (sess->back_channel.nr_stream_attrs) {
+                        RESERVE_SPACE(4);
+                        WRITE32(sess->back_channel.stream_attrs);
+                        ADJUST_ARGS();
+                }
+
+                RESERVE_SPACE(4);
+                WRITE32(sess->back_channel.nr_rdma_attrs);
+                ADJUST_ARGS();
+
+                if (sess->back_channel.nr_rdma_attrs) {
+                        RESERVE_SPACE(4);
+                        WRITE32(sess->back_channel.rdma_attrs);
+                        ADJUST_ARGS();
+                }
+        }
+}
+
+static void nfsd4_encode_sequence(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_sequence *seq)
+{
+        ENCODE_HEAD;
+
+        if (!nfserr) {
+                RESERVE_SPACE(NFS4_MAX_SESSIONID_LEN + 20);
+
+                WRITEMEM(seq->sessionid, NFS4_MAX_SESSIONID_LEN);
+                WRITE32(seq->seqid);
+                WRITE32(seq->slotid);
+                WRITE32(seq->maxslots);
+                WRITE32(seq->target_maxslots);
+                WRITE32(seq->status_flags);
+
+                ADJUST_ARGS();
+        }
+}
+
+static void nfsd4_encode_destroy_session(struct nfsd4_compoundres *resp,
+                                        int nfserr, struct nfsd4_destroy_session
+                                        *destroy_session)
+{
+        return;
+}
+
+static void
 nfsd4_encode_write(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_write *write)
 {
 	ENCODE_HEAD;
@@ -2412,6 +2737,18 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 		break;
 	case OP_RELEASE_LOCKOWNER:
 		break;
+	case OP_EXCHANGE_ID:
+                nfsd4_encode_exchange_id(resp, op->status, &op->u.exchange_id);
+                break;
+        case OP_CREATE_SESSION:
+                nfsd4_encode_create_session(resp, op->status, &op->u.create_session);
+                break;
+        case OP_SEQUENCE:
+                nfsd4_encode_sequence(resp, op->status, &op->u.sequence);
+		break;
+        case OP_DESTROY_SESSION:
+                nfsd4_encode_destroy_session(resp, op->status, &op->u.destroy_session);
+                break;
 	default:
 		break;
 	}

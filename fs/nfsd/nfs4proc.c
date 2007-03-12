@@ -739,6 +739,7 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	struct nfsd4_op	*op;
 	struct svc_fh	*current_fh = NULL;
 	struct svc_fh	*save_fh = NULL;
+	sessionid_t     *current_sid = NULL;
 	struct nfs4_stateowner *replay_owner = NULL;
 	int		slack_space;    /* in words, not bytes! */
 	int		status;
@@ -752,6 +753,9 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	if (save_fh == NULL)
 		goto out;
 	fh_init(save_fh, NFS4_FHSIZE);
+	current_sid = kzalloc(sizeof(*current_sid), GFP_KERNEL);
+	if (current_sid == NULL)
+		goto out;
 
 	resp->xbuf = &rqstp->rq_res;
 	resp->p = rqstp->rq_res.head[0].iov_base + rqstp->rq_res.head[0].iov_len;
@@ -775,7 +779,7 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	while (!status && resp->opcnt < args->opcnt) {
 		op = &args->ops[resp->opcnt++];
 
-		dprintk("nfsv4 compound op #%d: %d\n", resp->opcnt, op->opnum);
+		dprintk("nfsv4 compound op %p #%d: %d\n", args->ops, resp->opcnt, op->opnum);
 
 		/*
 		 * The XDR decode routines may have pre-set op->status;
@@ -807,10 +811,15 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 		   (op->opnum == OP_SETCLIENTID) ||
 		   (op->opnum == OP_SETCLIENTID_CONFIRM) ||
 		   (op->opnum == OP_RENEW) || (op->opnum == OP_RESTOREFH) ||
-		   (op->opnum == OP_RELEASE_LOCKOWNER))) {
+		   (op->opnum == OP_RELEASE_LOCKOWNER)|| (op->opnum == OP_EXCHANGE_ID) ||
+                   (op->opnum == OP_CREATE_SESSION) || (op->opnum == OP_SEQUENCE) ||
+		    (op->opnum == OP_DESTROY_SESSION))) {
 			op->status = nfserr_nofilehandle;
 			goto encode_op;
 		}
+
+		dprintk("xxx server proc %d\n", op->opnum);
+
 		switch (op->opnum) {
 		case OP_ACCESS:
 			op->status = nfsd4_access(rqstp, current_fh, &op->u.access);
@@ -915,6 +924,18 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 		case OP_RELEASE_LOCKOWNER:
 			op->status = nfsd4_release_lockowner(rqstp, &op->u.release_lockowner);
 			break;
+		case OP_EXCHANGE_ID:
+			op->status = nfsd4_exchange_id(rqstp, &op->u.exchange_id);
+			break;
+		case OP_CREATE_SESSION:
+			op->status = nfsd4_create_session(rqstp, &op->u.create_session);
+			break;
+		case OP_SEQUENCE:
+			op->status = nfsd4_sequence(rqstp, current_sid, &op->u.sequence);
+			break;
+		case OP_DESTROY_SESSION:
+			op->status = nfsd4_destroy_session(rqstp, &op->u.destroy_session);
+			break;
 		default:
 			BUG_ON(op->status == nfs_ok);
 			break;
@@ -947,6 +968,8 @@ out:
 	kfree(current_fh);
 	if (save_fh)
 		fh_put(save_fh);
+	if (current_sid)
+		kfree(current_sid);
 	kfree(save_fh);
 	return status;
 }

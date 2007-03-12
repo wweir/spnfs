@@ -57,6 +57,7 @@
 
 /* Mapping from NFS error code to "errno" error code. */
 #define errno_NFSERR_IO		EIO
+static int nr_sequence_quads = 0;
 
 static int nfs_stat_to_errno(int);
 
@@ -137,98 +138,140 @@ static int nfs_stat_to_errno(int);
 #define decode_create_maxsz	(op_decode_hdr_maxsz + 8)
 #define encode_delegreturn_maxsz (op_encode_hdr_maxsz + 4)
 #define decode_delegreturn_maxsz (op_decode_hdr_maxsz)
+#define encode_sequence_maxsz 	(op_encode_hdr_maxsz + 4 + 1 + 1 + 1)
+#define decode_sequence_maxsz 	(op_decode_hdr_maxsz + 4 + 1 + 1 + 1 + 1 + 1)
+#define encode_exchange_id_maxsz	(op_encode_hdr_maxsz + 4 + 1 + 6 + 6 + \
+					(NFS4_VERIFIER_SIZE >> 2))
+#define decode_exchange_id_maxsz	(op_decode_hdr_maxsz + 2 + 1 + 2 + 1 + \
+						(NFS4_OPAQUE_LIMIT >> 2) + 1 + \
+						(NFS4_OPAQUE_LIMIT >> 2))
+#define encode_create_session_maxsz	(op_encode_hdr_maxsz + 2 + 1 + 1 + 1 + \
+							1 + 1 + 1 + 1 + \
+						(NFS4_VERIFIER_SIZE >> 2) + \
+						7 * 2 + 1 + (1 + 64 + 1 + 1 \
+							+ 1 + 1 + 16))
+#define decode_create_session_maxsz	(op_decode_hdr_maxsz + 1 + 4 + 1 + 1 + \
+							1 + 1 + 1 + 2 + 7 * 2)
+#define encode_destroy_session_maxsz    (op_encode_hdr_maxsz + 4)
+#define decode_destroy_session_maxsz    (op_decode_hdr_maxsz)
+
 #define NFS4_enc_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS4_dec_compound_sz	(1024)  /* XXX: large enough? */
+
 #define NFS4_enc_read_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				op_encode_hdr_maxsz + 7)
 #define NFS4_dec_read_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + 2)
 #define NFS4_enc_readlink_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				op_encode_hdr_maxsz)
 #define NFS4_dec_readlink_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz)
 #define NFS4_enc_readdir_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				op_encode_hdr_maxsz + 9)
 #define NFS4_dec_readdir_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + 2)
 #define NFS4_enc_write_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				op_encode_hdr_maxsz + 8 + \
 				encode_getattr_maxsz)
 #define NFS4_dec_write_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + 4 + \
 				decode_getattr_maxsz)
 #define NFS4_enc_commit_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				op_encode_hdr_maxsz + 3 + \
 				encode_getattr_maxsz)
 #define NFS4_dec_commit_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + 2 + \
 				decode_getattr_maxsz)
 #define NFS4_enc_open_sz        (compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
                                 encode_putfh_maxsz + \
                                 op_encode_hdr_maxsz + \
                                 13 + 3 + 2 + 64 + \
                                 encode_getattr_maxsz + \
                                 encode_getfh_maxsz)
 #define NFS4_dec_open_sz        (compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
                                 decode_putfh_maxsz + \
                                 op_decode_hdr_maxsz + 4 + 5 + 2 + 3 + \
                                 decode_getattr_maxsz + \
                                 decode_getfh_maxsz)
 #define NFS4_enc_open_confirm_sz      \
                                 (compound_encode_hdr_maxsz + \
+				 encode_sequence_maxsz +\
                                 encode_putfh_maxsz + \
                                 op_encode_hdr_maxsz + 5)
 #define NFS4_dec_open_confirm_sz        (compound_decode_hdr_maxsz + \
+					decode_sequence_maxsz + \
                                         decode_putfh_maxsz + \
                                         op_decode_hdr_maxsz + 4)
 #define NFS4_enc_open_noattr_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 					encode_putfh_maxsz + \
 					op_encode_hdr_maxsz + \
 					11)
 #define NFS4_dec_open_noattr_sz	(compound_decode_hdr_maxsz + \
+					decode_sequence_maxsz + \
 					decode_putfh_maxsz + \
 					op_decode_hdr_maxsz + \
 					4 + 5 + 2 + 3)
 #define NFS4_enc_open_downgrade_sz \
 				(compound_encode_hdr_maxsz + \
+				 encode_sequence_maxsz +\
                                 encode_putfh_maxsz + \
                                 op_encode_hdr_maxsz + 7 + \
 				encode_getattr_maxsz)
 #define NFS4_dec_open_downgrade_sz \
 				(compound_decode_hdr_maxsz + \
+				 decode_sequence_maxsz + \
                                 decode_putfh_maxsz + \
                                 op_decode_hdr_maxsz + 4 + \
 				decode_getattr_maxsz)
 #define NFS4_enc_close_sz       (compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
                                 encode_putfh_maxsz + \
                                 op_encode_hdr_maxsz + 5 + \
 				encode_getattr_maxsz)
 #define NFS4_dec_close_sz       (compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
                                 decode_putfh_maxsz + \
                                 op_decode_hdr_maxsz + 4 + \
 				decode_getattr_maxsz)
 #define NFS4_enc_setattr_sz     (compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
                                 encode_putfh_maxsz + \
                                 op_encode_hdr_maxsz + 4 + \
                                 nfs4_fattr_maxsz + \
                                 encode_getattr_maxsz)
 #define NFS4_dec_setattr_sz     (compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
                                 decode_putfh_maxsz + \
                                 op_decode_hdr_maxsz + 3)
 #define NFS4_enc_fsinfo_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_fsinfo_maxsz)
 #define NFS4_dec_fsinfo_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				decode_fsinfo_maxsz)
 #define NFS4_enc_renew_sz	(compound_encode_hdr_maxsz + \
@@ -250,6 +293,7 @@ static int nfs_stat_to_errno(int);
 				decode_putrootfh_maxsz + \
 				decode_fsinfo_maxsz)
 #define NFS4_enc_lock_sz        (compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_getattr_maxsz + \
 				op_encode_hdr_maxsz + \
@@ -257,12 +301,14 @@ static int nfs_stat_to_errno(int);
 				1 + 4 + 1 + 2 + \
 				owner_id_maxsz)
 #define NFS4_dec_lock_sz        (compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				decode_getattr_maxsz + \
 				op_decode_hdr_maxsz + \
 				2 + 2 + 1 + 2 + \
 				owner_id_maxsz)
 #define NFS4_enc_lockt_sz       (compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_getattr_maxsz + \
 				op_encode_hdr_maxsz + \
@@ -270,53 +316,67 @@ static int nfs_stat_to_errno(int);
 				owner_id_maxsz)
 #define NFS4_dec_lockt_sz       (NFS4_dec_lock_sz)
 #define NFS4_enc_locku_sz       (compound_encode_hdr_maxsz + \
+				decode_sequence_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_getattr_maxsz + \
 				op_encode_hdr_maxsz + \
 				1 + 1 + 4 + 2 + 2)
 #define NFS4_dec_locku_sz       (compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				decode_getattr_maxsz + \
 				op_decode_hdr_maxsz + 4)
 #define NFS4_enc_access_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				op_encode_hdr_maxsz + 1)
 #define NFS4_dec_access_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + 2)
 #define NFS4_enc_getattr_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_getattr_maxsz)
 #define NFS4_dec_getattr_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				decode_getattr_maxsz)
 #define NFS4_enc_lookup_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_lookup_maxsz + \
 				encode_getattr_maxsz + \
 				encode_getfh_maxsz)
 #define NFS4_dec_lookup_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + \
 				decode_getattr_maxsz + \
 				decode_getfh_maxsz)
 #define NFS4_enc_lookup_root_sz (compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putrootfh_maxsz + \
 				encode_getattr_maxsz + \
 				encode_getfh_maxsz)
 #define NFS4_dec_lookup_root_sz (compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putrootfh_maxsz + \
 				decode_getattr_maxsz + \
 				decode_getfh_maxsz)
 #define NFS4_enc_remove_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_remove_maxsz + \
 				encode_getattr_maxsz)
 #define NFS4_dec_remove_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + 5 + \
 				decode_getattr_maxsz)
 #define NFS4_enc_rename_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_savefh_maxsz + \
 				encode_putfh_maxsz + \
@@ -325,6 +385,7 @@ static int nfs_stat_to_errno(int);
 				encode_restorefh_maxsz + \
 				encode_getattr_maxsz)
 #define NFS4_dec_rename_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				decode_savefh_maxsz + \
 				decode_putfh_maxsz + \
@@ -333,6 +394,7 @@ static int nfs_stat_to_errno(int);
 				decode_restorefh_maxsz + \
 				decode_getattr_maxsz)
 #define NFS4_enc_link_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_savefh_maxsz + \
 				encode_putfh_maxsz + \
@@ -341,6 +403,7 @@ static int nfs_stat_to_errno(int);
 				encode_restorefh_maxsz + \
 				decode_getattr_maxsz)
 #define NFS4_dec_link_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				decode_savefh_maxsz + \
 				decode_putfh_maxsz + \
@@ -349,16 +412,19 @@ static int nfs_stat_to_errno(int);
 				decode_restorefh_maxsz + \
 				decode_getattr_maxsz)
 #define NFS4_enc_symlink_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_symlink_maxsz + \
 				encode_getattr_maxsz + \
 				encode_getfh_maxsz)
 #define NFS4_dec_symlink_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				decode_symlink_maxsz + \
 				decode_getattr_maxsz + \
 				decode_getfh_maxsz)
 #define NFS4_enc_create_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_savefh_maxsz + \
 				encode_create_maxsz + \
@@ -367,6 +433,7 @@ static int nfs_stat_to_errno(int);
 				encode_restorefh_maxsz + \
 				encode_getattr_maxsz)
 #define NFS4_dec_create_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				decode_savefh_maxsz + \
 				decode_create_maxsz + \
@@ -375,51 +442,95 @@ static int nfs_stat_to_errno(int);
 				decode_restorefh_maxsz + \
 				decode_getattr_maxsz)
 #define NFS4_enc_pathconf_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_getattr_maxsz)
 #define NFS4_dec_pathconf_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				decode_getattr_maxsz)
 #define NFS4_enc_statfs_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_getattr_maxsz)
 #define NFS4_dec_statfs_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + 12)
 #define NFS4_enc_server_caps_sz (compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_getattr_maxsz)
 #define NFS4_dec_server_caps_sz (compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_getattr_maxsz)
 #define NFS4_enc_delegreturn_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_delegreturn_maxsz + \
 				encode_getattr_maxsz)
 #define NFS4_dec_delegreturn_sz (compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_delegreturn_maxsz + \
 				decode_getattr_maxsz)
 #define NFS4_enc_getacl_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				encode_getattr_maxsz)
 #define NFS4_dec_getacl_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + \
 				nfs4_fattr_bitmap_maxsz + 1)
 #define NFS4_enc_setacl_sz	(compound_encode_hdr_maxsz + \
+				encode_sequence_maxsz +\
 				encode_putfh_maxsz + \
 				op_encode_hdr_maxsz + 4 + \
 				nfs4_fattr_bitmap_maxsz + 1)
 #define NFS4_dec_setacl_sz	(compound_decode_hdr_maxsz + \
+				decode_sequence_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + nfs4_fattr_bitmap_maxsz)
 #define NFS4_enc_fs_locations_sz \
 				(compound_encode_hdr_maxsz + \
+				 encode_sequence_maxsz +\
 				 encode_putfh_maxsz + \
 				 encode_getattr_maxsz)
 #define NFS4_dec_fs_locations_sz \
 				(compound_decode_hdr_maxsz + \
+				 decode_sequence_maxsz + \
 				 decode_putfh_maxsz + \
 				 op_decode_hdr_maxsz + \
 				 nfs4_fattr_bitmap_maxsz)
+#define NFS4_enc_exchange_id_sz \
+				(compound_encode_hdr_maxsz + \
+				 encode_exchange_id_maxsz)
+#define NFS4_dec_exchange_id_sz \
+				(compound_decode_hdr_maxsz + \
+				 decode_exchange_id_maxsz)
+#define NFS4_enc_create_session_sz \
+				(compound_encode_hdr_maxsz + \
+				 encode_create_session_maxsz)
+#define NFS4_dec_create_session_sz \
+				(compound_decode_hdr_maxsz + \
+				 decode_create_session_maxsz)
+#define NFS4_enc_sequence_sz 	(compound_encode_hdr_maxsz + \
+				 encode_sequence_maxsz)
+#define NFS4_dec_sequence_sz	(compound_decode_hdr_maxsz + \
+				 decode_sequence_maxsz)
+#define NFS4_enc_destroy_session_sz    (compound_encode_hdr_maxsz + \
+					encode_destroy_session_maxsz)
+#define NFS4_dec_destroy_session_sz    (compound_decode_hdr_maxsz + \
+					decode_destroy_session_maxsz)
+#define NFS4_enc_get_lease_time_sz (compound_encode_hdr_maxsz + \
+					encode_sequence_maxsz +\
+					encode_putrootfh_maxsz + \
+					encode_fsinfo_maxsz)
+#define NFS4_dec_get_lease_time_sz (compound_decode_hdr_maxsz + \
+					decode_sequence_maxsz + \
+					decode_putrootfh_maxsz + \
+					decode_fsinfo_maxsz)
+
+#define NFS4_error_sz           0
 
 static struct {
 	unsigned int	mode;
@@ -478,7 +589,7 @@ static void encode_string(struct xdr_stream *xdr, unsigned int len, const char *
 	xdr_encode_opaque(p, str, len);
 }
 
-static int encode_compound_hdr(struct xdr_stream *xdr, struct compound_hdr *hdr)
+static int encode_compound_hdr(struct xdr_stream *xdr, struct compound_hdr *hdr, u32 minorversion)
 {
 	uint32_t *p;
 
@@ -487,7 +598,7 @@ static int encode_compound_hdr(struct xdr_stream *xdr, struct compound_hdr *hdr)
 	RESERVE_SPACE(12+(XDR_QUADLEN(hdr->taglen)<<2));
 	WRITE32(hdr->taglen);
 	WRITEMEM(hdr->tag, hdr->taglen);
-	WRITE32(NFS4_MINOR_VERSION);
+	WRITE32(minorversion);
 	WRITE32(hdr->nops);
 	return 0;
 }
@@ -1101,8 +1212,10 @@ static int encode_readdir(struct xdr_stream *xdr, const struct nfs4_readdir_arg 
 	/* set up reply kvec
 	 *    toplevel_status + taglen + rescount + OP_PUTFH + status
 	 *      + OP_READDIR + status + verifer(2)  = 9
+	 *      Add to this the size for the sequence op; 0 if no sessions,
+	 *      11 otherwise
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + 9) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + 9 + nr_sequence_quads) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen, readdir->pages,
 			 readdir->pgbase, readdir->count);
 	dprintk("%s: inlined page args = (%u, %p, %u, %u)\n",
@@ -1124,11 +1237,12 @@ static int encode_readlink(struct xdr_stream *xdr, const struct nfs4_readlink *r
 	/* set up reply kvec
 	 *    toplevel_status + taglen + rescount + OP_PUTFH + status
 	 *      + OP_READLINK + status + string length = 8
+	 *      Similar to readdir, add space for the sequence op
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + 8) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + 8 + nr_sequence_quads) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen, readlink->pages,
 			readlink->pgbase, readlink->pglen);
-	
+
 	return 0;
 }
 
@@ -1288,32 +1402,256 @@ static int encode_delegreturn(struct xdr_stream *xdr, const nfs4_stateid *statei
 	return 0;
 
 }
+
+/* NFSv4.1 operations */
+static int encode_create_session(struct xdr_stream *xdr, struct nfs41_create_session_args *args)
+{
+	uint32_t *p;
+	char machine_name[64];
+	uint32_t len;
+
+	RESERVE_SPACE(4);
+	WRITE32(OP_CREATE_SESSION);
+
+	RESERVE_SPACE(8);
+	WRITE64(args->client->cl_clientid);
+
+	RESERVE_SPACE(20);
+	WRITE32(args->client->cl_session->seqid);       /*Sequence id */
+	WRITE32(args->persist);                         /*Persist */
+	WRITE32(args->header_padding);                  /* Header padding */
+	WRITE32(args->use_for_backchannel);
+	WRITE32(args->use_for_rdma);
+
+	RESERVE_SPACE(4);
+	WRITE32(0);                             /*conn_binding4args */
+
+	RESERVE_SPACE(2*28);                    /* 2 channel_attrs */
+
+	/* Fore Channel */
+	WRITE32(32768);                         /* max req size */
+	WRITE32(32768);                         /* max resp size */
+	WRITE32(32768);                         /* Max resp size cached */
+	WRITE32(RPC_DEF_SLOT_TABLE);            /* max operations */
+	WRITE32(RPC_DEF_SLOT_TABLE);            /* max requests */
+	WRITE32(0);                             /* Streamchannel attrs */
+	WRITE32(0);                             /*rdmachannel_attrs */
+
+	/* Back Channel */
+	WRITE32(32768);                         /* max req size */
+	WRITE32(32768);                         /* max resp size */
+	WRITE32(32768);                         /* Max resp size cached */
+	WRITE32(RPC_DEF_SLOT_TABLE);            /* max operations */
+	WRITE32(RPC_DEF_SLOT_TABLE);            /* max requests */
+	WRITE32(0);                             /* Streamchannel attrs */
+	WRITE32(0);                             /*rdmachannel_attrs */
+
+	RESERVE_SPACE(4);
+	WRITE32(args->cb_program);              /* cb_program */
+
+	RESERVE_SPACE(4);                       /* # of security flavors */
+	WRITE32(1);
+
+	RESERVE_SPACE(4);
+	WRITE32(RPC_AUTH_UNIX);                 /* auth_sys */
+
+	RESERVE_SPACE(4);
+
+	WRITE32((u32)args->client->cl_boot_time.tv_nsec);       /* stamp */
+
+	len = scnprintf(machine_name, sizeof(machine_name), "%s", args->client->cl_ipaddr);
+
+	RESERVE_SPACE(16 + len);
+
+	WRITE32(len);
+	WRITEMEM(machine_name, len);
+
+	WRITE32(0);                             /* UID */
+	WRITE32(0);                             /* GID */
+
+	WRITE32(0);                             /* No more gids */
+
+	return 0;
+}
+
+static int encode_destroy_session (struct xdr_stream *xdr, struct nfs4_session *session)
+{
+	uint32_t *p;
+	RESERVE_SPACE(4 + NFS4_MAX_SESSIONID_LEN);
+	WRITE32(OP_DESTROY_SESSION);
+	WRITEMEM(session->sess_id, NFS4_MAX_SESSIONID_LEN);
+
+	return 0;
+}
+
+static int encode_exchange_id(struct xdr_stream *xdr, struct nfs41_exchange_id_args *args)
+{
+
+	uint32_t *p;
+
+	RESERVE_SPACE(4 + sizeof(args->verifier->data));
+	WRITE32(OP_EXCHANGE_ID);
+	WRITEMEM(args->verifier->data, sizeof(args->verifier->data));
+
+	encode_string(xdr, args->id_len, args->id);
+
+	return 0;
+}
+
+static int encode_sequence(struct xdr_stream *xdr, struct nfs41_sequence_args *args)
+{
+	uint32_t *p;
+	int *ptr;
+	if (!args)
+		return NFSERR_RESOURCE;
+
+	ptr = (int *)args->sessionid;
+
+	RESERVE_SPACE(16 + NFS4_MAX_SESSIONID_LEN);
+	WRITE32(OP_SEQUENCE);
+
+	WRITEMEM(args->sessionid, NFS4_MAX_SESSIONID_LEN);
+	WRITE32(args->seqid);
+	WRITE32(args->slotid);
+	WRITE32(args->maxslots);
+	return 0;
+}
+
 /*
  * END OF "GENERIC" ENCODE ROUTINES.
  */
 
+static int nfs41_xdr_error(void *p, void *q)
+{
+	printk(KERN_EMERG "Trying to use an deprecated NFSv4.0 op in NFSv4.1!\n");
+	BUG();
+
+	/* to stop gcc from complaining */
+	return 0;
+}
+
 /*
  * Encode an ACCESS request
  */
-static int nfs4_xdr_enc_access(struct rpc_rqst *req, uint32_t *p, const struct nfs4_accessargs *args)
+
+static int nfs4_xdr_enc_access(const struct nfs4_accessargs *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = encode_putfh(xdr, args->fh)) == 0)
+		status = encode_access(xdr, args->access);
+	return status;
+}
+
+static int nfs40_xdr_enc_access(struct rpc_rqst *req, uint32_t *p, const struct nfs4_accessargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
 		.nops = 2,
 	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_access(args, &xdr);
+}
+
+static int nfs41_xdr_enc_access(struct rpc_rqst *req, uint32_t *p, const struct nfs4_accessargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
 	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	if ((status = encode_putfh(&xdr, args->fh)) == 0)
-		status = encode_access(&xdr, args->access);
-	return status;
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if (((status = encode_sequence(&xdr, args->minorversion_info))))
+		return status;
+
+	return nfs4_xdr_enc_access(args, &xdr);
 }
 
 /*
  * Encode LOOKUP request
  */
-static int nfs4_xdr_enc_lookup(struct rpc_rqst *req, uint32_t *p, const struct nfs4_lookup_arg *args)
+static int nfs4_xdr_enc_lookup(const struct nfs4_lookup_arg *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = encode_putfh(xdr, args->dir_fh)) != 0)
+		goto out;
+	if ((status = encode_lookup(xdr, args->name)) != 0)
+		goto out;
+	if ((status = encode_getfh(xdr)) != 0)
+		goto out;
+	status = encode_getfattr(xdr, args->bitmask);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_lookup(struct rpc_rqst *req, uint32_t *p, const struct nfs4_lookup_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_lookup(args, &xdr);
+}
+
+static int nfs41_xdr_enc_lookup(struct rpc_rqst *req, uint32_t *p, const struct nfs4_lookup_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 5,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_lookup(args, &xdr);
+}
+
+/*
+ * Encode LOOKUP_ROOT request
+ */
+
+static int nfs4_xdr_enc_lookup_root(const struct nfs4_lookup_root_arg *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = encode_putrootfh(xdr)) != 0)
+		goto out;
+	if ((status = encode_getfh(xdr)) == 0)
+		status = encode_getfattr(xdr, args->bitmask);
+out:
+	return status;
+}
+
+
+static int nfs40_xdr_enc_lookup_root(struct rpc_rqst *req, uint32_t *p, const struct nfs4_lookup_root_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_lookup_root(args, &xdr);
+}
+
+static int nfs41_xdr_enc_lookup_root(struct rpc_rqst *req, uint32_t *p, const struct nfs4_lookup_root_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1322,262 +1660,415 @@ static int nfs4_xdr_enc_lookup(struct rpc_rqst *req, uint32_t *p, const struct n
 	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	if ((status = encode_putfh(&xdr, args->dir_fh)) != 0)
-		goto out;
-	if ((status = encode_lookup(&xdr, args->name)) != 0)
-		goto out;
-	if ((status = encode_getfh(&xdr)) != 0)
-		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
-out:
-	return status;
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_lookup_root(args, &xdr);
 }
 
-/*
- * Encode LOOKUP_ROOT request
- */
-static int nfs4_xdr_enc_lookup_root(struct rpc_rqst *req, uint32_t *p, const struct nfs4_lookup_root_arg *args)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr = {
-		.nops = 3,
-	};
-	int status;
-
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	if ((status = encode_putrootfh(&xdr)) != 0)
-		goto out;
-	if ((status = encode_getfh(&xdr)) == 0)
-		status = encode_getfattr(&xdr, args->bitmask);
-out:
-	return status;
-}
 
 /*
  * Encode REMOVE request
  */
-static int nfs4_xdr_enc_remove(struct rpc_rqst *req, uint32_t *p, const struct nfs4_remove_arg *args)
+static int nfs4_xdr_enc_remove(const struct nfs4_remove_arg *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = encode_putfh(xdr, args->fh)) != 0)
+		goto out;
+	if ((status = encode_remove(xdr, args->name)) != 0)
+		goto out;
+	status = encode_getfattr(xdr, args->bitmask);
+out:
+	return status;
+  }
+
+static int nfs40_xdr_enc_remove(struct rpc_rqst *req, uint32_t *p, const struct nfs4_remove_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
 		.nops = 3,
 	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_remove(args, &xdr);
+}
+
+static int nfs41_xdr_enc_remove(struct rpc_rqst *req, uint32_t *p, const struct nfs4_remove_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
 	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	if ((status = encode_putfh(&xdr, args->fh)) != 0)
-		goto out;
-	if ((status = encode_remove(&xdr, args->name)) != 0)
-		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
-out:
-	return status;
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_remove(args, &xdr);
 }
 
 /*
  * Encode RENAME request
  */
-static int nfs4_xdr_enc_rename(struct rpc_rqst *req, uint32_t *p, const struct nfs4_rename_arg *args)
+static int nfs4_xdr_enc_rename(const struct nfs4_rename_arg *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = encode_putfh(xdr, args->old_dir)) != 0)
+		goto out;
+	if ((status = encode_savefh(xdr)) != 0)
+		goto out;
+	if ((status = encode_putfh(xdr, args->new_dir)) != 0)
+		goto out;
+	if ((status = encode_rename(xdr, args->old_name, args->new_name)) != 0)
+		goto out;
+	if ((status = encode_getfattr(xdr, args->bitmask)) != 0)
+		goto out;
+	if ((status = encode_restorefh(xdr)) != 0)
+		goto out;
+	status = encode_getfattr(xdr, args->bitmask);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_rename(struct rpc_rqst *req, uint32_t *p, const struct nfs4_rename_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
 		.nops = 7,
 	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_rename(args, &xdr);
+}
+
+static int nfs41_xdr_enc_rename(struct rpc_rqst *req, uint32_t *p, const struct nfs4_rename_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 8,
+	};
 	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	if ((status = encode_putfh(&xdr, args->old_dir)) != 0)
-		goto out;
-	if ((status = encode_savefh(&xdr)) != 0)
-		goto out;
-	if ((status = encode_putfh(&xdr, args->new_dir)) != 0)
-		goto out;
-	if ((status = encode_rename(&xdr, args->old_name, args->new_name)) != 0)
-		goto out;
-	if ((status = encode_getfattr(&xdr, args->bitmask)) != 0)
-		goto out;
-	if ((status = encode_restorefh(&xdr)) != 0)
-		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
-out:
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
 	return status;
+
+	return nfs4_xdr_enc_rename(args, &xdr);
 }
 
 /*
  * Encode LINK request
  */
-static int nfs4_xdr_enc_link(struct rpc_rqst *req, uint32_t *p, const struct nfs4_link_arg *args)
+static int nfs4_xdr_enc_link(const struct nfs4_link_arg *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = encode_putfh(xdr, args->fh)) != 0)
+		goto out;
+	if ((status = encode_savefh(xdr)) != 0)
+		goto out;
+	if ((status = encode_putfh(xdr, args->dir_fh)) != 0)
+		goto out;
+	if ((status = encode_link(xdr, args->name)) != 0)
+		goto out;
+	if ((status = encode_getfattr(xdr, args->bitmask)) != 0)
+		goto out;
+	if ((status = encode_restorefh(xdr)) != 0)
+		goto out;
+	status = encode_getfattr(xdr, args->bitmask);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_link(struct rpc_rqst *req, uint32_t *p, const struct nfs4_link_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
 		.nops = 7,
 	};
-	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	if ((status = encode_putfh(&xdr, args->fh)) != 0)
-		goto out;
-	if ((status = encode_savefh(&xdr)) != 0)
-		goto out;
-	if ((status = encode_putfh(&xdr, args->dir_fh)) != 0)
-		goto out;
-	if ((status = encode_link(&xdr, args->name)) != 0)
-		goto out;
-	if ((status = encode_getfattr(&xdr, args->bitmask)) != 0)
-		goto out;
-	if ((status = encode_restorefh(&xdr)) != 0)
-		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
-out:
-	return status;
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_link(args, &xdr);
+}
+
+static int nfs41_xdr_enc_link(struct rpc_rqst *req, uint32_t *p, const struct nfs4_link_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 8,
+	};
+        int status;
+
+        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_link(args, &xdr);
 }
 
 /*
  * Encode CREATE request
  */
-static int nfs4_xdr_enc_create(struct rpc_rqst *req, uint32_t *p, const struct nfs4_create_arg *args)
+static int nfs4_xdr_enc_create(const struct nfs4_create_arg *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = encode_putfh(xdr, args->dir_fh)) != 0)
+		goto out;
+	if ((status = encode_savefh(xdr)) != 0)
+		goto out;
+	if ((status = encode_create(xdr, args)) != 0)
+		goto out;
+	if ((status = encode_getfh(xdr)) != 0)
+		goto out;
+	if ((status = encode_getfattr(xdr, args->bitmask)) != 0)
+		goto out;
+	if ((status = encode_restorefh(xdr)) != 0)
+		goto out;
+	status = encode_getfattr(xdr, args->bitmask);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_create(struct rpc_rqst *req, uint32_t *p, const struct nfs4_create_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
 		.nops = 7,
 	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_create(args, &xdr);
+}
+
+static int nfs41_xdr_enc_create(struct rpc_rqst *req, uint32_t *p, const struct nfs4_create_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 8,
+	};
 	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	if ((status = encode_putfh(&xdr, args->dir_fh)) != 0)
-		goto out;
-	if ((status = encode_savefh(&xdr)) != 0)
-		goto out;
-	if ((status = encode_create(&xdr, args)) != 0)
-		goto out;
-	if ((status = encode_getfh(&xdr)) != 0)
-		goto out;
-	if ((status = encode_getfattr(&xdr, args->bitmask)) != 0)
-		goto out;
-	if ((status = encode_restorefh(&xdr)) != 0)
-		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
-out:
-	return status;
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_create(args, &xdr);
 }
 
 /*
  * Encode SYMLINK request
  */
-static int nfs4_xdr_enc_symlink(struct rpc_rqst *req, uint32_t *p, const struct nfs4_create_arg *args)
+static int nfs40_xdr_enc_symlink(struct rpc_rqst *req, uint32_t *p, const struct nfs4_create_arg *args)
 {
-	return nfs4_xdr_enc_create(req, p, args);
+	return nfs40_xdr_enc_create(req, p, args);
+}
+
+static int nfs41_xdr_enc_symlink(struct rpc_rqst *req, uint32_t *p, const struct nfs4_create_arg *args)
+{
+	return nfs41_xdr_enc_create(req, p, args);
 }
 
 /*
  * Encode GETATTR request
  */
-static int nfs4_xdr_enc_getattr(struct rpc_rqst *req, uint32_t *p, const struct nfs4_getattr_arg *args)
+static int nfs4_xdr_enc_getattr(const struct nfs4_getattr_arg *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = encode_putfh(xdr, args->fh)) == 0)
+		status = encode_getfattr(xdr, args->bitmask);
+	return status;
+}
+
+static int nfs40_xdr_enc_getattr(struct rpc_rqst *req, uint32_t *p, const struct nfs4_getattr_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
 		.nops = 2,
 	};
-	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	if ((status = encode_putfh(&xdr, args->fh)) == 0)
-		status = encode_getfattr(&xdr, args->bitmask);
-	return status;
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_getattr(args, &xdr);
+}
+
+static int nfs41_xdr_enc_getattr(struct rpc_rqst *req, uint32_t *p, const struct nfs4_getattr_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+        int status;
+
+        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_getattr(args, &xdr);
 }
 
 /*
  * Encode a CLOSE request
  */
-static int nfs4_xdr_enc_close(struct rpc_rqst *req, uint32_t *p, struct nfs_closeargs *args)
+
+static int nfs4_xdr_enc_close(const struct nfs_closeargs *args, struct xdr_stream *xdr)
+{
+	int status;
+
+        status = encode_putfh(xdr, args->fh);
+        if(status)
+                goto out;
+        status = encode_close(xdr, args);
+	if (status != 0)
+		goto out;
+	status = encode_getfattr(xdr, args->bitmask);
+out:
+        return status;
+}
+
+static int nfs40_xdr_enc_close(struct rpc_rqst *req, uint32_t *p, const struct nfs_closeargs *args)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr = {
                 .nops   = 3,
         };
-        int status;
 
         xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-        encode_compound_hdr(&xdr, &hdr);
-        status = encode_putfh(&xdr, args->fh);
-        if(status)
-                goto out;
-        status = encode_close(&xdr, args);
-	if (status != 0)
-		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
-out:
-        return status;
+        encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_close(args, &xdr);
+}
+
+static int nfs41_xdr_enc_close(struct rpc_rqst *req, uint32_t *p, const struct nfs_closeargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 4,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_close(args, &xdr);
 }
 
 /*
  * Encode an OPEN request
  */
-static int nfs4_xdr_enc_open(struct rpc_rqst *req, uint32_t *p, struct nfs_openargs *args)
+
+static int nfs4_xdr_enc_open(const struct nfs_openargs *args, struct xdr_stream *xdr)
+{
+	int status;
+	status = encode_putfh(xdr, args->fh);
+	if (status)
+		goto out;
+	status = encode_savefh(xdr);
+	if (status)
+		goto out;
+	status = encode_open(xdr, args);
+	if (status)
+		goto out;
+	status = encode_getfh(xdr);
+	if (status)
+		goto out;
+	status = encode_getfattr(xdr, args->bitmask);
+	if (status)
+		goto out;
+	status = encode_restorefh(xdr);
+	if (status)
+		goto out;
+	status = encode_getfattr(xdr, args->bitmask);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_open(struct rpc_rqst *req, uint32_t *p, const struct nfs_openargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
 		.nops = 7,
 	};
-	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
-	if (status)
-		goto out;
-	status = encode_savefh(&xdr);
-	if (status)
-		goto out;
-	status = encode_open(&xdr, args);
-	if (status)
-		goto out;
-	status = encode_getfh(&xdr);
-	if (status)
-		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
-	if (status)
-		goto out;
-	status = encode_restorefh(&xdr);
-	if (status)
-		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
-out:
-	return status;
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_open(args, &xdr);
+}
+
+static int nfs41_xdr_enc_open(struct rpc_rqst *req, uint32_t *p, const struct nfs_openargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 8,
+        };
+        int status;
+
+        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return 	status;
+
+	return nfs4_xdr_enc_open(args, &xdr);
 }
 
 /*
  * Encode an OPEN_CONFIRM request
  */
-static int nfs4_xdr_enc_open_confirm(struct rpc_rqst *req, uint32_t *p, struct nfs_open_confirmargs *args)
+static int nfs4_xdr_enc_open_confirm(const struct nfs_open_confirmargs *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = encode_putfh(xdr, args->fh);
+	if(status)
+		goto out;
+	status = encode_open_confirm(xdr, args);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_open_confirm(struct rpc_rqst *req, uint32_t *p, const struct nfs_open_confirmargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
 		.nops   = 2,
 	};
-	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
-	if(status)
-		goto out;
-	status = encode_open_confirm(&xdr, args);
-out:
-	return status;
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_open_confirm(args, &xdr);
 }
 
-/*
- * Encode an OPEN request with no attributes.
- */
-static int nfs4_xdr_enc_open_noattr(struct rpc_rqst *req, uint32_t *p, struct nfs_openargs *args)
+static int nfs41_xdr_enc_open_confirm(struct rpc_rqst *req, uint32_t *p, const struct nfs_open_confirmargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1586,22 +2077,618 @@ static int nfs4_xdr_enc_open_noattr(struct rpc_rqst *req, uint32_t *p, struct nf
 	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_open_confirm(args, &xdr);
+}
+
+/*
+ * Encode an OPEN request with no attributes.
+ */
+static int nfs4_xdr_enc_open_noattr(const struct nfs_openargs *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = encode_putfh(xdr, args->fh);
 	if (status)
 		goto out;
-	status = encode_open(&xdr, args);
+	status = encode_open(xdr, args);
 	if (status)
 		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
+	status = encode_getfattr(xdr, args->bitmask);
 out:
 	return status;
 }
 
+static int nfs40_xdr_enc_open_noattr(struct rpc_rqst *req, uint32_t *p, const struct nfs_openargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_open_noattr(args, &xdr);
+}
+
+static int nfs41_xdr_enc_open_noattr(struct rpc_rqst *req, uint32_t *p, const struct nfs_openargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 4,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_open_noattr(args, &xdr);
+}
+
+
 /*
  * Encode an OPEN_DOWNGRADE request
  */
-static int nfs4_xdr_enc_open_downgrade(struct rpc_rqst *req, uint32_t *p, struct nfs_closeargs *args)
+static int nfs4_xdr_enc_open_downgrade(const struct nfs_closeargs *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = encode_putfh(xdr, args->fh);
+	if (status)
+		goto out;
+	status = encode_open_downgrade(xdr, args);
+	if (status != 0)
+		goto out;
+	status = encode_getfattr(xdr, args->bitmask);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_open_downgrade(struct rpc_rqst *req, uint32_t *p, const struct nfs_closeargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops	= 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_open_downgrade(args, &xdr);
+}
+
+static int nfs41_xdr_enc_open_downgrade(struct rpc_rqst *req, uint32_t *p, struct nfs_closeargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops	= 4,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_open_downgrade(args, &xdr);
+}
+
+
+/*
+ * Encode a LOCK request
+ */
+static int nfs4_xdr_enc_lock(const struct nfs_lock_args *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = encode_putfh(xdr, args->fh);
+	if(status)
+		goto out;
+	status = encode_lock(xdr, args);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_lock(struct rpc_rqst *req, uint32_t *p, const struct nfs_lock_args *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 2,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_lock(args, &xdr);
+}
+
+static int nfs41_xdr_enc_lock(struct rpc_rqst *req, uint32_t *p, const struct nfs_lock_args *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_lock(args, &xdr);
+}
+
+/*
+ * Encode a LOCKT request
+ */
+static int nfs4_xdr_enc_lockt(const struct nfs_lockt_args *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = encode_putfh(xdr, args->fh);
+	if(status)
+		goto out;
+	status = encode_lockt(xdr, args);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_lockt(struct rpc_rqst *req, uint32_t *p, const struct nfs_lockt_args *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 2,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_lockt(args, &xdr);
+}
+
+static int nfs41_xdr_enc_lockt(struct rpc_rqst *req, uint32_t *p, struct nfs_lockt_args *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_lockt(args, &xdr);
+}
+
+/*
+ * Encode a LOCKU request
+ */
+static int nfs4_xdr_enc_locku(const struct nfs_locku_args *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = encode_putfh(xdr, args->fh);
+	if(status)
+		goto out;
+	status = encode_locku(xdr, args);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_locku(struct rpc_rqst *req, uint32_t *p, const struct nfs_locku_args *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 2,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_locku(args, &xdr);
+}
+
+static int nfs41_xdr_enc_locku(struct rpc_rqst *req, uint32_t *p, const struct nfs_locku_args *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_locku(args, &xdr);
+}
+
+/*
+ * Encode a READLINK request
+ */
+static int nfs4_xdr_enc_readlink(struct rpc_rqst *req, const struct nfs4_readlink *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = encode_putfh(xdr, args->fh);
+	if(status)
+		goto out;
+	status = encode_readlink(xdr, args, req);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_readlink(struct rpc_rqst *req, uint32_t *p, const struct nfs4_readlink *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 2,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_readlink(req, args, &xdr);
+}
+
+static int nfs41_xdr_enc_readlink(struct rpc_rqst *req, uint32_t *p, const struct nfs4_readlink *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_readlink(req, args, &xdr);
+}
+
+/*
+ * Encode a READDIR request
+ */
+static int nfs4_xdr_enc_readdir(struct rpc_rqst *req, const struct nfs4_readdir_arg *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = encode_putfh(xdr, args->fh);
+	if(status)
+		goto out;
+	status = encode_readdir(xdr, args, req);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_readdir(struct rpc_rqst *req, uint32_t *p, const struct nfs4_readdir_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 2,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_readdir(req, args, &xdr);
+}
+
+static int nfs41_xdr_enc_readdir(struct rpc_rqst *req, uint32_t *p, const struct nfs4_readdir_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_readdir(req, args, &xdr);
+}
+
+/*
+ * Encode a READ request
+ */
+static int nfs4_xdr_enc_read(struct rpc_rqst *req, const struct nfs_readargs *args, struct xdr_stream *xdr)
+{
+        struct rpc_auth *auth = req->rq_task->tk_auth;
+        int replen, status;
+
+	status = encode_putfh(xdr, args->fh);
+	if (status)
+		goto out;
+	status = encode_read(xdr, args);
+	if (status)
+		goto out;
+
+	/* set up reply kvec
+	 *    toplevel status + taglen=0 + rescount + OP_PUTFH + status
+	 *       + OP_READ + status + eof + datalen = 9
+	 *    Add space for sequence op too XXX should only be for 4.1
+	 */
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS4_dec_read_sz + nr_sequence_quads) << 2;
+	xdr_inline_pages(&req->rq_rcv_buf, replen,
+			 args->pages, args->pgbase, args->count);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_read(struct rpc_rqst *req, uint32_t *p, const struct nfs_readargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 2,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_read(req, args, &xdr);
+}
+
+static int nfs41_xdr_enc_read(struct rpc_rqst *req, uint32_t *p, const struct nfs_readargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_read(req, args, &xdr);
+}
+
+/*
+ * Encode an SETATTR request
+ */
+static int nfs4_xdr_enc_setattr(const struct nfs_setattrargs *args, struct xdr_stream *xdr)
+{
+	int status;
+
+        status = encode_putfh(xdr, args->fh);
+        if(status)
+                goto out;
+        status = encode_setattr(xdr, args, args->server);
+        if(status)
+                goto out;
+	status = encode_getfattr(xdr, args->bitmask);
+out:
+        return status;
+}
+
+static int nfs40_xdr_enc_setattr(struct rpc_rqst *req, uint32_t *p, const struct nfs_setattrargs *args)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr = {
+                .nops   = 3,
+        };
+
+        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+        encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_setattr(args, &xdr);
+}
+
+static int nfs41_xdr_enc_setattr(struct rpc_rqst *req, uint32_t *p, const struct nfs_setattrargs *args)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr = {
+                .nops   = 4,
+        };
+        int status;
+
+        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+        encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_setattr(args, &xdr);
+}
+
+/*
+ * Encode a GETACL request
+ */
+
+static int nfs4_xdr_enc_getacl(struct rpc_rqst *req, const struct nfs_getaclargs *args, struct xdr_stream *xdr)
+{
+        struct rpc_auth *auth = req->rq_task->tk_auth;
+        int replen, status;
+
+	status = encode_putfh(xdr, args->fh);
+	if (status)
+		goto out;
+	status = encode_getattr_two(xdr, FATTR4_WORD0_ACL, 0);
+	/* set up reply buffer: XXX only add sequence space for 4.1*/
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS4_dec_getacl_sz + nr_sequence_quads) << 2;
+	xdr_inline_pages(&req->rq_rcv_buf, replen,
+		args->acl_pages, args->acl_pgbase, args->acl_len);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_getacl(struct rpc_rqst *req, uint32_t *p,
+		const struct nfs_getaclargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 2,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_getacl(req, args, &xdr);
+}
+
+static int nfs41_xdr_enc_getacl(struct rpc_rqst *req, uint32_t *p,
+		const struct nfs_getaclargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_getacl(req, args, &xdr);
+}
+
+/*
+ * Encode a WRITE request
+ */
+static int nfs4_xdr_enc_write(const struct nfs_writeargs *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = encode_putfh(xdr, args->fh);
+	if (status)
+		goto out;
+	status = encode_write(xdr, args);
+	if (status)
+		goto out;
+	status = encode_getfattr(xdr, args->bitmask);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_write(struct rpc_rqst *req, uint32_t *p, const struct nfs_writeargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_write(args, &xdr);
+}
+
+static int nfs41_xdr_enc_write(struct rpc_rqst *req, uint32_t *p, const struct nfs_writeargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_write(args, &xdr);
+}
+
+/*
+ *  a COMMIT request
+ */
+static int nfs4_xdr_enc_commit(const struct nfs_writeargs *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = encode_putfh(xdr, args->fh);
+	if (status)
+		goto out;
+	status = encode_commit(xdr, args);
+	if (status)
+		goto out;
+	status = encode_getfattr(xdr, args->bitmask);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_commit(struct rpc_rqst *req, uint32_t *p, const struct nfs_writeargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_commit(args, &xdr);
+}
+
+static int nfs41_xdr_enc_commit(struct rpc_rqst *req, uint32_t *p, const struct nfs_writeargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_commit(args, &xdr);
+}
+
+/*
+ * FSINFO request
+ */
+static int nfs4_xdr_enc_fsinfo(const struct nfs4_fsinfo_arg *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = encode_putfh(xdr, args->fh);
+	if (!status)
+		status = encode_fsinfo(xdr, args->bitmask);
+	return status;
+}
+
+static int nfs40_xdr_enc_fsinfo(struct rpc_rqst *req, uint32_t *p, const struct nfs4_fsinfo_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops	= 2,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_fsinfo(args, &xdr);
+}
+
+static int nfs41_xdr_enc_fsinfo(struct rpc_rqst *req, uint32_t *p, const struct nfs4_fsinfo_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1610,342 +2697,153 @@ static int nfs4_xdr_enc_open_downgrade(struct rpc_rqst *req, uint32_t *p, struct
 	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
-	if (status)
-		goto out;
-	status = encode_open_downgrade(&xdr, args);
-	if (status != 0)
-		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
-out:
-	return status;
-}
+	encode_compound_hdr(&xdr, &hdr, 1);
 
-/*
- * Encode a LOCK request
- */
-static int nfs4_xdr_enc_lock(struct rpc_rqst *req, uint32_t *p, struct nfs_lock_args *args)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr = {
-		.nops   = 2,
-	};
-	int status;
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
 
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
-	if(status)
-		goto out;
-	status = encode_lock(&xdr, args);
-out:
-	return status;
-}
-
-/*
- * Encode a LOCKT request
- */
-static int nfs4_xdr_enc_lockt(struct rpc_rqst *req, uint32_t *p, struct nfs_lockt_args *args)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr = {
-		.nops   = 2,
-	};
-	int status;
-
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
-	if(status)
-		goto out;
-	status = encode_lockt(&xdr, args);
-out:
-	return status;
-}
-
-/*
- * Encode a LOCKU request
- */
-static int nfs4_xdr_enc_locku(struct rpc_rqst *req, uint32_t *p, struct nfs_locku_args *args)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr = {
-		.nops   = 2,
-	};
-	int status;
-
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
-	if(status)
-		goto out;
-	status = encode_locku(&xdr, args);
-out:
-	return status;
-}
-
-/*
- * Encode a READLINK request
- */
-static int nfs4_xdr_enc_readlink(struct rpc_rqst *req, uint32_t *p, const struct nfs4_readlink *args)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr = {
-		.nops = 2,
-	};
-	int status;
-
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
-	if(status)
-		goto out;
-	status = encode_readlink(&xdr, args, req);
-out:
-	return status;
-}
-
-/*
- * Encode a READDIR request
- */
-static int nfs4_xdr_enc_readdir(struct rpc_rqst *req, uint32_t *p, const struct nfs4_readdir_arg *args)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr = {
-		.nops = 2,
-	};
-	int status;
-
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
-	if(status)
-		goto out;
-	status = encode_readdir(&xdr, args, req);
-out:
-	return status;
-}
-
-/*
- * Encode a READ request
- */
-static int nfs4_xdr_enc_read(struct rpc_rqst *req, uint32_t *p, struct nfs_readargs *args)
-{
-	struct rpc_auth	*auth = req->rq_task->tk_auth;
-	struct xdr_stream xdr;
-	struct compound_hdr hdr = {
-		.nops = 2,
-	};
-	int replen, status;
-
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
-	if (status)
-		goto out;
-	status = encode_read(&xdr, args);
-	if (status)
-		goto out;
-
-	/* set up reply kvec
-	 *    toplevel status + taglen=0 + rescount + OP_PUTFH + status
-	 *       + OP_READ + status + eof + datalen = 9
-	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS4_dec_read_sz) << 2;
-	xdr_inline_pages(&req->rq_rcv_buf, replen,
-			 args->pages, args->pgbase, args->count);
-out:
-	return status;
-}
-
-/*
- * Encode an SETATTR request
- */
-static int nfs4_xdr_enc_setattr(struct rpc_rqst *req, uint32_t *p, struct nfs_setattrargs *args)
-
-{
-        struct xdr_stream xdr;
-        struct compound_hdr hdr = {
-                .nops   = 3,
-        };
-        int status;
-
-        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-        encode_compound_hdr(&xdr, &hdr);
-        status = encode_putfh(&xdr, args->fh);
-        if(status)
-                goto out;
-        status = encode_setattr(&xdr, args, args->server);
-        if(status)
-                goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
-out:
-        return status;
-}
-
-/*
- * Encode a GETACL request
- */
-static int
-nfs4_xdr_enc_getacl(struct rpc_rqst *req, uint32_t *p,
-		struct nfs_getaclargs *args)
-{
-	struct xdr_stream xdr;
-	struct rpc_auth *auth = req->rq_task->tk_auth;
-	struct compound_hdr hdr = {
-		.nops   = 2,
-	};
-	int replen, status;
-
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
-	if (status)
-		goto out;
-	status = encode_getattr_two(&xdr, FATTR4_WORD0_ACL, 0);
-	/* set up reply buffer: */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS4_dec_getacl_sz) << 2;
-	xdr_inline_pages(&req->rq_rcv_buf, replen,
-		args->acl_pages, args->acl_pgbase, args->acl_len);
-out:
-	return status;
-}
-
-/*
- * Encode a WRITE request
- */
-static int nfs4_xdr_enc_write(struct rpc_rqst *req, uint32_t *p, struct nfs_writeargs *args)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr = {
-		.nops = 3,
-	};
-	int status;
-
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
-	if (status)
-		goto out;
-	status = encode_write(&xdr, args);
-	if (status)
-		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
-out:
-	return status;
-}
-
-/*
- *  a COMMIT request
- */
-static int nfs4_xdr_enc_commit(struct rpc_rqst *req, uint32_t *p, struct nfs_writeargs *args)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr = {
-		.nops = 3,
-	};
-	int status;
-
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
-	if (status)
-		goto out;
-	status = encode_commit(&xdr, args);
-	if (status)
-		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
-out:
-	return status;
-}
-
-/*
- * FSINFO request
- */
-static int nfs4_xdr_enc_fsinfo(struct rpc_rqst *req, uint32_t *p, struct nfs4_fsinfo_arg *args)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr = {
-		.nops	= 2,
-	};
-	int status;
-
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
-	if (!status)
-		status = encode_fsinfo(&xdr, args->bitmask);
-	return status;
+	return nfs4_xdr_enc_fsinfo(args, &xdr);
 }
 
 /*
  * a PATHCONF request
  */
-static int nfs4_xdr_enc_pathconf(struct rpc_rqst *req, uint32_t *p, const struct nfs4_pathconf_arg *args)
+static int nfs4_xdr_enc_pathconf(const struct nfs4_pathconf_arg *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = encode_putfh(xdr, args->fh);
+	if (!status)
+		status = encode_getattr_one(xdr,
+				args->bitmask[0] & nfs4_pathconf_bitmap[0]);
+	return status;
+}
+
+static int nfs40_xdr_enc_pathconf(struct rpc_rqst *req, uint32_t *p, const struct nfs4_pathconf_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
 		.nops = 2,
 	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_pathconf(args, &xdr);
+}
+
+static int nfs41_xdr_enc_pathconf(struct rpc_rqst *req, uint32_t *p, const struct nfs4_pathconf_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
 	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
-	if (!status)
-		status = encode_getattr_one(&xdr,
-				args->bitmask[0] & nfs4_pathconf_bitmap[0]);
-	return status;
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_pathconf(args, &xdr);
 }
 
 /*
  * a STATFS request
  */
-static int nfs4_xdr_enc_statfs(struct rpc_rqst *req, uint32_t *p, const struct nfs4_statfs_arg *args)
+static int nfs4_xdr_enc_statfs(const struct nfs4_statfs_arg *args, struct xdr_stream *xdr)
 {
-	struct xdr_stream xdr;
-	struct compound_hdr hdr = {
-		.nops = 2,
-	};
 	int status;
 
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fh);
+	status = encode_putfh(xdr, args->fh);
 	if (status == 0)
-		status = encode_getattr_two(&xdr,
+		status = encode_getattr_two(xdr,
 				args->bitmask[0] & nfs4_statfs_bitmap[0],
 				args->bitmask[1] & nfs4_statfs_bitmap[1]);
 	return status;
 }
 
-/*
- * GETATTR_BITMAP request
- */
-static int nfs4_xdr_enc_server_caps(struct rpc_rqst *req, uint32_t *p, const struct nfs_fh *fhandle)
+static int nfs40_xdr_enc_statfs(struct rpc_rqst *req, uint32_t *p, const struct nfs4_statfs_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
 		.nops = 2,
 	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_statfs(args, &xdr);
+}
+
+static int nfs41_xdr_enc_statfs(struct rpc_rqst *req, uint32_t *p, const struct nfs4_statfs_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
 	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, fhandle);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_statfs(args, &xdr);
+}
+
+/*
+ * GETATTR_BITMAP request
+ */
+static int nfs4_xdr_enc_server_caps(struct nfs_fh *fhandle, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = encode_putfh(xdr, fhandle);
 	if (status == 0)
-		status = encode_getattr_one(&xdr, FATTR4_WORD0_SUPPORTED_ATTRS|
+		status = encode_getattr_one(xdr, FATTR4_WORD0_SUPPORTED_ATTRS|
 				FATTR4_WORD0_LINK_SUPPORT|
 				FATTR4_WORD0_SYMLINK_SUPPORT|
 				FATTR4_WORD0_ACLSUPPORT);
 	return status;
 }
 
+static int nfs40_xdr_enc_server_caps(struct rpc_rqst *req, uint32_t *p, const struct nfs4_server_caps_args *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 2,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_server_caps(args->fhandle, &xdr);
+}
+
+static int nfs41_xdr_enc_server_caps(struct rpc_rqst *req, uint32_t *p, const struct nfs4_server_caps_args *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_server_caps(args->fhandle, &xdr);
+}
+
 /*
  * a RENEW request
  */
-static int nfs4_xdr_enc_renew(struct rpc_rqst *req, uint32_t *p, struct nfs4_client *clp)
+static int nfs40_xdr_enc_renew(struct rpc_rqst *req, uint32_t *p, struct nfs4_client *clp)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1953,14 +2851,31 @@ static int nfs4_xdr_enc_renew(struct rpc_rqst *req, uint32_t *p, struct nfs4_cli
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 	return encode_renew(&xdr, clp);
+}
+
+static int nfs41_xdr_enc_sequence(struct rpc_rqst *req, uint32_t *p, struct nfs41_sequence_args *args)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr = {
+                .nops   = 1,
+        };
+	int status;
+
+        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+        encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args)))
+		return status;
+
+	return 0;
 }
 
 /*
  * a SETCLIENTID request
  */
-static int nfs4_xdr_enc_setclientid(struct rpc_rqst *req, uint32_t *p, struct nfs4_setclientid *sc)
+static int nfs40_xdr_enc_setclientid(struct rpc_rqst *req, uint32_t *p, struct nfs4_setclientid *sc)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1968,14 +2883,29 @@ static int nfs4_xdr_enc_setclientid(struct rpc_rqst *req, uint32_t *p, struct nf
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 	return encode_setclientid(&xdr, sc);
+}
+
+static int nfs41_xdr_enc_exchange_id(struct rpc_rqst *req, uint32_t *p, void *args)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr = {
+	        .nops   = 1,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	encode_exchange_id(&xdr, args);
+
+	return 0;
 }
 
 /*
  * a SETCLIENTID_CONFIRM request
  */
-static int nfs4_xdr_enc_setclientid_confirm(struct rpc_rqst *req, uint32_t *p, struct nfs4_client *clp)
+static int nfs40_xdr_enc_setclientid_confirm(struct rpc_rqst *req, uint32_t *p, struct nfs4_client *clp)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1985,7 +2915,7 @@ static int nfs4_xdr_enc_setclientid_confirm(struct rpc_rqst *req, uint32_t *p, s
 	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 	status = encode_setclientid_confirm(&xdr, clp);
 	if (!status)
 		status = encode_putrootfh(&xdr);
@@ -1994,60 +2924,160 @@ static int nfs4_xdr_enc_setclientid_confirm(struct rpc_rqst *req, uint32_t *p, s
 	return status;
 }
 
+static int nfs41_xdr_enc_create_session(struct rpc_rqst *req, uint32_t *p, struct nfs41_create_session_args *args)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr = {
+		.nops   = 1,
+	};
+	int status;
+
+        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+        encode_compound_hdr(&xdr, &hdr, 1);
+
+	status = encode_create_session(&xdr, args);
+
+	return status;
+}
+
+static int nfs41_xdr_enc_get_lease_time(struct rpc_rqst *req, uint32_t *p, struct nfs4_get_lease_time_args *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 3,
+	};
+	int status;
+	const u32 lease_bitmap[2] = { FATTR4_WORD0_LEASE_TIME, 0 };
+
+        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+        encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+	status = encode_putrootfh(&xdr);
+	if (!status)
+		status = encode_fsinfo(&xdr, lease_bitmap);
+
+	return status;
+}
+
+static int nfs41_xdr_enc_destroy_session(struct rpc_rqst *req, uint32_t *p, struct nfs4_session *session)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr = {
+                .nops = 1,
+        };
+
+        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+        encode_compound_hdr(&xdr, &hdr, 1);
+
+        encode_destroy_session(&xdr, session);
+
+        return 0;
+}
+
 /*
  * DELEGRETURN request
  */
-static int nfs4_xdr_enc_delegreturn(struct rpc_rqst *req, uint32_t *p, const struct nfs4_delegreturnargs *args)
+static int nfs4_xdr_enc_delegreturn(const struct nfs4_delegreturnargs *args, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = encode_putfh(xdr, args->fhandle);
+	if (status != 0)
+		goto out;
+	status = encode_delegreturn(xdr, args->stateid);
+	if (status != 0)
+		goto out;
+	status = encode_getfattr(xdr, args->bitmask);
+out:
+	return status;
+}
+
+static int nfs40_xdr_enc_delegreturn(struct rpc_rqst *req, uint32_t *p, const struct nfs4_delegreturnargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
 		.nops = 3,
 	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_delegreturn(args, &xdr);
+}
+
+static int nfs41_xdr_enc_delegreturn(struct rpc_rqst *req, uint32_t *p, const struct nfs4_delegreturnargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
 	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	status = encode_putfh(&xdr, args->fhandle);
-	if (status != 0)
-		goto out;
-	status = encode_delegreturn(&xdr, args->stateid);
-	if (status != 0)
-		goto out;
-	status = encode_getfattr(&xdr, args->bitmask);
-out:
-	return status;
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_delegreturn(args, &xdr);
 }
 
 /*
  * Encode FS_LOCATIONS request
  */
-static int nfs4_xdr_enc_fs_locations(struct rpc_rqst *req, uint32_t *p, struct nfs4_fs_locations_arg *args)
+static int nfs4_xdr_enc_fs_locations(struct rpc_rqst *req, const struct nfs4_fs_locations_arg *args, struct xdr_stream *xdr)
 {
-	struct xdr_stream xdr;
-	struct compound_hdr hdr = {
-		.nops = 3,
-	};
 	struct rpc_auth *auth = req->rq_task->tk_auth;
 	int replen;
 	int status;
 
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
-	if ((status = encode_putfh(&xdr, args->dir_fh)) != 0)
+	if ((status = encode_putfh(xdr, args->dir_fh)) != 0)
 		goto out;
-	if ((status = encode_lookup(&xdr, args->name)) != 0)
+	if ((status = encode_lookup(xdr, args->name)) != 0)
 		goto out;
-	if ((status = encode_fs_locations(&xdr, args->bitmask)) != 0)
+	if ((status = encode_fs_locations(xdr, args->bitmask)) != 0)
 		goto out;
 	/* set up reply
 	 *   toplevel_status + OP_PUTFH + status
 	 *   + OP_LOOKUP + status + OP_GETATTR + status = 7
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + 7) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + 7 + nr_sequence_quads) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen, &args->page,
 			0, PAGE_SIZE);
 out:
 	return status;
+}
+
+static int nfs40_xdr_enc_fs_locations(struct rpc_rqst *req, uint32_t *p, const struct nfs4_fs_locations_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_fs_locations(req, args, &xdr);
+}
+
+static int nfs41_xdr_enc_fs_locations(struct rpc_rqst *req, uint32_t *p, const struct nfs4_fs_locations_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_fs_locations(req, args, &xdr);
 }
 
 /*
@@ -2078,8 +3108,8 @@ out:
 #define READ_BUF(nbytes)  do { \
 	p = xdr_inline_decode(xdr, nbytes); \
 	if (!p) { \
-		printk(KERN_WARNING "%s: reply buffer overflowed in line %d.", \
-			       	__FUNCTION__, __LINE__); \
+		printk(KERN_WARNING "%s: reply buffer overflowed in line %d.\n", \
+					__FUNCTION__, __LINE__); \
 		return -EIO; \
 	} \
 } while (0)
@@ -2852,6 +3882,8 @@ static int verify_attr_len(struct xdr_stream *xdr, uint32_t *savep, uint32_t att
 	return 0;
 }
 
+/* The type of file system exported
+*/
 static int decode_change_info(struct xdr_stream *xdr, struct nfs4_change_info *cinfo)
 {
 	uint32_t *p;
@@ -3027,6 +4059,7 @@ static int decode_getfattr(struct xdr_stream *xdr, struct nfs_fattr *fattr, cons
 
 	if ((status = decode_attr_length(xdr, &attrlen, &savep)) != 0)
 		goto xdr_error;
+
 
 
 	if ((status = decode_attr_type(xdr, bitmap, &type)) != 0)
@@ -3629,28 +4662,151 @@ static int decode_delegreturn(struct xdr_stream *xdr)
 	return decode_op_hdr(xdr, OP_DELEGRETURN);
 }
 
-/*
- * Decode OPEN_DOWNGRADE response
- */
-static int nfs4_xdr_dec_open_downgrade(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_closeres *res)
+static int decode_sequence(struct xdr_stream *xdr, struct nfs41_sequence_res *res)
 {
-        struct xdr_stream xdr;
-        struct compound_hdr hdr;
-        int status;
+	uint32_t *p;
+	u32 status;
 
-        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-        status = decode_compound_hdr(&xdr, &hdr);
-        if (status)
-                goto out;
-        status = decode_putfh(&xdr);
-        if (status)
-                goto out;
-        status = decode_open_downgrade(&xdr, res);
-	if (status != 0)
-		goto out;
-	decode_getfattr(&xdr, res->fattr, res->server);
-out:
-        return status;
+	status = decode_op_hdr(xdr, OP_SEQUENCE);
+	if (status)
+		return status;
+	READ_BUF(NFS4_MAX_SESSIONID_LEN);
+
+	COPYMEM(res->sessionid, NFS4_MAX_SESSIONID_LEN);
+
+	READ_BUF(20);
+	READ32(res->seqid);
+	READ32(res->slotid);
+	READ32(res->maxslots);
+	READ32(res->target_maxslots);
+	READ32(res->status_flags);
+
+	return 0;
+}
+
+static int decode_exchange_id(struct xdr_stream *xdr, struct nfs41_exchange_id_res *res)
+{
+	uint32_t *p;
+	int status;
+	struct nfs4_client *clp = res->client;
+
+	status = decode_op_hdr(xdr, OP_EXCHANGE_ID);
+	if (status)
+		return status;
+
+	READ_BUF(8);
+	READ64(clp->cl_clientid);
+	READ_BUF(4);
+	READ32(clp->cl_session->seqid);
+
+	/* server_owner */
+	/* minor_id */
+	READ_BUF(8);
+	READ64(res->server_owner.minor_id);
+
+	/* Major id */
+	READ_BUF(4);
+	READ32(res->server_owner.major_id_sz);
+	READ_BUF(res->server_owner.major_id_sz);
+	COPYMEM(res->server_owner.major_id, res->server_owner.major_id_sz);
+
+	/* server_scope */
+	READ_BUF(4);
+	READ32(res->server_scope.server_scope_sz);
+	READ_BUF(res->server_scope.server_scope_sz);
+	COPYMEM(res->server_scope.server_scope, res->server_scope.server_scope_sz);
+
+	return 0;
+}
+
+static int decode_create_session(struct xdr_stream *xdr, struct nfs41_create_session_res *res)
+{
+	uint32_t *p;
+	int status;
+	u32 cbr_enforce;
+	u32 nr_attrs;
+
+	struct nfs4_session *session = res->session;
+
+	status = decode_op_hdr(xdr, OP_CREATE_SESSION);
+
+	if (status)
+		return status;
+
+	/* sessionid */
+	READ_BUF(NFS4_MAX_SESSIONID_LEN);
+	COPYMEM(&session->sess_id, NFS4_MAX_SESSIONID_LEN);
+
+	/* seqid, persist, header padding, use_for back_chan, rdma_mode */
+	READ_BUF(20);
+	READ32(session->seqid);
+	READ32(session->persist);
+	READ32(session->header_padding);
+	READ32(session->use_for_back_chan);
+	READ32(session->rdma_mode);
+
+	READ_BUF(4);
+	READ32(cbr_enforce);
+
+	if (cbr_enforce) {
+		READ_BUF(8);
+		READ32(session->hash_alg);
+		READ32(session->ssv_len);
+	}
+
+	/* Channel attributes */
+	/* fore channel */
+	READ_BUF(20);
+	READ32(session->fore_channel.chan_attrs.max_rqst_sz);
+	READ32(session->fore_channel.chan_attrs.max_resp_sz);
+	READ32(session->fore_channel.chan_attrs.max_resp_sz_cached);
+	READ32(session->fore_channel.chan_attrs.max_ops);
+	READ32(session->fore_channel.chan_attrs.max_reqs);
+
+	READ_BUF(4);
+	READ32(nr_attrs);
+
+	if (nr_attrs == 1) {
+		READ_BUF(4);
+		READ32(session->fore_channel.chan_attrs.stream_attrs);
+	}
+
+	READ_BUF(4);
+	READ32(nr_attrs);
+	if (nr_attrs == 1) {
+		READ_BUF(4);
+		READ32(session->fore_channel.chan_attrs.rdma_attrs);
+	}
+
+	/* back channel */
+	READ_BUF(20);
+	READ32(session->back_channel.chan_attrs.max_rqst_sz);
+	READ32(session->back_channel.chan_attrs.max_resp_sz);
+	READ32(session->back_channel.chan_attrs.max_resp_sz_cached);
+	READ32(session->back_channel.chan_attrs.max_ops);
+	READ32(session->back_channel.chan_attrs.max_reqs);
+
+	READ_BUF(4);
+	READ32(nr_attrs);
+	if (nr_attrs == 1) {
+		READ_BUF(4);
+		READ32(session->back_channel.chan_attrs.stream_attrs);
+	}
+
+	READ_BUF(4);
+	READ32(nr_attrs);
+
+	if (nr_attrs == 1) {
+		READ_BUF(4);
+		READ32(session->back_channel.chan_attrs.rdma_attrs);
+	}
+
+	return 0;
+}
+
+static int decode_destroy_session(struct xdr_stream *xdr, void *dummy)
+{
+	return decode_op_hdr(xdr, OP_DESTROY_SESSION);
 }
 
 /*
@@ -3658,279 +4814,24 @@ out:
  */
 
 /*
- * Decode ACCESS response
+ * Decode OPEN_DOWNGRADE response
  */
-static int nfs4_xdr_dec_access(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_accessres *res)
+static int nfs4_xdr_dec_open_downgrade(struct nfs_closeres *res, struct xdr_stream *xdr)
 {
-	struct xdr_stream xdr;
-	struct compound_hdr hdr;
 	int status;
-	
-	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
-		goto out;
-	if ((status = decode_putfh(&xdr)) == 0)
-		status = decode_access(&xdr, res);
-out:
-	return status;
-}
 
-/*
- * Decode LOOKUP response
- */
-static int nfs4_xdr_dec_lookup(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_lookup_res *res)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr;
-	int status;
-	
-	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
-		goto out;
-	if ((status = decode_putfh(&xdr)) != 0)
-		goto out;
-	if ((status = decode_lookup(&xdr)) != 0)
-		goto out;
-	if ((status = decode_getfh(&xdr, res->fh)) != 0)
-		goto out;
-	status = decode_getfattr(&xdr, res->fattr, res->server);
-out:
-	return status;
-}
-
-/*
- * Decode LOOKUP_ROOT response
- */
-static int nfs4_xdr_dec_lookup_root(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_lookup_res *res)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr;
-	int status;
-	
-	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
-		goto out;
-	if ((status = decode_putrootfh(&xdr)) != 0)
-		goto out;
-	if ((status = decode_getfh(&xdr, res->fh)) == 0)
-		status = decode_getfattr(&xdr, res->fattr, res->server);
-out:
-	return status;
-}
-
-/*
- * Decode REMOVE response
- */
-static int nfs4_xdr_dec_remove(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_remove_res *res)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr;
-	int status;
-	
-	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
-		goto out;
-	if ((status = decode_putfh(&xdr)) != 0)
-		goto out;
-	if ((status = decode_remove(&xdr, &res->cinfo)) != 0)
-		goto out;
-	decode_getfattr(&xdr, res->dir_attr, res->server);
-out:
-	return status;
-}
-
-/*
- * Decode RENAME response
- */
-static int nfs4_xdr_dec_rename(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_rename_res *res)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr;
-	int status;
-	
-	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
-		goto out;
-	if ((status = decode_putfh(&xdr)) != 0)
-		goto out;
-	if ((status = decode_savefh(&xdr)) != 0)
-		goto out;
-	if ((status = decode_putfh(&xdr)) != 0)
-		goto out;
-	if ((status = decode_rename(&xdr, &res->old_cinfo, &res->new_cinfo)) != 0)
-		goto out;
-	/* Current FH is target directory */
-	if (decode_getfattr(&xdr, res->new_fattr, res->server) != 0)
-		goto out;
-	if ((status = decode_restorefh(&xdr)) != 0)
-		goto out;
-	decode_getfattr(&xdr, res->old_fattr, res->server);
-out:
-	return status;
-}
-
-/*
- * Decode LINK response
- */
-static int nfs4_xdr_dec_link(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_link_res *res)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr;
-	int status;
-	
-	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
-		goto out;
-	if ((status = decode_putfh(&xdr)) != 0)
-		goto out;
-	if ((status = decode_savefh(&xdr)) != 0)
-		goto out;
-	if ((status = decode_putfh(&xdr)) != 0)
-		goto out;
-	if ((status = decode_link(&xdr, &res->cinfo)) != 0)
-		goto out;
-	/*
-	 * Note order: OP_LINK leaves the directory as the current
-	 *             filehandle.
-	 */
-	if (decode_getfattr(&xdr, res->dir_attr, res->server) != 0)
-		goto out;
-	if ((status = decode_restorefh(&xdr)) != 0)
-		goto out;
-	decode_getfattr(&xdr, res->fattr, res->server);
-out:
-	return status;
-}
-
-/*
- * Decode CREATE response
- */
-static int nfs4_xdr_dec_create(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_create_res *res)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr;
-	int status;
-	
-	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
-		goto out;
-	if ((status = decode_putfh(&xdr)) != 0)
-		goto out;
-	if ((status = decode_savefh(&xdr)) != 0)
-		goto out;
-	if ((status = decode_create(&xdr,&res->dir_cinfo)) != 0)
-		goto out;
-	if ((status = decode_getfh(&xdr, res->fh)) != 0)
-		goto out;
-	if (decode_getfattr(&xdr, res->fattr, res->server) != 0)
-		goto out;
-	if ((status = decode_restorefh(&xdr)) != 0)
-		goto out;
-	decode_getfattr(&xdr, res->dir_fattr, res->server);
-out:
-	return status;
-}
-
-/*
- * Decode SYMLINK response
- */
-static int nfs4_xdr_dec_symlink(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_create_res *res)
-{
-	return nfs4_xdr_dec_create(rqstp, p, res);
-}
-
-/*
- * Decode GETATTR response
- */
-static int nfs4_xdr_dec_getattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_getattr_res *res)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr;
-	int status;
-	
-	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-	status = decode_compound_hdr(&xdr, &hdr);
-	if (status)
-		goto out;
-	status = decode_putfh(&xdr);
-	if (status)
-		goto out;
-	status = decode_getfattr(&xdr, res->fattr, res->server);
-out:
-	return status;
-
-}
-
-/*
- * Encode an SETACL request
- */
-static int
-nfs4_xdr_enc_setacl(struct rpc_rqst *req, uint32_t *p, struct nfs_setaclargs *args)
-{
-        struct xdr_stream xdr;
-        struct compound_hdr hdr = {
-                .nops   = 2,
-        };
-        int status;
-
-        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-        encode_compound_hdr(&xdr, &hdr);
-        status = encode_putfh(&xdr, args->fh);
+        status = decode_putfh(xdr);
         if (status)
                 goto out;
-        status = encode_setacl(&xdr, args);
+        status = decode_open_downgrade(xdr, res);
+	if (status != 0)
+		goto out;
+	decode_getfattr(xdr, res->fattr, res->server);
 out:
         return status;
 }
-/*
- * Decode SETACL response
- */
-static int
-nfs4_xdr_dec_setacl(struct rpc_rqst *rqstp, uint32_t *p, void *res)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr;
-	int status;
 
-	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-	status = decode_compound_hdr(&xdr, &hdr);
-	if (status)
-		goto out;
-	status = decode_putfh(&xdr);
-	if (status)
-		goto out;
-	status = decode_setattr(&xdr, res);
-out:
-	return status;
-}
-
-/*
- * Decode GETACL response
- */
-static int
-nfs4_xdr_dec_getacl(struct rpc_rqst *rqstp, uint32_t *p, size_t *acl_len)
-{
-	struct xdr_stream xdr;
-	struct compound_hdr hdr;
-	int status;
-
-	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-	status = decode_compound_hdr(&xdr, &hdr);
-	if (status)
-		goto out;
-	status = decode_putfh(&xdr);
-	if (status)
-		goto out;
-	status = decode_getacl(&xdr, rqstp, acl_len);
-
-out:
-	return status;
-}
-
-/*
- * Decode CLOSE response
- */
-static int nfs4_xdr_dec_close(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_closeres *res)
+static int nfs40_xdr_dec_open_downgrade(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_closeres *res)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr;
@@ -3939,11 +4840,614 @@ static int nfs4_xdr_dec_close(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_cl
         xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
         status = decode_compound_hdr(&xdr, &hdr);
         if (status)
-                goto out;
-        status = decode_putfh(&xdr);
+                return status;
+
+	return nfs4_xdr_dec_open_downgrade(res, &xdr);
+}
+
+static int nfs41_xdr_dec_open_downgrade(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_closeres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+	status = decode_sequence(&xdr, res->minorversion_info);
+
+	if (status)
+		return status;
+
+	return nfs4_xdr_dec_open_downgrade(res, &xdr);
+}
+
+/*
+ * Decode ACCESS response
+ */
+static int nfs4_xdr_dec_access(struct nfs4_accessres *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = decode_putfh(xdr)) == 0)
+		status = decode_access(xdr, res);
+
+	return status;
+}
+
+static int nfs40_xdr_dec_access(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_accessres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+
+	return nfs4_xdr_dec_access(res, &xdr);
+}
+
+
+static int nfs41_xdr_dec_access(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_accessres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+        if (status)
+		return status;
+
+	return nfs4_xdr_dec_access(res, &xdr);
+}
+
+/*
+ * Decode LOOKUP response
+ */
+static int nfs4_xdr_dec_lookup(struct nfs4_lookup_res *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = decode_putfh(xdr)) != 0)
+		goto out;
+	if ((status = decode_lookup(xdr)) != 0)
+		goto out;
+	if ((status = decode_getfh(xdr, res->fh)) != 0)
+		goto out;
+	status = decode_getfattr(xdr, res->fattr, res->server);
+out:
+	return status;
+}
+
+
+static int nfs40_xdr_dec_lookup(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_lookup_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+
+	return nfs4_xdr_dec_lookup(res, &xdr);
+}
+
+static int nfs41_xdr_dec_lookup(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_lookup_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_lookup(res, &xdr);
+}
+
+/*
+ * Decode LOOKUP_ROOT response
+ */
+static int nfs4_xdr_dec_lookup_root(struct nfs4_lookup_res *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = decode_putrootfh(xdr)) != 0)
+		goto out;
+	if ((status = decode_getfh(xdr, res->fh)) == 0)
+		status = decode_getfattr(xdr, res->fattr, res->server);
+out:
+	return status;
+}
+
+static int nfs40_xdr_dec_lookup_root(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_lookup_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+
+	return nfs4_xdr_dec_lookup_root(res, &xdr);
+}
+
+
+static int nfs41_xdr_dec_lookup_root(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_lookup_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_lookup_root(res, &xdr);
+}
+
+/*
+ * Decode REMOVE response
+ */
+static int nfs4_xdr_dec_remove(struct nfs4_remove_res *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = decode_putfh(xdr)) != 0)
+		goto out;
+	if ((status = decode_remove(xdr, &res->cinfo)) != 0)
+		goto out;
+	decode_getfattr(xdr, res->dir_attr, res->server);
+out:
+	return status;
+}
+
+static int nfs40_xdr_dec_remove(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_remove_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+
+	return nfs4_xdr_dec_remove(res, &xdr);
+}
+
+
+static int nfs41_xdr_dec_remove(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_remove_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_remove(res, &xdr);
+}
+
+/*
+ * Decode RENAME response
+ */
+static int nfs4_xdr_dec_rename(struct nfs4_rename_res *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = decode_putfh(xdr)) != 0)
+		goto out;
+	if ((status = decode_savefh(xdr)) != 0)
+		goto out;
+	if ((status = decode_putfh(xdr)) != 0)
+		goto out;
+	if ((status = decode_rename(xdr, &res->old_cinfo, &res->new_cinfo)) != 0)
+		goto out;
+	/* Current FH is target directory */
+	if (decode_getfattr(xdr, res->new_fattr, res->server) != 0)
+		goto out;
+	if ((status = decode_restorefh(xdr)) != 0)
+		goto out;
+	decode_getfattr(xdr, res->old_fattr, res->server);
+out:
+	return status;
+}
+
+static int nfs40_xdr_dec_rename(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_rename_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+
+	return nfs4_xdr_dec_rename(res, &xdr);
+}
+
+
+static int nfs41_xdr_dec_rename(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_rename_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_rename(res, &xdr);
+}
+
+/*
+ * Decode LINK response
+ */
+static int nfs4_xdr_dec_link(struct nfs4_link_res *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = decode_putfh(xdr)) != 0)
+		goto out;
+	if ((status = decode_savefh(xdr)) != 0)
+		goto out;
+	if ((status = decode_putfh(xdr)) != 0)
+		goto out;
+	if ((status = decode_link(xdr, &res->cinfo)) != 0)
+		goto out;
+	/*
+	 * Note order: OP_LINK leaves the directory as the current
+	 *             filehandle.
+	 */
+	if (decode_getfattr(xdr, res->dir_attr, res->server) != 0)
+		goto out;
+	if ((status = decode_restorefh(xdr)) != 0)
+		goto out;
+	decode_getfattr(xdr, res->fattr, res->server);
+out:
+	return status;
+}
+
+static int nfs40_xdr_dec_link(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_link_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+
+	return nfs4_xdr_dec_link(res, &xdr);
+}
+
+static int nfs41_xdr_dec_link(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_link_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_link(res, &xdr);
+}
+
+/*
+ * Decode CREATE response
+ */
+static int nfs4_xdr_dec_create(struct nfs4_create_res *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = decode_putfh(xdr)) != 0)
+		goto out;
+	if ((status = decode_savefh(xdr)) != 0)
+		goto out;
+	if ((status = decode_create(xdr,&res->dir_cinfo)) != 0)
+		goto out;
+	if ((status = decode_getfh(xdr, res->fh)) != 0)
+		goto out;
+	if (decode_getfattr(xdr, res->fattr, res->server) != 0)
+		goto out;
+	if ((status = decode_restorefh(xdr)) != 0)
+		goto out;
+	decode_getfattr(xdr, res->dir_fattr, res->server);
+out:
+	return status;
+}
+
+static int nfs40_xdr_dec_create(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_create_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+
+	return nfs4_xdr_dec_create(res, &xdr);
+}
+
+
+static int nfs41_xdr_dec_create(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_create_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_create(res, &xdr);
+}
+
+
+/*
+ * Decode SYMLINK response
+ */
+static int nfs40_xdr_dec_symlink(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_create_res *res)
+{
+	return nfs40_xdr_dec_create(rqstp, p, res);
+}
+
+static int nfs41_xdr_dec_symlink(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_create_res *res)
+{
+	return nfs41_xdr_dec_create(rqstp, p, res);
+}
+/*
+ * Decode GETATTR response
+ */
+static int nfs4_xdr_dec_getattr(struct nfs4_getattr_res *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = decode_putfh(xdr);
+	if (status)
+		goto out;
+	status = decode_getfattr(xdr, res->fattr, res->server);
+out:
+	return status;
+
+}
+
+static int nfs40_xdr_dec_getattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_getattr_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+	
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+	return nfs4_xdr_dec_getattr(res, &xdr);
+}
+
+
+static int nfs41_xdr_dec_getattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_getattr_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_getattr(res, &xdr);
+}
+/*
+ * Encode an SETACL request
+ */
+static int
+nfs4_xdr_enc_setacl( struct nfs_setaclargs *args, struct xdr_stream *xdr)
+{
+        int status;
+
+        status = encode_putfh(xdr, args->fh);
         if (status)
                 goto out;
-        status = decode_close(&xdr, res);
+        status = encode_setacl(xdr, args);
+out:
+        return status;
+}
+
+static int
+nfs40_xdr_enc_setacl(struct rpc_rqst *req, uint32_t *p, struct nfs_setaclargs *args)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr = {
+                .nops   = 2,
+        };
+
+        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+        encode_compound_hdr(&xdr, &hdr, 0);
+
+	return nfs4_xdr_enc_setacl(args, &xdr);
+}
+
+static int
+nfs41_xdr_enc_setacl(struct rpc_rqst *req, uint32_t *p, struct nfs_setaclargs *args)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr = {
+                .nops   = 3,
+        };
+	int status;
+
+        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+        encode_compound_hdr(&xdr, &hdr, 1);
+
+	if ((status = encode_sequence(&xdr, args->minorversion_info)))
+		return status;
+
+	return nfs4_xdr_enc_setacl(args, &xdr);
+}
+
+/*
+ * Decode SETACL response
+ */
+static int
+nfs4_xdr_dec_setacl(void *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = decode_putfh(xdr);
+	if (status)
+		goto out;
+	status = decode_setattr(xdr, res);
+out:
+	return status;
+}
+
+static int
+nfs40_xdr_dec_setacl(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_setaclres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+	return nfs4_xdr_dec_setacl(res->opres, &xdr);
+}
+
+
+static int
+nfs41_xdr_dec_setacl(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_setaclres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_setacl(res->opres, &xdr);
+}
+
+/*
+ * Decode GETACL response
+ */
+static int
+nfs4_xdr_dec_getacl(struct rpc_rqst *rqstp, size_t *acl_len, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = decode_putfh(xdr);
+	if (status)
+		goto out;
+	status = decode_getacl(xdr, rqstp, acl_len);
+
+out:
+	return status;
+}
+
+static int
+nfs40_xdr_dec_getacl(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_getaclres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+	return nfs4_xdr_dec_getacl(rqstp, res->acl_len, &xdr);
+}
+
+static int
+nfs41_xdr_dec_getacl(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_getaclres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_getacl(rqstp, res->acl_len, &xdr);
+}
+/*
+ * Decode CLOSE response
+ */
+static int nfs4_xdr_dec_close(struct nfs_closeres *res, struct xdr_stream *xdr)
+{
+        int status;
+
+        status = decode_putfh(xdr);
+        if (status)
+                goto out;
+        status = decode_close(xdr, res);
 	if (status != 0)
 		goto out;
 	/*
@@ -3952,15 +5456,12 @@ static int nfs4_xdr_dec_close(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_cl
 	 * 	an ESTALE error. Shouldn't be a problem,
 	 * 	though, since fattr->valid will remain unset.
 	 */
-	decode_getfattr(&xdr, res->fattr, res->server);
+	decode_getfattr(xdr, res->fattr, res->server);
 out:
         return status;
 }
 
-/*
- * Decode OPEN response
- */
-static int nfs4_xdr_dec_open(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_openres *res)
+static int nfs40_xdr_dec_close(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_closeres *res)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr;
@@ -3969,32 +5470,108 @@ static int nfs4_xdr_dec_open(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_ope
         xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
         status = decode_compound_hdr(&xdr, &hdr);
         if (status)
-                goto out;
-        status = decode_putfh(&xdr);
+                return status;
+
+	return nfs4_xdr_dec_close(res, &xdr);
+}
+
+
+static int nfs41_xdr_dec_close(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_closeres *res)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr;
+        int status;
+
+        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+        status = decode_compound_hdr(&xdr, &hdr);
+        if (status)
+                return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_close(res, &xdr);
+}
+/*
+ * Decode OPEN response
+ */
+static int nfs4_xdr_dec_open(struct nfs_openres *res, struct xdr_stream *xdr)
+{
+        int status;
+
+        status = decode_putfh(xdr);
         if (status)
                 goto out;
-        status = decode_savefh(&xdr);
+        status = decode_savefh(xdr);
 	if (status)
 		goto out;
-        status = decode_open(&xdr, res);
+        status = decode_open(xdr, res);
         if (status)
                 goto out;
-	status = decode_getfh(&xdr, &res->fh);
+	status = decode_getfh(xdr, &res->fh);
         if (status)
 		goto out;
-	if (decode_getfattr(&xdr, res->f_attr, res->server) != 0)
+	if (decode_getfattr(xdr, res->f_attr, res->server) != 0)
 		goto out;
-	if ((status = decode_restorefh(&xdr)) != 0)
+	if ((status = decode_restorefh(xdr)) != 0)
 		goto out;
-	decode_getfattr(&xdr, res->dir_attr, res->server);
+	decode_getfattr(xdr, res->dir_attr, res->server);
 out:
         return status;
+}
+
+static int nfs40_xdr_dec_open(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_openres *res)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr;
+        int status;
+
+        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+        status = decode_compound_hdr(&xdr, &hdr);
+        if (status)
+                return status;
+
+	return nfs4_xdr_dec_open(res, &xdr);
+}
+
+static int nfs41_xdr_dec_open(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_openres *res)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr;
+        int status;
+
+        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+        status = decode_compound_hdr(&xdr, &hdr);
+        if (status)
+                return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_open(res, &xdr);
 }
 
 /*
  * Decode OPEN_CONFIRM response
  */
-static int nfs4_xdr_dec_open_confirm(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_open_confirmres *res)
+
+static int nfs4_xdr_dec_open_confirm(struct nfs_open_confirmres *res, struct xdr_stream *xdr)
+{
+        int status;
+
+        status = decode_putfh(xdr);
+        if (status)
+                goto out;
+        status = decode_open_confirm(xdr, res);
+out:
+        return status;
+}
+
+static int nfs40_xdr_dec_open_confirm(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_open_confirmres *res)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr;
@@ -4003,43 +5580,49 @@ static int nfs4_xdr_dec_open_confirm(struct rpc_rqst *rqstp, uint32_t *p, struct
         xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
         status = decode_compound_hdr(&xdr, &hdr);
         if (status)
-                goto out;
-        status = decode_putfh(&xdr);
-        if (status)
-                goto out;
-        status = decode_open_confirm(&xdr, res);
-out:
-        return status;
+                return status;
+
+	return nfs4_xdr_dec_open_confirm(res, &xdr);
 }
 
+
+static int nfs41_xdr_dec_open_confirm(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_open_confirmres *res)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr;
+        int status;
+
+        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+        status = decode_compound_hdr(&xdr, &hdr);
+        if (status)
+                return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_open_confirm(res, &xdr);
+}
 /*
  * Decode OPEN response
  */
-static int nfs4_xdr_dec_open_noattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_openres *res)
+static int nfs4_xdr_dec_open_noattr(struct nfs_openres *res, struct xdr_stream *xdr)
 {
-        struct xdr_stream xdr;
-        struct compound_hdr hdr;
         int status;
 
-        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-        status = decode_compound_hdr(&xdr, &hdr);
+        status = decode_putfh(xdr);
         if (status)
                 goto out;
-        status = decode_putfh(&xdr);
+        status = decode_open(xdr, res);
         if (status)
                 goto out;
-        status = decode_open(&xdr, res);
-        if (status)
-                goto out;
-	decode_getfattr(&xdr, res->f_attr, res->server);
+	decode_getfattr(xdr, res->f_attr, res->server);
 out:
         return status;
 }
 
-/*
- * Decode SETATTR response
- */
-static int nfs4_xdr_dec_setattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_setattrres *res)
+static int nfs40_xdr_dec_open_noattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_openres *res)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr;
@@ -4048,24 +5631,98 @@ static int nfs4_xdr_dec_setattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_
         xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
         status = decode_compound_hdr(&xdr, &hdr);
         if (status)
-                goto out;
-        status = decode_putfh(&xdr);
+                return status;
+
+	return nfs4_xdr_dec_open_noattr(res, &xdr);
+}
+
+static int nfs41_xdr_dec_open_noattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_openres *res)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr;
+        int status;
+
+        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+        status = decode_compound_hdr(&xdr, &hdr);
+        if (status)
+                return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_open_noattr(res, &xdr);
+}
+/*
+ * Decode SETATTR response
+ */
+static int nfs4_xdr_dec_setattr(struct nfs_setattrres *res, struct xdr_stream *xdr)
+{
+        int status;
+
+        status = decode_putfh(xdr);
         if (status)
                 goto out;
-        status = decode_setattr(&xdr, res);
+        status = decode_setattr(xdr, res);
         if (status)
                 goto out;
-	status = decode_getfattr(&xdr, res->fattr, res->server);
+	status = decode_getfattr(xdr, res->fattr, res->server);
 	if (status == NFS4ERR_DELAY)
 		status = 0;
 out:
         return status;
 }
 
+static int nfs40_xdr_dec_setattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_setattrres *res)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr;
+        int status;
+
+        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+        status = decode_compound_hdr(&xdr, &hdr);
+        if (status)
+                return status;
+
+	return nfs4_xdr_dec_setattr(res, &xdr);
+}
+
+
+static int nfs41_xdr_dec_setattr(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_setattrres *res)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr;
+        int status;
+
+        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+        status = decode_compound_hdr(&xdr, &hdr);
+        if (status)
+                return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_setattr(res, &xdr);
+}
 /*
  * Decode LOCK response
  */
-static int nfs4_xdr_dec_lock(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_lock_res *res)
+static int nfs4_xdr_dec_lock(struct nfs_lock_res *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = decode_putfh(xdr);
+	if (status)
+		goto out;
+	status = decode_lock(xdr, res);
+out:
+	return status;
+}
+
+static int nfs40_xdr_dec_lock(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_lock_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4074,19 +5731,45 @@ static int nfs4_xdr_dec_lock(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_loc
 	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
 	if (status)
-		goto out;
-	status = decode_putfh(&xdr);
-	if (status)
-		goto out;
-	status = decode_lock(&xdr, res);
-out:
-	return status;
+		return status;
+
+	return nfs4_xdr_dec_lock(res, &xdr);
 }
 
+static int nfs41_xdr_dec_lock(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_lock_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_lock(res, &xdr);
+}
 /*
  * Decode LOCKT response
  */
-static int nfs4_xdr_dec_lockt(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_lockt_res *res)
+static int nfs4_xdr_dec_lockt(struct nfs_lockt_res *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = decode_putfh(xdr);
+	if (status)
+		goto out;
+	status = decode_lockt(xdr, res);
+out:
+	return status;
+}
+
+static int nfs40_xdr_dec_lockt(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_lockt_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4095,19 +5778,45 @@ static int nfs4_xdr_dec_lockt(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_lo
 	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
 	if (status)
-		goto out;
-	status = decode_putfh(&xdr);
-	if (status)
-		goto out;
-	status = decode_lockt(&xdr, res);
-out:
-	return status;
+		return status;
+
+	return nfs4_xdr_dec_lockt(res, &xdr);
 }
 
+static int nfs41_xdr_dec_lockt(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_lockt_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_lockt(res, &xdr);
+}
 /*
  * Decode LOCKU response
  */
-static int nfs4_xdr_dec_locku(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_locku_res *res)
+static int nfs4_xdr_dec_locku(struct nfs_locku_res *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = decode_putfh(xdr);
+	if (status)
+		goto out;
+	status = decode_locku(xdr, res);
+out:
+	return status;
+}
+
+static int nfs40_xdr_dec_locku(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_locku_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4116,19 +5825,45 @@ static int nfs4_xdr_dec_locku(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_lo
 	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
 	if (status)
-		goto out;
-	status = decode_putfh(&xdr);
-	if (status)
-		goto out;
-	status = decode_locku(&xdr, res);
-out:
-	return status;
+		return status;
+
+	return nfs4_xdr_dec_locku(res, &xdr);
 }
 
+static int nfs41_xdr_dec_locku(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_locku_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_locku(res, &xdr);
+}
 /*
  * Decode READLINK response
  */
-static int nfs4_xdr_dec_readlink(struct rpc_rqst *rqstp, uint32_t *p, void *res)
+static int nfs4_xdr_dec_readlink(struct rpc_rqst *rqstp, void *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = decode_putfh(xdr);
+	if (status)
+		goto out;
+	status = decode_readlink(xdr, rqstp);
+out:
+	return status;
+}
+
+static int nfs40_xdr_dec_readlink(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_readlinkres *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4137,19 +5872,45 @@ static int nfs4_xdr_dec_readlink(struct rpc_rqst *rqstp, uint32_t *p, void *res)
 	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
 	if (status)
-		goto out;
-	status = decode_putfh(&xdr);
-	if (status)
-		goto out;
-	status = decode_readlink(&xdr, rqstp);
-out:
-	return status;
+		return status;
+
+	return nfs4_xdr_dec_readlink(rqstp, res, &xdr);
 }
 
+static int nfs41_xdr_dec_readlink(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_readlinkres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_readlink(rqstp, res, &xdr);
+}
 /*
  * Decode READDIR response
  */
-static int nfs4_xdr_dec_readdir(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_readdir_res *res)
+static int nfs4_xdr_dec_readdir(struct rpc_rqst *rqstp, struct nfs4_readdir_res *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = decode_putfh(xdr);
+	if (status)
+		goto out;
+	status = decode_readdir(xdr, rqstp, res);
+out:
+	return status;
+}
+
+static int nfs40_xdr_dec_readdir(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_readdir_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4158,19 +5919,49 @@ static int nfs4_xdr_dec_readdir(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4
 	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
 	if (status)
-		goto out;
-	status = decode_putfh(&xdr);
-	if (status)
-		goto out;
-	status = decode_readdir(&xdr, rqstp, res);
-out:
-	return status;
+		return status;
+
+	return nfs4_xdr_dec_readdir(rqstp, res, &xdr);
 }
 
+
+static int nfs41_xdr_dec_readdir(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_readdir_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_readdir(rqstp, res, &xdr);
+}
 /*
  * Decode Read response
  */
-static int nfs4_xdr_dec_read(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_readres *res)
+static int nfs4_xdr_dec_read(struct rpc_rqst *rqstp, struct nfs_readres *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = decode_putfh(xdr);
+	if (status)
+		goto out;
+	status = decode_read(xdr, rqstp, res);
+	if (!status)
+		status = res->count;
+out:
+	return status;
+}
+
+static int nfs40_xdr_dec_read(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_readres *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4179,47 +5970,50 @@ static int nfs4_xdr_dec_read(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_rea
 	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
 	if (status)
-		goto out;
-	status = decode_putfh(&xdr);
-	if (status)
-		goto out;
-	status = decode_read(&xdr, rqstp, res);
-	if (!status)
-		status = res->count;
-out:
-	return status;
+		return status;
+
+	return nfs4_xdr_dec_read(rqstp, res, &xdr);
 }
 
+static int nfs41_xdr_dec_read(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_readres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_read(rqstp, res, &xdr);
+}
 /*
  * Decode WRITE response
  */
-static int nfs4_xdr_dec_write(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_writeres *res)
+static int nfs4_xdr_dec_write(struct nfs_writeres *res, struct xdr_stream *xdr)
 {
-	struct xdr_stream xdr;
-	struct compound_hdr hdr;
 	int status;
 
-	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-	status = decode_compound_hdr(&xdr, &hdr);
+	status = decode_putfh(xdr);
 	if (status)
 		goto out;
-	status = decode_putfh(&xdr);
+	status = decode_write(xdr, res);
 	if (status)
 		goto out;
-	status = decode_write(&xdr, res);
-	if (status)
-		goto out;
-	decode_getfattr(&xdr, res->fattr, res->server);
+	decode_getfattr(xdr, res->fattr, res->server);
 	if (!status)
 		status = res->count;
 out:
 	return status;
 }
 
-/*
- * Decode COMMIT response
- */
-static int nfs4_xdr_dec_commit(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_writeres *res)
+static int nfs40_xdr_dec_write(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_writeres *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4228,42 +6022,95 @@ static int nfs4_xdr_dec_commit(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_w
 	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
 	if (status)
-		goto out;
-	status = decode_putfh(&xdr);
+		return status;
+
+	return nfs4_xdr_dec_write(res, &xdr);
+}
+
+static int nfs41_xdr_dec_write(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_writeres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_write(res, &xdr);
+}
+/*
+ * Decode COMMIT response
+ */
+static int nfs4_xdr_dec_commit(struct nfs_writeres *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = decode_putfh(xdr);
 	if (status)
 		goto out;
-	status = decode_commit(&xdr, res);
+	status = decode_commit(xdr, res);
 	if (status)
 		goto out;
-	decode_getfattr(&xdr, res->fattr, res->server);
+	decode_getfattr(xdr, res->fattr, res->server);
 out:
 	return status;
 }
 
+static int nfs40_xdr_dec_commit(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_writeres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+	return nfs4_xdr_dec_commit(res, &xdr);
+}
+
+static int nfs41_xdr_dec_commit(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_writeres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_commit(res, &xdr);
+}
 /*
  * FSINFO request
  */
-static int nfs4_xdr_dec_fsinfo(struct rpc_rqst *req, uint32_t *p, struct nfs_fsinfo *fsinfo)
+static int nfs4_xdr_dec_fsinfo(struct nfs_fsinfo *fsinfo, struct compound_hdr *hdr, struct xdr_stream *xdr)
 {
-	struct xdr_stream xdr;
-	struct compound_hdr hdr;
 	int status;
 
-	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
-	status = decode_compound_hdr(&xdr, &hdr);
+	status = decode_putfh(xdr);
 	if (!status)
-		status = decode_putfh(&xdr);
+		status = decode_fsinfo(xdr, fsinfo);
 	if (!status)
-		status = decode_fsinfo(&xdr, fsinfo);
-	if (!status)
-		status = -nfs_stat_to_errno(hdr.status);
+		status = -nfs_stat_to_errno(hdr->status);
 	return status;
 }
 
-/*
- * PATHCONF request
- */
-static int nfs4_xdr_dec_pathconf(struct rpc_rqst *req, uint32_t *p, struct nfs_pathconf *pathconf)
+static int nfs40_xdr_dec_fsinfo(struct rpc_rqst *req, uint32_t *p, struct nfs4_fsinfo_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4271,17 +6118,92 @@ static int nfs4_xdr_dec_pathconf(struct rpc_rqst *req, uint32_t *p, struct nfs_p
 
 	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+	return nfs4_xdr_dec_fsinfo(res->fsinfo, &hdr, &xdr);
+}
+
+static int nfs41_xdr_dec_fsinfo(struct rpc_rqst *req, uint32_t *p, struct nfs4_fsinfo_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_fsinfo(res->fsinfo, &hdr, &xdr);
+}
+/*
+ * PATHCONF request
+ */
+static int nfs4_xdr_dec_pathconf(struct nfs_pathconf *pathconf, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = decode_putfh(xdr);
 	if (!status)
-		status = decode_putfh(&xdr);
-	if (!status)
-		status = decode_pathconf(&xdr, pathconf);
+		status = decode_pathconf(xdr, pathconf);
 	return status;
+}
+
+static int nfs40_xdr_dec_pathconf(struct rpc_rqst *req, uint32_t *p, struct nfs4_pathconf_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+
+	if (status)
+		return status;
+
+	return nfs4_xdr_dec_pathconf(res->pathconf, &xdr);
+}
+
+static int nfs41_xdr_dec_pathconf(struct rpc_rqst *req, uint32_t *p, struct nfs4_pathconf_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+
+	if (status)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_pathconf(res->pathconf, &xdr);
 }
 
 /*
  * STATFS request
  */
-static int nfs4_xdr_dec_statfs(struct rpc_rqst *req, uint32_t *p, struct nfs_fsstat *fsstat)
+static int nfs4_xdr_dec_statfs(struct nfs_fsstat *fsstat, struct xdr_stream *xdr)
+{
+	int status;
+
+	status = decode_putfh(xdr);
+	if (!status)
+		status = decode_statfs(xdr, fsstat);
+	return status;
+}
+
+static int nfs40_xdr_dec_statfs(struct rpc_rqst *req, uint32_t *p, struct nfs4_statfs_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4289,17 +6211,46 @@ static int nfs4_xdr_dec_statfs(struct rpc_rqst *req, uint32_t *p, struct nfs_fss
 
 	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
-	if (!status)
-		status = decode_putfh(&xdr);
-	if (!status)
-		status = decode_statfs(&xdr, fsstat);
-	return status;
+	if (status)
+		return status;
+
+	return nfs4_xdr_dec_statfs(res->fsstat, &xdr);
+}
+
+static int nfs41_xdr_dec_statfs(struct rpc_rqst *req, uint32_t *p, struct nfs4_statfs_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_statfs(res->fsstat, &xdr);
 }
 
 /*
  * GETATTR_BITMAP request
  */
-static int nfs4_xdr_dec_server_caps(struct rpc_rqst *req, uint32_t *p, struct nfs4_server_caps_res *res)
+static int nfs4_xdr_dec_server_caps(struct nfs4_server_caps_res *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = decode_putfh(xdr)) != 0)
+		goto out;
+	status = decode_server_caps(xdr, res);
+out:
+	return status;
+}
+
+static int nfs40_xdr_dec_server_caps(struct rpc_rqst *req, uint32_t *p, struct nfs4_server_caps_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4307,18 +6258,34 @@ static int nfs4_xdr_dec_server_caps(struct rpc_rqst *req, uint32_t *p, struct nf
 
 	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
 	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
-		goto out;
-	if ((status = decode_putfh(&xdr)) != 0)
-		goto out;
-	status = decode_server_caps(&xdr, res);
-out:
-	return status;
+		return status;
+
+	return nfs4_xdr_dec_server_caps(res, &xdr);
 }
+
+static int nfs41_xdr_dec_server_caps(struct rpc_rqst *req, uint32_t *p, struct nfs4_server_caps_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
+	if ((status = decode_compound_hdr(&xdr, &hdr)) != 0)
+		return status;
+
+        status = decode_sequence(&xdr, res->minorversion_info);
+
+        if (status)
+	        return status;
+
+	return nfs4_xdr_dec_server_caps(res, &xdr);
+}
+
 
 /*
  * Decode RENEW response
  */
-static int nfs4_xdr_dec_renew(struct rpc_rqst *rqstp, uint32_t *p, void *dummy)
+static int nfs40_xdr_dec_renew(struct rpc_rqst *rqstp, uint32_t *p, void *dummy)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4331,10 +6298,24 @@ static int nfs4_xdr_dec_renew(struct rpc_rqst *rqstp, uint32_t *p, void *dummy)
 	return status;
 }
 
+static int nfs41_xdr_dec_sequence(struct rpc_rqst *rqstp, uint32_t *p, struct nfs41_sequence_res *res)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr;
+        int status;
+
+        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+        status = decode_compound_hdr(&xdr, &hdr);
+
+	status = decode_sequence(&xdr, res);
+
+	return status;
+}
+
 /*
  * a SETCLIENTID request
  */
-static int nfs4_xdr_dec_setclientid(struct rpc_rqst *req, uint32_t *p,
+static int nfs40_xdr_dec_setclientid(struct rpc_rqst *req, uint32_t *p,
 		struct nfs4_client *clp)
 {
 	struct xdr_stream xdr;
@@ -4350,10 +6331,27 @@ static int nfs4_xdr_dec_setclientid(struct rpc_rqst *req, uint32_t *p,
 	return status;
 }
 
+static int nfs41_xdr_dec_exchange_id(struct rpc_rqst *rqstp, uint32_t *p, void *res)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr;
+        int status;
+
+        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+        status = decode_compound_hdr(&xdr, &hdr);
+
+	if (hdr.status)
+		return hdr.status;
+
+	status = decode_exchange_id(&xdr, res);
+
+	return status;
+}
+
 /*
  * a SETCLIENTID_CONFIRM request
  */
-static int nfs4_xdr_dec_setclientid_confirm(struct rpc_rqst *req, uint32_t *p, struct nfs_fsinfo *fsinfo)
+static int nfs40_xdr_dec_setclientid_confirm(struct rpc_rqst *req, uint32_t *p, struct nfs_fsinfo *fsinfo)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4372,10 +6370,73 @@ static int nfs4_xdr_dec_setclientid_confirm(struct rpc_rqst *req, uint32_t *p, s
 	return status;
 }
 
+static int nfs41_xdr_dec_create_session(struct rpc_rqst *rqstp, uint32_t *p, struct nfs41_create_session_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (hdr.status)
+		return hdr.status;
+
+	status = decode_create_session(&xdr, res);
+	if (!status)
+		nr_sequence_quads = decode_sequence_maxsz;
+
+	return status;
+}
+
+static int nfs41_xdr_dec_get_lease_time(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_get_lease_time_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (hdr.status)
+		return hdr.status;
+
+	status = decode_sequence(&xdr, res->minorversion_info);
+	if (!status)
+		status = decode_putrootfh(&xdr);
+	if (!status)
+		status = decode_fsinfo(&xdr, res->fsinfo);
+	if (!status)
+		status = -nfs_stat_to_errno(hdr.status);
+	return status;
+}
+
+static int nfs41_xdr_dec_destroy_session(struct rpc_rqst *rqstp, uint32_t *p, void *dummy)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+
+	return decode_destroy_session(&xdr, dummy);
+}
+
 /*
  * DELEGRETURN request
  */
-static int nfs4_xdr_dec_delegreturn(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_delegreturnres *res)
+static int nfs4_xdr_dec_delegreturn(struct nfs4_delegreturnres *res, struct xdr_stream *xdr)
+{
+	int status;
+	status = decode_putfh(xdr);
+	if (status != 0)
+		goto out;
+	status = decode_delegreturn(xdr);
+	decode_getfattr(xdr, res->fattr, res->server);
+out:
+	return status;
+}
+
+static int nfs40_xdr_dec_delegreturn(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_delegreturnres *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4384,20 +6445,48 @@ static int nfs4_xdr_dec_delegreturn(struct rpc_rqst *rqstp, uint32_t *p, struct 
 	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
 	if (status != 0)
-		goto out;
-	status = decode_putfh(&xdr);
+		return status;
+
+	return nfs4_xdr_dec_delegreturn(res, &xdr);
+}
+
+static int nfs41_xdr_dec_delegreturn(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_delegreturnres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
 	if (status != 0)
-		goto out;
-	status = decode_delegreturn(&xdr);
-	decode_getfattr(&xdr, res->fattr, res->server);
-out:
-	return status;
+		return status;
+
+	status = decode_sequence(&xdr, res->minorversion_info);
+
+	if (status)
+		return status;
+
+	return nfs4_xdr_dec_delegreturn(res, &xdr);
 }
 
 /*
  * FS_LOCATIONS request
  */
-static int nfs4_xdr_dec_fs_locations(struct rpc_rqst *req, uint32_t *p, struct nfs4_fs_locations *res)
+static int nfs4_xdr_dec_fs_locations(struct nfs4_fs_locations *res, struct xdr_stream *xdr)
+{
+	int status;
+
+	if ((status = decode_putfh(xdr)) != 0)
+		goto out;
+	if ((status = decode_lookup(xdr)) != 0)
+		goto out;
+	xdr_enter_page(xdr, PAGE_SIZE);
+	status = decode_getfattr(xdr, &res->fattr, res->server);
+out:
+	return status;
+}
+
+static int nfs40_xdr_dec_fs_locations(struct rpc_rqst *req, uint32_t *p, struct nfs4_fs_locations *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4406,15 +6495,28 @@ static int nfs4_xdr_dec_fs_locations(struct rpc_rqst *req, uint32_t *p, struct n
 	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
 	if (status != 0)
-		goto out;
-	if ((status = decode_putfh(&xdr)) != 0)
-		goto out;
-	if ((status = decode_lookup(&xdr)) != 0)
-		goto out;
-	xdr_enter_page(&xdr, PAGE_SIZE);
-	status = decode_getfattr(&xdr, &res->fattr, res->server);
-out:
-	return status;
+		return status;
+
+	return nfs4_xdr_dec_fs_locations(res, &xdr);
+}
+
+static int nfs41_xdr_dec_fs_locations(struct rpc_rqst *req, uint32_t *p, struct nfs4_fs_locations *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		return status;
+
+	status = decode_sequence(&xdr, res->minorversion_info);
+
+	if (status)
+		return status;
+
+	return nfs4_xdr_dec_fs_locations(res, &xdr);
 }
 
 uint32_t *nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
@@ -4544,58 +6646,126 @@ nfs_stat_to_errno(int stat)
 # define MAX(a, b)	(((a) > (b))? (a) : (b))
 #endif
 
-#define PROC(proc, argtype, restype)				\
-[NFSPROC4_CLNT_##proc] = {					\
-	.p_proc   = NFSPROC4_COMPOUND,				\
-	.p_encode = (kxdrproc_t) nfs4_xdr_##argtype,		\
-	.p_decode = (kxdrproc_t) nfs4_xdr_##restype,		\
+#define PROC(proc, argtype, restype, minorversion)			\
+[NFSPROC4_CLNT_##proc] = {						\
+	.p_proc   = NFSPROC4_COMPOUND,					\
+	.p_encode = (kxdrproc_t) nfs4##minorversion##_xdr_##argtype,	\
+	.p_decode = (kxdrproc_t) nfs4##minorversion##_xdr_##restype,	\
 	.p_bufsiz = MAX(NFS4_##argtype##_sz,NFS4_##restype##_sz) << 2,	\
 	.p_statidx = NFSPROC4_CLNT_##proc,			\
 	.p_name   = #proc,					\
     }
 
-struct rpc_procinfo	nfs4_procedures[] = {
-  PROC(READ,		enc_read,	dec_read),
-  PROC(WRITE,		enc_write,	dec_write),
-  PROC(COMMIT,		enc_commit,	dec_commit),
-  PROC(OPEN,		enc_open,	dec_open),
-  PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm),
-  PROC(OPEN_NOATTR,	enc_open_noattr,	dec_open_noattr),
-  PROC(OPEN_DOWNGRADE,	enc_open_downgrade,	dec_open_downgrade),
-  PROC(CLOSE,		enc_close,	dec_close),
-  PROC(SETATTR,		enc_setattr,	dec_setattr),
-  PROC(FSINFO,		enc_fsinfo,	dec_fsinfo),
-  PROC(RENEW,		enc_renew,	dec_renew),
-  PROC(SETCLIENTID,	enc_setclientid,	dec_setclientid),
-  PROC(SETCLIENTID_CONFIRM,	enc_setclientid_confirm,	dec_setclientid_confirm),
-  PROC(LOCK,            enc_lock,       dec_lock),
-  PROC(LOCKT,           enc_lockt,      dec_lockt),
-  PROC(LOCKU,           enc_locku,      dec_locku),
-  PROC(ACCESS,		enc_access,	dec_access),
-  PROC(GETATTR,		enc_getattr,	dec_getattr),
-  PROC(LOOKUP,		enc_lookup,	dec_lookup),
-  PROC(LOOKUP_ROOT,	enc_lookup_root,	dec_lookup_root),
-  PROC(REMOVE,		enc_remove,	dec_remove),
-  PROC(RENAME,		enc_rename,	dec_rename),
-  PROC(LINK,		enc_link,	dec_link),
-  PROC(SYMLINK,		enc_symlink,	dec_symlink),
-  PROC(CREATE,		enc_create,	dec_create),
-  PROC(PATHCONF,	enc_pathconf,	dec_pathconf),
-  PROC(STATFS,		enc_statfs,	dec_statfs),
-  PROC(READLINK,	enc_readlink,	dec_readlink),
-  PROC(READDIR,		enc_readdir,	dec_readdir),
-  PROC(SERVER_CAPS,	enc_server_caps, dec_server_caps),
-  PROC(DELEGRETURN,	enc_delegreturn, dec_delegreturn),
-  PROC(GETACL,		enc_getacl,	dec_getacl),
-  PROC(SETACL,		enc_setacl,	dec_setacl),
-  PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations),
+struct rpc_procinfo	nfs40_procedures[] = {
+  PROC(READ,		enc_read,	dec_read, 0),
+  PROC(WRITE,		enc_write,	dec_write, 0),
+  PROC(COMMIT,		enc_commit,	dec_commit, 0),
+  PROC(OPEN,		enc_open,	dec_open, 0),
+  PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm, 0),
+  PROC(OPEN_NOATTR,	enc_open_noattr,	dec_open_noattr, 0),
+  PROC(OPEN_DOWNGRADE,	enc_open_downgrade,	dec_open_downgrade, 0),
+  PROC(CLOSE,		enc_close,	dec_close, 0),
+  PROC(SETATTR,		enc_setattr,	dec_setattr, 0),
+  PROC(FSINFO,		enc_fsinfo,	dec_fsinfo, 0),
+  PROC(RENEW,		enc_renew,	dec_renew, 0),
+  PROC(SETCLIENTID,	enc_setclientid,	dec_setclientid, 0),
+  PROC(SETCLIENTID_CONFIRM,	enc_setclientid_confirm,	dec_setclientid_confirm, 0),
+  PROC(LOCK,            enc_lock,       dec_lock, 0),
+  PROC(LOCKT,           enc_lockt,      dec_lockt, 0),
+  PROC(LOCKU,           enc_locku,      dec_locku, 0),
+  PROC(ACCESS,		enc_access,	dec_access, 0),
+  PROC(GETATTR,		enc_getattr,	dec_getattr, 0),
+  PROC(LOOKUP,		enc_lookup,	dec_lookup, 0),
+  PROC(LOOKUP_ROOT,	enc_lookup_root,	dec_lookup_root, 0),
+  PROC(REMOVE,		enc_remove,	dec_remove, 0),
+  PROC(RENAME,		enc_rename,	dec_rename, 0),
+  PROC(LINK,		enc_link,	dec_link, 0),
+  PROC(SYMLINK,		enc_symlink,	dec_symlink, 0),
+  PROC(CREATE,		enc_create,	dec_create, 0),
+  PROC(PATHCONF,	enc_pathconf,	dec_pathconf, 0),
+  PROC(STATFS,		enc_statfs,	dec_statfs, 0),
+  PROC(READLINK,	enc_readlink,	dec_readlink, 0),
+  PROC(READDIR,		enc_readdir,	dec_readdir, 0),
+  PROC(SERVER_CAPS,	enc_server_caps, dec_server_caps, 0),
+  PROC(DELEGRETURN,	enc_delegreturn, dec_delegreturn, 0),
+  PROC(GETACL,		enc_getacl,	dec_getacl, 0),
+  PROC(SETACL,		enc_setacl,	dec_setacl, 0),
+  PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations, 0),
+};
+
+struct rpc_procinfo	nfs41_procedures[] = {
+  PROC(READ,		enc_read,	dec_read, 1),
+  PROC(WRITE,		enc_write,	dec_write, 1),
+  PROC(COMMIT,		enc_commit,	dec_commit, 1),
+  PROC(OPEN,		enc_open,	dec_open, 1),
+  PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm, 1),
+  PROC(OPEN_NOATTR,	enc_open_noattr,	dec_open_noattr, 1),
+  PROC(OPEN_DOWNGRADE,	enc_open_downgrade,	dec_open_downgrade, 1),
+  PROC(CLOSE,		enc_close,	dec_close, 1),
+  PROC(SETATTR,		enc_setattr,	dec_setattr, 1),
+  PROC(FSINFO,		enc_fsinfo,	dec_fsinfo, 1),
+//  PROC(RENEW,		error,	error, 1),
+  PROC(RENEW,		enc_renew,	dec_renew, 0),
+  PROC(SETCLIENTID,	error,	error, 1),
+  PROC(SETCLIENTID_CONFIRM,	error,	error, 1),
+  PROC(LOCK,            enc_lock,       dec_lock, 1),
+  PROC(LOCKT,           enc_lockt,      dec_lockt, 1),
+  PROC(LOCKU,           enc_locku,      dec_locku, 1),
+  PROC(ACCESS,		enc_access,	dec_access, 1),
+  PROC(GETATTR,		enc_getattr,	dec_getattr, 1),
+  PROC(LOOKUP,		enc_lookup,	dec_lookup, 1),
+  PROC(LOOKUP_ROOT,	enc_lookup_root,	dec_lookup_root, 1),
+  PROC(REMOVE,		enc_remove,	dec_remove, 1),
+  PROC(RENAME,		enc_rename,	dec_rename, 1),
+  PROC(LINK,		enc_link,	dec_link, 1),
+  PROC(SYMLINK,		enc_symlink,	dec_symlink, 1),
+  PROC(CREATE,		enc_create,	dec_create, 1),
+  PROC(PATHCONF,	enc_pathconf,	dec_pathconf, 1),
+  PROC(STATFS,		enc_statfs,	dec_statfs, 1),
+  PROC(READLINK,	enc_readlink,	dec_readlink, 1),
+  PROC(READDIR,		enc_readdir,	dec_readdir, 1),
+  PROC(SERVER_CAPS,	enc_server_caps, dec_server_caps, 1),
+  PROC(DELEGRETURN,	enc_delegreturn, dec_delegreturn, 1),
+  PROC(GETACL,		enc_getacl,	dec_getacl, 1),
+  PROC(SETACL,		enc_setacl,	dec_setacl, 1),
+  PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations, 1),
+  PROC(EXCHANGE_ID, enc_exchange_id, dec_exchange_id, 1),
+  PROC(CREATE_SESSION,  enc_create_session, dec_create_session, 1),
+  PROC(SEQUENCE,        enc_sequence, dec_sequence, 1),
+  PROC(DESTROY_SESSION,        enc_destroy_session, dec_destroy_session, 1),
+  PROC(GET_LEASE_TIME,          enc_get_lease_time, dec_get_lease_time, 1),
 };
 
 struct rpc_version		nfs_version4 = {
 	.number			= 4,
-	.nrprocs		= ARRAY_SIZE(nfs4_procedures),
-	.procs			= nfs4_procedures
+	.nrprocs		= ARRAY_SIZE(nfs40_procedures),
+	.procs			= nfs40_procedures
 };
+
+struct rpc_version      nfs_version40 = {
+	.number                 = 4,
+	.nrprocs                = ARRAY_SIZE(nfs40_procedures),
+	.procs                  = nfs40_procedures
+};
+
+struct rpc_version      nfs_version41 = {
+	.number                 = 4,
+	.nrprocs                = ARRAY_SIZE(nfs41_procedures),
+	.procs                  = nfs41_procedures
+};
+
+struct rpc_version *nfs4_minorversions[] = {
+	&nfs_version40,
+	&nfs_version41,
+};
+
+struct rpc_procinfo *nfs4_minorversion_procedures[] = {
+	nfs40_procedures,
+	nfs41_procedures,
+};
+
+struct rpc_procinfo *nfs4_procedures;
+
 
 /*
  * Local variables:

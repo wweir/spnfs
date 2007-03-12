@@ -9,7 +9,10 @@
 #ifndef __LINUX_FS_NFS_NFS4_FS_H
 #define __LINUX_FS_NFS_NFS4_FS_H
 
+#include "nfs41_sessions.h"
+
 #ifdef CONFIG_NFS_V4
+#define NFSV4_MAX_MINORVERSION 1
 
 struct idmap;
 
@@ -52,6 +55,7 @@ struct nfs4_client {
 	nfs4_verifier		cl_confirm;
 	unsigned long		cl_state;
 
+	struct nfs4_session *   cl_session;
 	u32			cl_lockowner_id;
 
 	/*
@@ -71,6 +75,7 @@ struct nfs4_client {
 
 	struct list_head	cl_superblocks;	/* List of nfs_server structs */
 
+	u32			cl_minorversion;
 	unsigned long		cl_lease_time;
 	unsigned long		cl_last_renewal;
 	struct work_struct	cl_renewd;
@@ -214,9 +219,17 @@ extern int nfs4_proc_setclientid(struct nfs4_client *, u32, unsigned short, stru
 extern int nfs4_proc_setclientid_confirm(struct nfs4_client *, struct rpc_cred *);
 extern int nfs4_proc_async_renew(struct nfs4_client *, struct rpc_cred *);
 extern int nfs4_proc_renew(struct nfs4_client *, struct rpc_cred *);
+extern int nfs4_proc_async_sequence(struct nfs4_client *, struct rpc_cred *);
+extern int nfs4_proc_sequence(struct nfs4_client *, struct rpc_cred *);
+
 extern int nfs4_do_close(struct inode *inode, struct nfs4_state *state);
 extern struct dentry *nfs4_atomic_open(struct inode *, struct dentry *, struct nameidata *);
 extern int nfs4_open_revalidate(struct inode *, struct dentry *, int, struct nameidata *);
+extern int nfs4_server_capabilities(struct nfs_server *server, struct nfs_fh *fhandle);
+extern int nfs4_proc_fs_locations(struct inode *dir, struct dentry *dentry,
+		struct nfs4_fs_locations *fs_locations, struct page *page);
+extern int nfs41_proc_setup_session(struct nfs4_client *clp);
+extern int nfs4_proc_destroy_session(struct nfs4_client *);
 extern int nfs4_server_capabilities(struct nfs_server *server, struct nfs_fh *fhandle);
 extern int nfs4_proc_fs_locations(struct inode *dir, struct dentry *dentry,
 		struct nfs4_fs_locations *fs_locations, struct page *page);
@@ -267,7 +280,10 @@ extern const nfs4_stateid zero_stateid;
 
 /* nfs4xdr.c */
 extern uint32_t *nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus);
-extern struct rpc_procinfo nfs4_procedures[];
+extern struct rpc_procinfo *nfs4_procedures;
+extern struct rpc_version *nfs4_minorversions[];
+extern struct rpc_procinfo *nfs4_minorversion_procedures[];
+
 
 struct nfs4_mount_data;
 

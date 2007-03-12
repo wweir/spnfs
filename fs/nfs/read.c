@@ -77,6 +77,48 @@ void nfs_readdata_release(void *data)
         nfs_readdata_free(data);
 }
 
+struct nfs_read_data *nfs4_readdata_alloc(size_t len)
+{
+        struct nfs_read_data *p;
+
+        p = nfs_readdata_alloc(len);
+
+        if(!p)
+                return NULL;
+
+        p->args.minorversion_info = kzalloc(sizeof(struct nfs41_sequence_args), GFP_KERNEL);
+        if (!p->args.minorversion_info)
+                goto out_free;
+
+        p->res.minorversion_info = kzalloc(sizeof(struct nfs41_sequence_res), GFP_KERNEL);
+        if (!p->res.minorversion_info)
+                goto out_free2;
+
+        return p;
+
+out_free2:
+                kfree(p->args.minorversion_info);
+out_free:
+                nfs_readdata_free(p);
+                return NULL;
+}
+
+void nfs4_readdata_release(void *data)
+{
+        struct nfs_read_data *rdata = (struct nfs_read_data *)data;
+
+        if (rdata->args.minorversion_info) {
+                kfree(rdata->args.minorversion_info);
+                rdata->args.minorversion_info = NULL;
+        }
+        if (rdata->res.minorversion_info) {
+                kfree(rdata->res.minorversion_info);
+                rdata->res.minorversion_info = NULL;
+        }
+
+        nfs_readdata_release(rdata);
+}
+
 static
 unsigned int nfs_page_length(struct inode *inode, struct page *page)
 {
@@ -142,7 +184,15 @@ static int nfs_readpage_sync(struct nfs_open_context *ctx, struct inode *inode,
 	int		result;
 	struct nfs_read_data *rdata;
 
-	rdata = nfs_readdata_alloc(count);
+#ifdef CONFIG_NFS_V4
+        if (NFS_PROTO(inode)->setup_sequence)
+                rdata = nfs4_readdata_alloc(count);
+        else
+                rdata = nfs_readdata_alloc(count);
+#else
+        rdata = nfs_readdata_alloc(count);
+#endif
+
 	if (!rdata)
 		return -ENOMEM;
 
@@ -351,7 +401,14 @@ static int nfs_pagein_multi(struct list_head *head, struct inode *inode)
 	do {
 		size_t len = min(nbytes,rsize);
 
-		data = nfs_readdata_alloc(len);
+#ifdef CONFIG_NFS_V4
+                if (NFS_PROTO(inode)->setup_sequence)
+                        data = nfs4_readdata_alloc(len);
+                else
+                        data = nfs_readdata_alloc(len);
+#else
+                data = nfs_readdata_alloc(len);
+#endif
 		if (!data)
 			goto out_bad;
 		INIT_LIST_HEAD(&data->pages);
@@ -402,11 +459,20 @@ static int nfs_pagein_one(struct list_head *head, struct inode *inode)
 	struct page		**pages;
 	struct nfs_read_data	*data;
 	unsigned int		count;
+	unsigned int            len = NFS_SERVER(inode)->rsize;
 
 	if (NFS_SERVER(inode)->rsize < PAGE_CACHE_SIZE)
 		return nfs_pagein_multi(head, inode);
 
-	data = nfs_readdata_alloc(NFS_SERVER(inode)->rsize);
+#ifdef CONFIG_NFS_V4
+        if (NFS_PROTO(inode)->setup_sequence)
+                data = nfs4_readdata_alloc(len);
+        else
+                data = nfs_readdata_alloc(len);
+#else
+        data = nfs_readdata_alloc(len);
+#endif
+
 	if (!data)
 		goto out_bad;
 
@@ -478,7 +544,11 @@ static void nfs_readpage_result_partial(struct rpc_task *task, void *calldata)
 
 static const struct rpc_call_ops nfs_read_partial_ops = {
 	.rpc_call_done = nfs_readpage_result_partial,
-	.rpc_release = nfs_readdata_release,
+#ifdef CONFIG_NFS_V4
+        .rpc_release = nfs4_readdata_release,
+#else
+        .rpc_release = nfs_readdata_release,
+#endif
 };
 
 static void nfs_readpage_set_pages_uptodate(struct nfs_read_data *data)
@@ -546,7 +616,12 @@ static void nfs_readpage_result_full(struct rpc_task *task, void *calldata)
 
 static const struct rpc_call_ops nfs_read_full_ops = {
 	.rpc_call_done = nfs_readpage_result_full,
-	.rpc_release = nfs_readdata_release,
+#ifdef CONFIG_NFS_V4
+        .rpc_release = nfs4_readdata_release,
+#else
+        .rpc_release = nfs_readdata_release,
+#endif
+
 };
 
 /*
