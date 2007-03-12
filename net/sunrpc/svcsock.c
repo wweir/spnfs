@@ -884,7 +884,7 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 	struct svc_sock	*svsk = rqstp->rq_sock;
 	struct svc_serv	*serv = svsk->sk_server;
 	int		len;
-	struct kvec vec[RPCSVC_MAXPAGES];
+	struct kvec *vec;
 	int pnum, vlen;
 
 	dprintk("svc: tcp_recv %p data %d conn %d close %d\n",
@@ -976,6 +976,9 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 	}
 	len = svsk->sk_reclen;
 	set_bit(SK_DATA, &svsk->sk_flags);
+	/* Create io vector */
+	if (!(vec = kmalloc(sizeof(struct kvec) * RPCSVC_MAXPAGES, GFP_KERNEL)))
+		goto error;
 
 	vec[0] = rqstp->rq_arg.head[0];
 	vlen = PAGE_SIZE;
@@ -989,8 +992,10 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 
 	/* Now receive data */
 	len = svc_recvfrom(rqstp, vec, pnum, len);
-	if (len < 0)
+	if (len < 0) {
+		kfree(vec);
 		goto error;
+	}
 
 	dprintk("svc: TCP complete record (%d bytes)\n", len);
 	rqstp->rq_arg.len = len;
@@ -1012,7 +1017,7 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 	svc_sock_received(svsk);
 	if (serv->sv_stats)
 		serv->sv_stats->nettcpcnt++;
-
+	kfree(vec);
 	return len;
 
  err_delete:

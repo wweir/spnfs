@@ -489,3 +489,13 @@ err_bad:
 	svc_putu32(resv, rpc_stat);
 	goto sendit;
 }
+
+/*
+ * Return (transport-specific) limit on the rpc payload.
+ */
+__u32 svc_max_payload(const struct svc_rqst *rqstp)
+{
+       if (rqstp->rq_sock->sk_sock->type == SOCK_DGRAM)
+               return RPCSVC_MAXPAYLOAD_UDP;
+       return RPCSVC_MAXPAYLOAD_TCP;
+}
