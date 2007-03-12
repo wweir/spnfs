@@ -45,6 +45,7 @@ struct nfs_page {
 	atomic_t		wb_count;	/* reference count */
 	unsigned long		wb_flags;
 	struct nfs_writeverf	wb_verf;	/* Commit cookie */
+	unsigned int		wb_devid;	/* pNFS data server id */
 };
 
 #define NFS_WBACK_BUSY(req)	(test_bit(PG_BUSY,&(req)->wb_flags))
@@ -65,7 +66,7 @@ extern  int nfs_scan_lock_dirty(struct nfs_inode *nfsi, struct list_head *dst,
 extern	int nfs_scan_list(struct nfs_inode *nfsi, struct list_head *head, struct list_head *dst,
 			  unsigned long idx_start, unsigned int npages);
 extern	int nfs_coalesce_requests(struct list_head *, struct list_head *,
-				  unsigned int);
+				  unsigned int, unsigned int);
 extern  int nfs_wait_on_request(struct nfs_page *);
 extern	void nfs_unlock_request(struct nfs_page *req);
 extern  int nfs_set_page_writeback_locked(struct nfs_page *req);

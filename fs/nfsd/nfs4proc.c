@@ -54,6 +54,8 @@
 #include <linux/nfsd/state.h>
 #include <linux/nfsd/xdr4.h>
 #include <linux/nfs4_acl.h>
+#include <linux/nfsd/stats.h>
+#include <linux/nfsd/pnfsd.h>
 
 #define NFSDDBG_FACILITY		NFSDDBG_PROC
 
@@ -328,10 +330,19 @@ static inline int
 nfsd4_commit(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_commit *commit)
 {
 	int status;
+	struct super_block *sb;
 
 	u32 *p = (u32 *)commit->co_verf.data;
+
+	sb = current_fh->fh_dentry->d_inode->i_sb;
+	if (sb->s_export_op->get_verifier) {
+		sb->s_export_op->get_verifier(sb, p);
+		p += 2;
+	}
+	else {
 	*p++ = nfssvc_boot.tv_sec;
 	*p++ = nfssvc_boot.tv_usec;
+	}
 
 	status = nfsd_commit(rqstp, current_fh, commit->co_offset, commit->co_count);
 	if (status == nfserr_symlink)
@@ -620,6 +631,7 @@ nfsd4_write(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_writ
 	stateid_t *stateid = &write->wr_stateid;
 	struct file *filp = NULL;
 	u32 *p;
+	struct super_block *sb;
 	int status = nfs_ok;
 
 	/* no need to check permission - this will be done in nfsd_write() */
@@ -642,9 +654,22 @@ nfsd4_write(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_writ
 	write->wr_bytes_written = write->wr_buflen;
 	write->wr_how_written = write->wr_stable_how;
 	p = (u32 *)write->wr_verifier.data;
+
+	sb = current_fh->fh_dentry->d_inode->i_sb;
+	if (sb->s_export_op->get_verifier) {
+		struct pnfs_ds_stateid *dsp = find_pnfs_ds_stateid(stateid);
+		if(dsp) {  /* get it from MDS */
+			*p++ = dsp->ds_verifier[0];
+			*p++ = dsp->ds_verifier[1];
+		} else {   /* must be on MDS */
+			sb->s_export_op->get_verifier(sb, p);
+			p += 2;
+		}
+	}
+	else {
 	*p++ = nfssvc_boot.tv_sec;
 	*p++ = nfssvc_boot.tv_usec;
-
+	}
 	status =  nfsd_write(rqstp, current_fh, filp, write->wr_offset,
 			write->wr_vec, write->wr_vlen, write->wr_buflen,
 			&write->wr_how_written);
@@ -712,6 +737,237 @@ out_kfree:
 	return status;
 }
 
+static int
+nfsd4_getdevlist( struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_pnfs_getdevlist *gdlp)
+{
+	struct super_block *sb;
+	int type = 0, status = 0;
+
+	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
+	if (status) {
+		printk("pNFS %s: verify filehandle failed\n",__FUNCTION__);
+		goto out;
+	}
+
+	status = nfserr_inval;
+	sb = current_fh->fh_dentry->d_inode->i_sb;
+	if (!sb)
+		goto out;
+
+	/* check to see if requested layout type is supported. */
+	status = nfserr_unknown_layouttype;
+	if (!sb->s_export_op->layout_type ||
+		((type = sb->s_export_op->layout_type()) != gdlp->gd_type)) {
+
+		printk("pNFS %s: requested layout type %d does not match suppored type %d\n", __FUNCTION__, gdlp->gd_type, type);
+		goto out;
+	}
+
+	/* set the layouttype for encoding the devaddr */
+	gdlp->gd_ops = sb->s_export_op;
+
+	/* device list is allocated by underlying file system, and free'd
+	 * via export_ops callback. */
+	if (sb->s_export_op->get_devicelist) {
+		status = sb->s_export_op->get_devicelist(sb, (void *)gdlp);
+
+		dprintk("%s: status %d type %d maxcount %d len %d\n",
+			__FUNCTION__, status, gdlp->gd_type, gdlp->gd_maxcount,
+			gdlp->gd_devlist_len);
+	}
+	if (gdlp->gd_devlist_len < 0)
+		status = nfserr_inval;
+out:
+	return status;
+}
+
+/*
+ * NOTE: to implement CB_LAYOUTRECALL, need to associate layouts with clientid
+ */
+static int
+nfsd4_layoutget( struct svc_rqst *rqstp, sessionid_t *current_sid, struct svc_fh *current_fh, struct nfsd4_pnfs_layoutget *lgp)
+{
+	int type = 0, status = 0;
+	struct super_block *sb;
+
+	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
+	if (status) {
+		printk("pNFS %s: verify filehandle failed\n",__FUNCTION__);
+		goto out;
+	}
+
+	status = nfserr_inval;
+	sb = current_fh->fh_dentry->d_inode->i_sb;
+	if (!sb)
+		goto out;
+
+	/* check to see if requested layout type is supported. */
+	status = nfserr_unknown_layouttype;
+	if (!sb->s_export_op->layout_type ||
+		((type = sb->s_export_op->layout_type()) != lgp->lg_type)) {
+
+		printk("pNFS %s: requested layout type %d does not match suppored type %d\n", __FUNCTION__, lgp->lg_type, type);
+		goto out;
+	}
+
+	/* set the export ops for encoding the devaddr */
+	lgp->lg_ops = sb->s_export_op;
+
+        /* Set file handle and clientid*/
+	memcpy(&lgp->lg_fh, &current_fh->fh_handle, sizeof(struct knfsd_fh));
+	memcpy(&lgp->lg_clientid, current_sid, sizeof(clientid_t));
+
+        status = nfs4_pnfs_get_layout(sb, current_fh, lgp);
+out:
+	return status;
+}
+
+static int
+nfsd4_layoutcommit( struct svc_rqst *rqstp, sessionid_t *current_sid, struct svc_fh *current_fh, struct nfsd4_pnfs_layoutcommit *lcp)
+{
+	int status;
+	struct inode* ino = NULL;
+	struct iattr ia;
+	struct super_block *sb;
+
+	dprintk("NFSD: nfsd4_layoutcommit \n");
+	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
+	if (status) {
+		printk("%s: verify filehandle failed\n",__FUNCTION__);
+		goto out;
+	}
+
+	ino = current_fh->fh_dentry->d_inode;
+
+        /* This will only extend the file length.  Do a quick
+	 * check to see if there is any point in waiting for the update
+	 * locks.
+	 * TODO: Is this correct for all back ends?
+	 */
+	dprintk("%s:new size: %llu old size: %lld\n", __FUNCTION__, lcp->lc_last_wr + 1, ino->i_size);
+
+	fh_lock(current_fh);
+	if ((lcp->lc_last_wr + 1) <= ino->i_size)
+	{
+		status = 0;
+		lcp->lc_size_chg = 0;
+		fh_unlock(current_fh);
+		goto out;
+	}
+
+	/* Try our best to update the file size */
+	dprintk("%s: Modifying file size\n", __FUNCTION__);
+	ia.ia_valid = ATTR_SIZE;
+	ia.ia_size = lcp->lc_last_wr + 1;
+	sb = current_fh->fh_dentry->d_inode->i_sb;
+	if (sb->s_export_op->layout_commit) {
+		status = sb->s_export_op->layout_commit(ino, lcp);
+		dprintk("%s:layout_commit result %d\n", __FUNCTION__, status);
+	} else {
+		status = notify_change(current_fh->fh_dentry, &ia);
+		dprintk("%s:notify_change result %d\n", __FUNCTION__, status);
+	}
+
+	fh_unlock(current_fh);
+
+	if (!status) {
+		if (EX_ISSYNC(current_fh->fh_export))
+		{
+			dprintk("%s:Synchronously writing inode size %llu\n", __FUNCTION__, ino->i_size);
+			write_inode_now(ino, 1);
+		}
+		lcp->lc_size_chg = 1;
+		lcp->lc_newsize = ino->i_size;
+		status = 0;
+	}
+
+        /* DH: Removed for now since commit should be sent directly from
+	 * client to data server
+	 status = nfsd_commit(rqstp, current_fh, lcp->lc_offset, lcp->lc_length);
+	 */
+out:
+	return status;
+}
+
+static int
+nfsd4_layoutreturn( struct svc_rqst *rqstp, sessionid_t *current_sid, struct svc_fh *current_fh, struct nfsd4_pnfs_layoutreturn *lrp)
+{
+	int type = 0, status = 0;
+	struct super_block *sb;
+
+	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
+	if (status) {
+		printk("pNFS %s: verify filehandle failed\n", __FUNCTION__);
+		goto out;
+	}
+
+	status = nfserr_inval;
+	sb = current_fh->fh_dentry->d_inode->i_sb;
+	if (!sb)
+		goto out;
+
+	/* check to see if requested layout type is supported. */
+	status = nfserr_unknown_layouttype;
+	if (!sb->s_export_op->layout_type ||
+		((type = sb->s_export_op->layout_type()) != lrp->lr_layout_type)) {
+
+		printk("pNFS %s: requested layout type %d does not match suppored type %d\n", __FUNCTION__, lrp->lr_layout_type, type);
+		goto out;
+	}
+
+        /* Set clientid from sessionid */
+	memcpy(&lrp->lr_clientid, current_sid, sizeof(clientid_t));
+        status = nfs4_pnfs_return_layout(sb, current_fh, lrp);
+out:
+	dprintk("pNFS %s: status %d layout_type %d\n",
+		__FUNCTION__, status, lrp->lr_layout_type);
+	return status;
+}
+
+static int
+nfsd4_getdevinfo( struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_pnfs_getdevinfo *gdp)
+{
+	struct super_block *sb;
+	int type = 0, status;
+
+	printk("%s: type %d dev_id %d\n",
+		__FUNCTION__, gdp->gd_type, gdp->gd_dev_id);
+
+	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
+	if (status) {
+		printk("%s: verify filehandle failed\n",__FUNCTION__);
+		goto out;
+	}
+
+	status = nfserr_inval;
+	sb = current_fh->fh_dentry->d_inode->i_sb;
+	if (!sb)
+		goto out;
+
+	/* check to see if requested layout type is supported. */
+	status = nfserr_unknown_layouttype;
+	if (!sb->s_export_op->layout_type ||
+		  ((type = sb->s_export_op->layout_type()) != gdp->gd_type)) {
+
+		printk("pNFS %s: requested layout type %d does not match suppored type %d\n", __FUNCTION__, gdp->gd_type, type);
+		goto out;
+}
+
+        /* set the ops for encoding the devaddr */
+        gdp->gd_ops = sb->s_export_op;
+
+	if (sb && sb->s_export_op->get_deviceinfo) {
+		status = sb->s_export_op->get_deviceinfo(sb, (void *)gdp);
+
+		dprintk("%s: status %d type %d dev_id %d\n",
+			__FUNCTION__, status, gdp->gd_type, gdp->gd_dev_id);
+		goto out;
+	}
+	printk("%s:  failed, no support\n",__FUNCTION__);
+out:
+	return status;
+}
+
 /*
  * NULL call.
  */
@@ -753,9 +1009,10 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	if (save_fh == NULL)
 		goto out;
 	fh_init(save_fh, NFS4_FHSIZE);
-	current_sid = kzalloc(sizeof(*current_sid), GFP_KERNEL);
+	current_sid = kmalloc(sizeof(*current_sid), GFP_KERNEL);
 	if (current_sid == NULL)
 		goto out;
+	memset(current_sid, 0, sizeof(*current_sid));
 
 	resp->xbuf = &rqstp->rq_res;
 	resp->p = rqstp->rq_res.head[0].iov_base + rqstp->rq_res.head[0].iov_len;
@@ -924,6 +1181,21 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 		case OP_RELEASE_LOCKOWNER:
 			op->status = nfsd4_release_lockowner(rqstp, &op->u.release_lockowner);
 			break;
+		case OP_GETDEVICELIST:
+			op->status = nfsd4_getdevlist(rqstp, current_fh, &op->u.pnfs_getdevlist);
+			break;
+		case OP_GETDEVICEINFO:
+			op->status = nfsd4_getdevinfo(rqstp, current_fh, &op->u.pnfs_getdevinfo);
+			break;
+		case OP_LAYOUTGET:
+			op->status = nfsd4_layoutget(rqstp, current_sid, current_fh, &op->u.pnfs_layoutget);
+			break;
+		case OP_LAYOUTCOMMIT:
+			op->status = nfsd4_layoutcommit(rqstp, current_sid, current_fh, &op->u.pnfs_layoutcommit);
+			break;
+		case OP_LAYOUTRETURN:
+			op->status = nfsd4_layoutreturn(rqstp, current_sid, current_fh, &op->u.pnfs_layoutreturn);
+			break;
 		case OP_EXCHANGE_ID:
 			op->status = nfsd4_exchange_id(rqstp, &op->u.exchange_id);
 			break;
@@ -968,9 +1240,9 @@ out:
 	kfree(current_fh);
 	if (save_fh)
 		fh_put(save_fh);
+	kfree(save_fh);
 	if (current_sid)
 		kfree(current_sid);
-	kfree(save_fh);
 	return status;
 }
 

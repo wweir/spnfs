@@ -18,6 +18,10 @@
 #include <linux/nfs_fs.h>
 #include <linux/nfs_mount.h>
 
+#ifndef MIN
+#define MIN(a,b) (((a) < (b)) ? a : b)
+#endif
+
 #define NFS_PARANOIA 1
 
 static kmem_cache_t *nfs_page_cachep;
@@ -226,17 +230,31 @@ out:
  * @head: source list
  * @dst: destination list
  * @nmax: maximum number of requests to coalesce
+ * @boundary: byte boundary multiple that must not be crossed by this request
  *
  * Moves a maximum of 'nmax' elements from one list to another.
  * The elements are checked to ensure that they form a contiguous set
  * of pages, and that the RPC credentials are the same.
  */
 int
-nfs_coalesce_requests(struct list_head *head, struct list_head *dst,
-		      unsigned int nmax)
+nfs_coalesce_requests(struct list_head *head,
+		      struct list_head *dst,
+		      unsigned int nmax,
+		      unsigned int boundary)
 {
 	struct nfs_page		*req = NULL;
 	unsigned int		npages = 0;
+
+	if (boundary && !list_empty(head)) {
+		/* Boundary can be thought of as a stripe unit, we don't want requests
+		 * that span multiple stripes; boundary is given in bytes and is a
+		 * multiple of the PAGE_CACHE_SIZE.
+		 */
+		req = nfs_list_entry(head->next);
+		nmax = MIN(nmax, ((boundary - ((req->wb_index << PAGE_CACHE_SHIFT) %
+					       boundary)) >> PAGE_CACHE_SHIFT));
+		req = NULL;
+	}
 
 	while (!list_empty(head)) {
 		struct nfs_page	*prev = req;

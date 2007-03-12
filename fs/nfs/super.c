@@ -49,6 +49,7 @@
 #include "delegation.h"
 #include "iostat.h"
 #include "internal.h"
+#include "pnfs.h"
 
 #define NFSDBG_FACILITY		NFSDBG_VFS
 
@@ -557,6 +558,7 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	};
 	int no_root_error = 0;
 	unsigned long max_rpc_payload;
+	unsigned long dssize;
 
 	/* We probably want something more informative here */
 	snprintf(sb->s_id, sizeof(sb->s_id), "%x:%x", MAJOR(sb->s_dev), MINOR(sb->s_dev));
@@ -589,6 +591,29 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	if (server->namelen == 0 &&
 	    server->rpc_ops->pathconf(server, &server->fh, &pathinfo) >= 0)
 		server->namelen = pathinfo.max_namelen;
+
+#ifdef CONFIG_NFS_V4 /* XXX CONFIG_PNFS */
+	/* XXX: This should probably be in nfs4_fill_super, or some nfsv4
+	 * specific routine, rather than have such a lame fencing off
+	 */
+	if ((server->nfs4_state) && (server->nfs4_state->cl_minorversion == 1)) {
+		/* Set and initialize the layout driver */
+		set_pnfs_layoutdriver(sb, fsinfo.layoutclass);
+
+		/* Set buffer size for data servers */
+		dssize = pnfs_getiosize(server);
+		if (dssize > 0) {
+			server->ds_rsize = server->ds_wsize =
+					nfs_block_size(dssize, NULL);
+			server->ds_rpages = server->ds_wpages =
+					(server->ds_rsize + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+		}
+	}
+#else
+	server->pnfs_curr_ld = NULL;
+	server->pnfs_mountid = NULL;
+#endif
+
 	/* Work out a lot of parameters */
 	if (server->rsize == 0)
 		server->rsize = nfs_block_size(fsinfo.rtpref, NULL);
@@ -612,6 +637,19 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	if (server->wsize > NFS_MAX_FILE_IO_SIZE)
 		server->wsize = NFS_MAX_FILE_IO_SIZE;
 	server->wpages = (server->wsize + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+
+#ifdef CONFIG_NFS_V4 /* XXX CONFIG_PNFS */
+	/* Fix up data server values if there is no layout driver or
+	* the layout driver doesn't define its own blocksize
+	*/
+	if (server->ds_wsize == 0 || server->ds_rsize == 0)
+	{
+		server->ds_wsize = server->wsize;
+		server->ds_rsize = server->rsize;
+		server->ds_rpages = server->rpages;
+		server->ds_wpages = server->wpages;
+	}
+#endif
 
 	if (sb->s_blocksize == 0)
 		sb->s_blocksize = nfs_block_bits(server->wsize,
@@ -678,6 +716,26 @@ static void nfs_init_timeout_values(struct rpc_timeout *to, int proto, unsigned 
 		break;
 	}
 }
+
+/*
+ * Create an RPC client handle for pNFS filelayout driver
+ */
+struct rpc_clnt*
+create_nfs_rpcclient(struct rpc_xprt *xprt, char* server_name, u32 version, rpc_authflavor_t authflavor, int *err)
+{
+	struct rpc_clnt* clnt = rpc_create_client(xprt, server_name,
+							&nfs_program, version,
+							authflavor);
+	if (IS_ERR(clnt)) {
+		*err = PTR_ERR(clnt);
+		printk("%s: error rpc_create_client\n", __FUNCTION__);
+		return NULL;
+	}
+	clnt->cl_intr = 1;
+	clnt->cl_softrtry = 1;
+	return clnt;
+}
+EXPORT_SYMBOL(create_nfs_rpcclient);
 
 /*
  * Create an RPC client handle.
@@ -942,7 +1000,9 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 
 static int nfs_set_super(struct super_block *s, void *data)
 {
+	struct nfs_server *server = data;
 	s->s_fs_info = data;
+        server->sb = s;
 	return set_anon_super(s, data);
 }
 
@@ -1253,7 +1313,7 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
                 server->client = nfs4_create_client(server, &timeparms, data->proto, authflavour);
                 if (IS_ERR(server->client)) {
                         err = PTR_ERR(server->client);
-                                dprintk("%s: cannot create RPC client. Error = %d\n",
+                                printk(KERN_EMERG "%s: cannot create RPC client. Error = %d\n",
                                                 __FUNCTION__, err);
                                 goto out_fail;
                 }
@@ -1261,7 +1321,6 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 
                 if (server->rpc_ops->setup_session) {
                         int status;
-
                         lock_kernel();
                         down_write(&server->nfs4_state->cl_sem);
                         status =  server->rpc_ops->setup_session(server->nfs4_state);
@@ -1424,11 +1483,13 @@ static void nfs4_kill_super(struct super_block *sb)
 
 	nfs_return_all_delegations(sb);
 
+	/* Unmount the layout driver */
+	unmount_pnfs_layoutdriver(sb);
+
 	kill_anon_super(sb);
 
-	if ((server->nfs4_state) && (server->nfs4_state->cl_minorversion == 1)) {
-		dprintk("Destroy session for superblock %p for client %p\n",
-				server, server->nfs4_state);
+	 if ((server ->nfs4_state) && (server->nfs4_state->cl_minorversion == 1)) {
+		 dprintk("calling destroy session for superblock %p for client %p\n", server, server->nfs4_state);
 		nfs4_proc_destroy_session(server->nfs4_state);
 	}
 

@@ -938,7 +938,6 @@ static inline int has_fs_excl(void)
 	return atomic_read(&current->fs_excl);
 }
 
-
 /*
  * Superblock locking.
  */
@@ -1298,8 +1297,46 @@ struct export_operations {
 		struct super_block *sb, void *obj, void *parent,
 		int (*acceptable)(void *context, struct dentry *de),
 		void *context);
+	/* pNFS operations */
+		/* pNFS: returns the verifier */
+	void (*get_verifier) (struct super_block *sb, u32 *p);
+		/* pNFS: Returns the supported pnfs_layouttype4. */
+	int (*layout_type)(void);
+		/* pNFS: encodes opaque device list */
+	int (*devaddr_encode)(u32 *p, u32 *end, void * devaddr);
+		/* pNFS: free's opaque device list */
+	void (*devaddr_free)(void * devaddr);
+		/* pNFS: returns the opaque device list */
+	int (*get_devicelist) (struct super_block *sb, void *buf);
+		/* pNFS: encodes opaque layout
+		 * Arg: resp - xdr buffer pointer
+		        layout - file system defined
+		 * Ret: new value of xdr buffer pointer
+		*/
+	int (*layout_encode)(u32 *p, u32 *end, void *layout);
+		/* pNFS: free's opaque layout
+		 * Arg: layout - file system defined
+		 */
+	void (*layout_free)(void * layout);
+		/* pNFS: returns the opaque layout
+		 * Arg: buf - struct nfsd4_pnfs_layoutget
+		 */
+	int (*layout_get) (struct inode *inode, void *buf);
+		/* pNFS: returns the opaque device */
+	int (*get_deviceinfo) (struct super_block *sb, void *p);
+		/* pNFS: commit changes to layout */
+	int (*layout_commit) (struct inode *inode, void *p);
+		/* pNFS: returns the layout */
+	int (*layout_return) (struct inode *inode, void *p);
 
 
+		/* callback from fs on MDS only */
+	int (*cb_get_state) (void *state);
+	int (*cb_layout_recall) (struct super_block *sb, struct inode *inode, void *p);
+		/* call fs on DS only */
+	int (*get_state) (struct inode *inode, void *fh, void *state);
+		/* callback from fs on DS only */
+	int (*cb_change_state) (void *p);
 };
 
 extern struct dentry *

@@ -37,6 +37,7 @@ struct nfs_server {
 	struct sockaddr_in	addr;
 	struct nfs_fsid		fsid;
 	unsigned long		mount_time;	/* when this fs was mounted */
+	struct super_block	*sb;
 #ifdef CONFIG_NFS_V4
 	/* Our own IP address, as a null-terminated string.
 	 * This is used to generate the clientid, and the callback address.
@@ -53,6 +54,17 @@ struct nfs_server {
 	u32			acl_bitmask;	/* V4 bitmask representing the ACEs
 						   that are supported on this
 						   filesystem */
+	struct pnfs_layoutdriver_type *	pnfs_curr_ld;  /* Active layout driver */
+	struct pnfs_mount_type        * pnfs_mountid;  /* Mount identifier for
+							  layout driver
+						       */
+	/* Data server values will equal NFS server values if
+	 * no pNFS layout driver exists for the mountpoint
+	 */
+	unsigned int		ds_rsize;	/* Data server read size */
+	unsigned int		ds_rpages;	/* Data server read size (in pages) */
+	unsigned int		ds_wsize;	/* Data server write size */
+	unsigned int		ds_wpages;	/* Data server write size (in pages) */
 #endif
 };
 

@@ -21,11 +21,12 @@
 #define NFSSVC_MAXVERS		3
 
 /*
- * Maximum blocksize supported by daemon currently at 32K
+ * Maximum blocksize supported by daemon under various circumstances.
  */
 #define NFSSVC_MAXBLKSIZE      RPCSVC_MAXPAYLOAD
- /* NFSv2 is limited by the protocol specification, see RFC 1094 */
+/* NFSv2 is limited by the protocol specification, see RFC 1094 */
 #define NFSSVC_MAXBLKSIZE_V2	(8*1024)
+
 
 #ifdef __KERNEL__
 

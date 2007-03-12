@@ -10,7 +10,7 @@
  * support a megabyte or more.  The default is left at 4096 bytes, which is
  * reasonable for NFS over UDP.
  */
-#define NFS_MAX_FILE_IO_SIZE	(1048576U)
+#define NFS_MAX_FILE_IO_SIZE	(4U * 1048576U)
 #define NFS_DEF_FILE_IO_SIZE	(4096U)
 #define NFS_MIN_FILE_IO_SIZE	(1024U)
 
@@ -59,6 +59,8 @@ struct nfs_fattr {
 	unsigned long		time_start;
 };
 
+#include <linux/pnfs_xdr.h>
+
 #define NFS_ATTR_WCC		0x0001		/* pre-op WCC data    */
 #define NFS_ATTR_FATTR		0x0002		/* post-op attributes */
 #define NFS_ATTR_FATTR_V3	0x0004		/* NFSv3 attributes */
@@ -79,6 +81,7 @@ struct nfs_fsinfo {
 	__u32			dtpref;	/* pref. readdir transfer size */
 	__u64			maxfilesize;
 	__u32			lease_time; /* in seconds */
+	__u32                   layoutclass; /* supported pnfs layout driver */
 };
 
 struct nfs_fsstat {
@@ -747,10 +750,34 @@ struct nfs4_setclientid {
 	u32				sc_cb_ident;      /* request */
 };
 
+struct nfstime4 {
+	u64	seconds;
+	u32	nseconds;
+};
+
+
+struct nfs_impl_id4 {
+	u32		domain_len;
+	char 		domain[NFS4_OPAQUE_LIMIT];
+	u32		name_len;
+	char 		name[NFS4_OPAQUE_LIMIT];
+	struct nfstime4	date;
+};
+
+#define EXCHGID4_FLAG_SUPP_MOVED_REFER	0x00000001
+#define EXCHGID4_FLAG_SUPP_MOVED_MIGR	0x00000002
+#define EXCHGID4_FLAG_USE_NON_PNFS	0x00010000
+#define EXCHGID4_FLAG_USE_PNFS_MDS	0x00020000
+#define EXCHGID4_FLAG_USE_PNFS_DS	0x00040000
+
 struct nfs41_exchange_id_args {
 	nfs4_verifier *			verifier;
 	unsigned int 			id_len;
 	char 				id[NFS4_OPAQUE_LIMIT];
+	u32				flags;
+	struct nfs_impl_id4		impl_id;
+	clientid4			clientid;
+	u32				seqid;
 };
 
 struct server_owner {
@@ -899,12 +926,21 @@ struct nfs_read_data {
 	unsigned int		npages;	/* Max length of pagevec */
 	struct nfs_readargs args;
 	struct nfs_readres  res;
+	const struct rpc_call_ops         *call_ops;
 #ifdef CONFIG_NFS_V4
 	unsigned long		timestamp;	/* For lease renewal */
+	struct rpc_clnt         *pnfs_client;   /* Holds pNFS device across async calls */
+	int                     pnfsflags;
+	__u64                   orig_offset;
 	struct nfs4_session *	session;
 #endif
 	struct page		*page_array[NFS_PAGEVEC_SIZE];
 };
+
+/* pnfsflag values */
+#define PNFS_ISSYNC            0x0001   /* sync I/O request */
+#define PNFS_USE_DS            0x0002   /* use data server I/O */
+#define PNFS_USE_FULL_CB       0x0004   /* non rpc result callback switch */
 
 struct nfs_write_data {
 	int			flags;
@@ -919,8 +955,13 @@ struct nfs_write_data {
 	unsigned int		npages;		/* Max length of pagevec */
 	struct nfs_writeargs	args;		/* argument struct */
 	struct nfs_writeres	res;		/* result struct */
+	const struct rpc_call_ops         *call_ops;
 #ifdef CONFIG_NFS_V4
 	unsigned long		timestamp;	/* For lease renewal */
+        struct rpc_clnt         *pnfs_client;   /* Holds pNFS device across async calls */
+        int                     pnfsflags;
+        __u64                   orig_offset;
+	int                     how;            /* for FLUSH_STABLE */
 	struct nfs4_session *	session;
 #endif
 	struct page		*page_array[NFS_PAGEVEC_SIZE];
@@ -936,6 +977,7 @@ struct nfs_rpc_ops {
 	struct dentry_operations *dentry_ops;
 	struct inode_operations *dir_inode_ops;
 	struct inode_operations *file_inode_ops;
+	struct file_operations *file_ops;
 
 	int	(*getroot) (struct nfs_server *, struct nfs_fh *,
 			    struct nfs_fsinfo *);
@@ -989,6 +1031,19 @@ struct nfs_rpc_ops {
 	int	(*setup_session)(struct nfs4_client *);
 	int	(*setup_sequence)(struct nfs4_session *, struct nfs41_sequence_args *, struct nfs41_sequence_res *);
 	int	(*sequence_done)(struct nfs4_session *, struct nfs41_sequence_res *, int status);
+        int     (*rsize) (struct inode *, unsigned int, struct nfs_read_data *);
+        int     (*wsize) (struct inode *, unsigned int, struct nfs_write_data *);
+        int     (*rpages) (struct inode *);
+        int     (*wpages) (struct inode *);
+        u32     (*boundary) (struct inode *);
+        int     (*pnfs_layoutget)(struct nfs4_pnfs_layoutget* layout);
+        void    (*pnfs_layoutcommit_setup)(struct pnfs_layoutcommit_data *);
+        int     (*pnfs_layoutcommit)  (struct pnfs_layoutcommit_data *);
+        int     (*pnfs_layoutreturn)(struct nfs4_pnfs_layoutreturn* layout);
+        int     (*pagein_one) (struct list_head *head, struct inode *inode);
+        int     (*flush_one) (struct inode *, struct list_head *, int, int);
+	struct nfs4_client *(*get_client) (struct in_addr *addr);
+	void	(*put_client) (struct nfs4_client *);
 };
 
 /*
@@ -1003,9 +1058,9 @@ struct nfs_rpc_ops {
  */
 extern struct nfs_rpc_ops	nfs_v2_clientops;
 extern struct nfs_rpc_ops	nfs_v3_clientops;
-extern struct nfs_rpc_ops	nfs_v4_clientops;
 extern struct nfs_rpc_ops	nfs_v40_clientops;
 extern struct nfs_rpc_ops	nfs_v41_clientops;
+extern struct nfs_rpc_ops      pnfs_v4_clientops;
 extern struct nfs_rpc_ops *     nfsv4_minorversion_clientops[];
 
 extern struct rpc_version	nfs_version2;

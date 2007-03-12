@@ -876,7 +876,13 @@ static void nfs3_proc_commit_setup(struct nfs_write_data *data, int how)
 		.rpc_resp	= &data->res,
 		.rpc_cred	= data->cred,
 	};
+	int flags;
 
+	/* Set up the initial task struct.  */
+	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
+
+	rpc_init_task(&data->task, NFS_CLIENT(data->inode), flags,
+						data->call_ops, data);
 	rpc_call_setup(&data->task, &msg, 0);
 }
 
@@ -889,6 +895,7 @@ nfs3_proc_lock(struct file *filp, int cmd, struct file_lock *fl)
 struct nfs_rpc_ops	nfs_v3_clientops = {
 	.version	= 3,			/* protocol version */
 	.dentry_ops	= &nfs_dentry_operations,
+	.file_ops	= &nfs_file_operations,
 	.dir_inode_ops	= &nfs3_dir_inode_operations,
 	.file_inode_ops	= &nfs3_file_inode_operations,
 	.getroot	= nfs3_proc_get_root,
@@ -924,5 +931,12 @@ struct nfs_rpc_ops	nfs_v3_clientops = {
 	.file_open	= nfs_open,
 	.file_release	= nfs_release,
 	.lock		= nfs3_proc_lock,
+	.rsize		= nfs_rsize,
+	.wsize		= nfs_wsize,
+	.rpages		= nfs_rpages,
+	.wpages		= nfs_wpages,
+	.boundary	= nfs_boundary,
 	.clear_acl_cache = nfs3_forget_cached_acls,
+	.pagein_one	= nfs_pagein_one,
+	.flush_one	= nfs_flush_one,
 };

@@ -94,6 +94,8 @@ struct nfs4_client {
 	 */
 	char			cl_ipaddr[16];
 	unsigned char		cl_id_uniquifier;
+	u32                     cl_session_flags;
+	u32                     cl_exchange_flags;
 };
 
 /*
@@ -230,9 +232,6 @@ extern int nfs4_proc_fs_locations(struct inode *dir, struct dentry *dentry,
 		struct nfs4_fs_locations *fs_locations, struct page *page);
 extern int nfs41_proc_setup_session(struct nfs4_client *clp);
 extern int nfs4_proc_destroy_session(struct nfs4_client *);
-extern int nfs4_server_capabilities(struct nfs_server *server, struct nfs_fh *fhandle);
-extern int nfs4_proc_fs_locations(struct inode *dir, struct dentry *dentry,
-		struct nfs4_fs_locations *fs_locations, struct page *page);
 
 extern struct nfs4_state_recovery_ops nfs4_reboot_recovery_ops;
 extern struct nfs4_state_recovery_ops nfs4_network_partition_recovery_ops;

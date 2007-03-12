@@ -28,8 +28,10 @@ int nfs_inode_set_delegation(struct inode *inode, struct rpc_cred *cred, struct 
 void nfs_inode_reclaim_delegation(struct inode *inode, struct rpc_cred *cred, struct nfs_openres *res);
 int __nfs_inode_return_delegation(struct inode *inode);
 int nfs_async_inode_return_delegation(struct inode *inode, const nfs4_stateid *stateid);
+int nfs_async_return_layout(struct nfs4_client *clp, struct inode *inode, struct nfs_fsid *fsid);
 
 struct inode *nfs_delegation_find_inode(struct nfs4_client *clp, const struct nfs_fh *fhandle);
+struct inode *nfs_layout_find_inode(struct nfs4_client *clp, const struct nfs_fh *fhandle);
 void nfs_return_all_delegations(struct super_block *sb);
 void nfs_expire_all_delegations(struct nfs4_client *clp);
 void nfs_handle_cb_pathdown(struct nfs4_client *clp);

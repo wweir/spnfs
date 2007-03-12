@@ -674,6 +674,7 @@ nfs_proc_lock(struct file *filp, int cmd, struct file_lock *fl)
 struct nfs_rpc_ops	nfs_v2_clientops = {
 	.version	= 2,		       /* protocol version */
 	.dentry_ops	= &nfs_dentry_operations,
+	.file_ops	= &nfs_file_operations,
 	.dir_inode_ops	= &nfs_dir_inode_operations,
 	.file_inode_ops	= &nfs_file_inode_operations,
 	.getroot	= nfs_proc_get_root,
@@ -708,4 +709,11 @@ struct nfs_rpc_ops	nfs_v2_clientops = {
 	.file_open	= nfs_open,
 	.file_release	= nfs_release,
 	.lock		= nfs_proc_lock,
+	.rsize		= nfs_rsize,
+	.wsize		= nfs_wsize,
+	.rpages		= nfs_rpages,
+	.wpages		= nfs_wpages,
+	.boundary	= nfs_boundary,
+	.pagein_one	= nfs_pagein_one,
+	.flush_one	= nfs_flush_one,
 };

@@ -9,14 +9,6 @@
 #ifndef _LINUX_NFS_FS_H
 #define _LINUX_NFS_FS_H
 
-/*
- * Enable debugging support for nfs client.
- * Requires RPC_DEBUG.
- */
-#ifdef RPC_DEBUG
-# define NFS_DEBUG
-#endif
-
 /* Default timeout values */
 #define NFS_MAX_UDP_TIMEOUT	(60*HZ)
 #define NFS_MAX_TCP_TIMEOUT	(600*HZ)
@@ -179,6 +171,19 @@ struct nfs_inode {
 	struct nfs_delegation	*delegation;
 	int			 delegation_state;
 	struct rw_semaphore	rwsem;
+
+	/* pNFS layout information */
+	u32 pnfs_layout_state;
+#define NFS_INO_LAYOUT_FAILED	0x0001	/* get layout failed, stop trying */
+	time_t pnfs_layout_suspend;
+	struct pnfs_layout_type* current_layout;
+	struct nfs_open_context* layoutcommit_ctx; /* use rpc_creds in this open_context
+												* to send LAYOUTCOMMIT to MDS */
+	/* DH: These vars keep track of the maximum write range
+	 * so the values can be used for layoutcommit.
+	 */
+	loff_t                  pnfs_write_begin_pos;
+	loff_t                  pnfs_write_end_pos;
 #endif /* CONFIG_NFS_V4*/
 	struct inode		vfs_inode;
 };
@@ -334,6 +339,7 @@ extern struct inode_operations nfs_file_inode_operations;
 extern struct inode_operations nfs3_file_inode_operations;
 #endif /* CONFIG_NFS_V3 */
 extern const struct file_operations nfs_file_operations;
+extern const struct file_operations pnfs_file_operations;
 extern const struct address_space_operations nfs_file_aops;
 
 static inline struct rpc_cred *nfs_file_cred(struct file *file)
@@ -425,6 +431,7 @@ extern int  nfs_flush_incompatible(struct file *file, struct page *page);
 extern int  nfs_updatepage(struct file *, struct page *, unsigned int, unsigned int);
 extern int nfs_writeback_done(struct rpc_task *, struct nfs_write_data *);
 extern void nfs_writedata_release(void *);
+extern int nfs_flush_one(struct inode *, struct list_head *,int, int);
 
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
 struct nfs_write_data *nfs_commit_alloc(void);
@@ -491,6 +498,37 @@ extern int  nfs_readpages(struct file *, struct address_space *,
 extern int  nfs_readpage_result(struct rpc_task *, struct nfs_read_data *);
 extern void nfs_readdata_release(void *data);
 extern void nfs4_readdata_release(void *data);
+extern int nfs_pagein_one(struct list_head *head, struct inode *inode);
+
+static inline int
+nfs_rsize(struct inode *inode, unsigned int count, struct nfs_read_data *data)
+{
+	return NFS_SERVER(inode)->rsize;
+}
+
+static inline int
+nfs_wsize(struct inode *inode, unsigned int count, struct nfs_write_data *data)
+{
+	return NFS_SERVER(inode)->wsize;
+}
+
+static inline int
+nfs_rpages(struct inode *inode)
+{
+	return NFS_SERVER(inode)->rpages;
+}
+
+static inline int
+nfs_wpages(struct inode *inode)
+{
+	return NFS_SERVER(inode)->wpages;
+}
+
+static inline unsigned int
+nfs_boundary(struct inode *inode)
+{
+	return 0;
+}
 
 /*
  * Allocate nfs_read_data structures
@@ -582,7 +620,19 @@ extern void * nfs_root_data(void);
 #define NFSDBG_FILE		0x0040
 #define NFSDBG_ROOT		0x0080
 #define NFSDBG_CALLBACK		0x0100
+#define NFSDBG_IO		0x0200
+#define NFSDBG_PNFS		0x0400
+#define NFSDBG_FILELAYOUT	0x0800
+#define NFSDBG_ODIRECT		0x1000
 #define NFSDBG_ALL		0xFFFF
+
+/*
+ * Enable debugging support for nfs client.
+ * Requires RPC_DEBUG.
+ */
+#ifdef RPC_DEBUG
+# define NFS_DEBUG
+#endif
 
 #ifdef __KERNEL__
 # undef ifdebug

@@ -80,6 +80,7 @@ int		nfsd_setattr(struct svc_rqst *, struct svc_fh *,
 int             nfsd4_set_nfs4_acl(struct svc_rqst *, struct svc_fh *,
                     struct nfs4_acl *);
 int             nfsd4_get_nfs4_acl(struct svc_rqst *, struct dentry *, struct nfs4_acl **);
+u32 pnfs_set_layout_type (struct super_block *, struct svc_export *);
 #endif /* CONFIG_NFSD_V4 */
 int		nfsd_create(struct svc_rqst *, struct svc_fh *,
 				char *name, int len, struct iattr *attrs,
@@ -231,7 +232,8 @@ void		nfsd_lockd_shutdown(void);
 #define	nfserr_badname		__constant_htonl(NFSERR_BADNAME)
 #define	nfserr_cb_path_down	__constant_htonl(NFSERR_CB_PATH_DOWN)
 #define	nfserr_locked		__constant_htonl(NFSERR_LOCKED)
-#define nfserr_seq_misordered	__constant_htonl(NFSERR_SEQ_MISORDERED)
+#define	nfserr_badiomode	__constant_htonl(NFSERR_BADIOMODE)
+#define	nfserr_badlayout	__constant_htonl(NFSERR_BADLAYOUT)
 #define nfserr_bad_session_digest	__constant_htonl(NFSERR_BAD_SESSION_DIGEST)
 #define nfserr_badsession	__constant_htonl(NFSERR_BADSESSION)
 #define nfserr_badslot	__constant_htonl(NFSERR_BADSLOT)
@@ -239,9 +241,13 @@ void		nfsd_lockd_shutdown(void);
 #define nfserr_conn_not_bound_to_session	__constant_htonl(NFSERR_CONN_NOT_BOUND_TO_SESSION)
 #define nfserr_deleg_already_wanted	__constant_htonl(NFSERR_DELEG_ALREADY_WANTED)
 #define nfserr_dirdeleg_unavail	__constant_htonl(NFSERR_DIRDELEG_UNAVAIL)
+#define	nfserr_layouttrylater		__constant_htonl(NFSERR_LAYOUTTRYLATER)
+#define	nfserr_layoutunavailable	__constant_htonl(NFSERR_LAYOUTUNAVAILABLE)
+#define	nfserr_nomatching_layout	__constant_htonl(NFSERR_NOMATCHING_LAYOUT)
 #define nfserr_recallconflict	__constant_htonl(NFSERR_RECALLCONFLICT)
+#define	nfserr_unknown_layouttype	__constant_htonl(NFSERR_UNKNOWN_LAYOUTTYPE)
+#define	nfserr_seq_misordered		__constant_htonl(NFSERR_SEQ_MISORDERED)
 #define nfserr_sequence_pos	__constant_htonl(NFSERR_SEQUENCE_POS)
-
 
 /* error codes for internal use */
 /* if a request fails due to kmalloc failure, it gets dropped.
@@ -323,7 +329,7 @@ static inline int is_fsid(struct svc_fh *fh, struct knfsd_fh *reffh)
  | FATTR4_WORD1_SPACE_AVAIL     | FATTR4_WORD1_SPACE_FREE   | FATTR4_WORD1_SPACE_TOTAL      \
  | FATTR4_WORD1_SPACE_USED      | FATTR4_WORD1_TIME_ACCESS  | FATTR4_WORD1_TIME_ACCESS_SET  \
  | FATTR4_WORD1_TIME_DELTA   | FATTR4_WORD1_TIME_METADATA    \
- | FATTR4_WORD1_TIME_MODIFY     | FATTR4_WORD1_TIME_MODIFY_SET | FATTR4_WORD1_MOUNTED_ON_FILEID)
+ | FATTR4_WORD1_TIME_MODIFY     | FATTR4_WORD1_TIME_MODIFY_SET | FATTR4_WORD1_MOUNTED_ON_FILEID | FATTR4_WORD1_FS_LAYOUT_TYPES)
 
 /* These will return ERR_INVAL if specified in GETATTR or READDIR. */
 #define NFSD_WRITEONLY_ATTRS_WORD1							    \

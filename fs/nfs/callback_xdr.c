@@ -19,8 +19,14 @@
 				CB_OP_GETATTR_BITMAP_MAXSZ + \
 				2 + 2 + 3 + 3)
 #define CB_OP_RECALL_RES_MAXSZ	(CB_OP_HDR_RES_MAXSZ)
+#define CB_OP_LAYOUTRECALL_RES_MAXSZ	(CB_OP_HDR_RES_MAXSZ)
 
 #define NFSDBG_FACILITY NFSDBG_CALLBACK
+
+#define READ64(x)         do {			\
+	(x) = (u64)ntohl(*p++) << 32;		\
+	(x) |= ntohl(*p++);			\
+} while (0)
 
 typedef unsigned (*callback_process_op_t)(void *, void *);
 typedef unsigned (*callback_decode_arg_t)(struct svc_rqst *, struct xdr_stream *, void *);
@@ -204,6 +210,42 @@ out:
 	return status;
 }
 
+static unsigned decode_pnfs_layoutrecall_args(struct svc_rqst *rqstp, struct xdr_stream *xdr, struct cb_pnfs_layoutrecallargs *args)
+{
+	uint32_t *p;
+	unsigned status = 0;
+
+	args->cbl_addr = &rqstp->rq_addr;
+	p = read_buf(xdr, 4 * sizeof(uint32_t));
+
+	args->cbl_layout_type = ntohl(*p++);
+	args->cbl_iomode = ntohl(*p++);
+	args->cbl_layoutchanged = ntohl(*p++);
+	args->cbl_recall_type = ntohl(*p++);
+
+        if (args->cbl_recall_type == RECALL_FSID) {
+		p = read_buf(xdr, 2 * sizeof(uint64_t));
+		READ64(args->cbl_fsid.major);
+		READ64(args->cbl_fsid.minor);
+        }
+        else if (args->cbl_recall_type == RECALL_FILE) {
+		status = decode_fh(xdr, &args->cbl_fh);
+		if (unlikely(status != 0))
+			goto out;
+
+		p = read_buf(xdr, 2 * sizeof(uint64_t));
+		READ64(args->cbl_offset);
+		READ64(args->cbl_length);
+	}
+	dprintk("%s: ltype %d iomode %d changed %d recall_type %d fsid %llx-%llx\n",
+		__FUNCTION__, args->cbl_layout_type, args->cbl_iomode,
+		args->cbl_layoutchanged, args->cbl_recall_type,
+		args->cbl_fsid.major, args->cbl_fsid.minor);
+out:
+	dprintk("%s: exit with status = %d\n", __FUNCTION__, status);
+	return 0;
+}
+
 static unsigned encode_string(struct xdr_stream *xdr, unsigned int len, const char *str)
 {
 	uint32_t *p;
@@ -369,6 +411,7 @@ static unsigned process_op(struct svc_rqst *rqstp,
 		switch (op_nr) {
 			case OP_CB_GETATTR:
 			case OP_CB_RECALL:
+			case OP_CB_LAYOUTRECALL:
 				op = &callback_ops[op_nr];
 				break;
 			default:
@@ -452,6 +495,11 @@ static struct callback_op callback_ops[] = {
 		.process_op = (callback_process_op_t)nfs4_callback_recall,
 		.decode_args = (callback_decode_arg_t)decode_recall_args,
 		.res_maxsize = CB_OP_RECALL_RES_MAXSZ,
+	},
+	[OP_CB_LAYOUTRECALL] = {
+		.process_op = (callback_process_op_t)nfs4_callback_pnfs_layoutrecall,
+		.decode_args = (callback_decode_arg_t)decode_pnfs_layoutrecall_args,
+		.res_maxsize = CB_OP_LAYOUTRECALL_RES_MAXSZ,
 	}
 };
 

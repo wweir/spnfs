@@ -40,6 +40,7 @@
 #define _LINUX_NFSD_XDR4_H
 
 #include <linux/nfs4.h>
+#include <linux/nfsd/nfsd4_pnfs.h>
 
 #define NFSD4_MAX_TAGLEN	128
 #define XDR_LEN(n)                     (((n) + 3) & ~3)
@@ -334,10 +335,26 @@ struct nfsd4_write {
 	nfs4_verifier	wr_verifier;        /* response */
 };
 
+struct impl_id4 {
+	u32		domain_len;
+	char *		domain;
+	u32		name_len;
+	char *		name;
+	struct nfstime4	date;
+};
+
+#define EXCHGID4_FLAG_SUPP_MOVED_REFER	0x00000001
+#define EXCHGID4_FLAG_SUPP_MOVED_MIGR	0x00000002
+#define EXCHGID4_FLAG_USE_NON_PNFS	0x00010000
+#define EXCHGID4_FLAG_USE_PNFS_MDS	0x00020000
+#define EXCHGID4_FLAG_USE_PNFS_DS	0x00040000
+
 struct nfsd4_exchange_id {
         nfs4_verifier   verifier;
         u32             id_len;
         char *          id;
+	u32			flags;
+	struct impl_id4		impl_id;
         clientid_t      clientid;
         u32             seqid;
 };
@@ -412,6 +429,11 @@ struct nfsd4_op {
 		struct nfsd4_verify		verify;
 		struct nfsd4_write		write;
 		struct nfsd4_release_lockowner	release_lockowner;
+		struct nfsd4_pnfs_getdevlist	pnfs_getdevlist;
+		struct nfsd4_pnfs_getdevinfo	pnfs_getdevinfo;
+		struct nfsd4_pnfs_layoutget	pnfs_layoutget;
+		struct nfsd4_pnfs_layoutcommit	pnfs_layoutcommit;
+		struct nfsd4_pnfs_layoutreturn	pnfs_layoutreturn;
 		struct nfsd4_exchange_id	exchange_id;
 		struct nfsd4_create_session	create_session;
 		struct nfsd4_sequence		sequence;
@@ -514,6 +536,13 @@ nfsd4_release_lockowner(struct svc_rqst *rqstp,
 extern void nfsd4_release_compoundargs(struct nfsd4_compoundargs *);
 extern int nfsd4_delegreturn(struct svc_rqst *rqstp,
 		struct svc_fh *current_fh, struct nfsd4_delegreturn *dr);
+extern void nfsd4_devlist_free( struct nfsd4_pnfs_getdevlist *gdlp);
+
+int filelayout_encode_devaddr(u32 *p, u32 *end, void *dev_addr);
+void filelayout_free_devaddr(void *devaddr);
+int filelayout_encode_layout(u32 *p, u32 *end, void *layout);
+void filelayout_free_layout(void *layout);
+
 #endif
 
 /*

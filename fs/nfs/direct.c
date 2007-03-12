@@ -55,6 +55,7 @@
 #include <asm/atomic.h>
 
 #include "iostat.h"
+#include "pnfs.h"
 
 #define NFSDBG_FACILITY		NFSDBG_VFS
 
@@ -74,6 +75,8 @@ struct nfs_direct_req {
 	/* completion state */
 	atomic_t		io_count;	/* i/os we're waiting for */
 	spinlock_t		lock;		/* protect completion state */
+	size_t			user_count;	/* total bytes to move */
+	loff_t			pos;		/* starting offset in file */
 	ssize_t			count,		/* bytes actually processed */
 				error;		/* any reported error */
 	struct completion	completion;	/* wait for i/o completion */
@@ -261,13 +264,19 @@ static ssize_t nfs_direct_read_schedule(struct nfs_direct_req *dreq, unsigned lo
 {
 	struct nfs_open_context *ctx = dreq->ctx;
 	struct inode *inode = ctx->dentry->d_inode;
+#if defined(CONFIG_NFS_V4)
+	size_t rsize = NFS_SERVER(inode)->ds_rsize;
+#else
 	size_t rsize = NFS_SERVER(inode)->rsize;
+#endif
 	unsigned int pgbase;
 	int result;
 	ssize_t started = 0;
 
 	get_dreq(dreq);
 
+	dreq->user_count = count;
+	dreq->pos = pos;
 	do {
 		struct nfs_read_data *data;
 		size_t bytes;
@@ -323,6 +332,8 @@ static ssize_t nfs_direct_read_schedule(struct nfs_direct_req *dreq, unsigned lo
 		data->res.eof = 0;
 		data->res.count = bytes;
 
+		/* Only create an rpc request if utilizing NFSv4 I/O */
+		if (!pnfs_use_read(inode, dreq->user_count)) {
 		rpc_init_task(&data->task, NFS_CLIENT(inode), RPC_TASK_ASYNC,
 				&nfs_read_direct_ops, data);
 		NFS_PROTO(inode)->read_setup(data);
@@ -339,6 +350,11 @@ static ssize_t nfs_direct_read_schedule(struct nfs_direct_req *dreq, unsigned lo
 				(long long)NFS_FILEID(inode),
 				bytes,
 				(unsigned long long)data->args.offset);
+		} else {
+			dprintk("%s Using pNFS direct read\n",__FUNCTION__);
+			data->call_ops = &nfs_read_direct_ops;
+			pnfs_readpages(data);
+		}
 
 		started += bytes;
 		user_addr += bytes;
@@ -379,8 +395,21 @@ static ssize_t nfs_direct_read(struct kiocb *iocb, unsigned long user_addr, size
 	nfs_add_stats(inode, NFSIOS_DIRECTREADBYTES, count);
 	rpc_clnt_sigmask(clnt, &oldset);
 	result = nfs_direct_read_schedule(dreq, user_addr, count, pos);
-	if (!result)
+	if (result !=0)
+		goto out;
+	if (pnfs_use_nfsv4_rproto(inode, count))
 		result = nfs_direct_wait(dreq);
+	else {
+		/* TODO: Do I need a new pNFS callback to wait
+		* on outstanding requests?  How do I identify
+		* to the layout driver that they are all part
+		* of the same overall o_direct request.  For now
+		* assume I/O is sync.
+		*/
+		result = dreq->count;
+		kref_put(&dreq->kref, nfs_direct_req_release);
+	}
+out:
 	rpc_clnt_sigunmask(clnt, &oldset);
 
 	return result;
@@ -451,9 +480,19 @@ static void nfs_direct_commit_result(struct rpc_task *task, void *calldata)
 	struct nfs_write_data *data = calldata;
 	struct nfs_direct_req *dreq = (struct nfs_direct_req *) data->req;
 
+	dprintk( "%s Begin\n", __FUNCTION__);
+
 	/* Call the NFS version-specific code */
 	if (NFS_PROTO(data->inode)->commit_done(task, data) != 0)
 		return;
+
+	/* TODO: Non-nfsv4 LD's don't handle re-execution well yet since
+	* pnfs callback functions don't know the reexecution is
+	* happening.
+	*/
+	if (!pnfs_use_nfsv4_wproto(data->inode, dreq->user_count))
+		goto complete;
+
 	if (unlikely(task->tk_status < 0)) {
 		dreq->error = task->tk_status;
 		dreq->flags = NFS_ODIRECT_RESCHED_WRITES;
@@ -463,8 +502,16 @@ static void nfs_direct_commit_result(struct rpc_task *task, void *calldata)
 		dreq->flags = NFS_ODIRECT_RESCHED_WRITES;
 	}
 
+complete:
 	dprintk("NFS: %5u commit returned %d\n", task->tk_pid, task->tk_status);
+#if defined(CONFIG_NFS_V4)
+	/* Set flag indicating we need a layout commit */
+	if (task->tk_status >= 0 && pnfs_use_write(data->inode, data->args.count)) {
+		pnfs_need_layoutcommit(NFS_I(data->inode), data->args.context);
+	}
+#endif
 	nfs_direct_write_complete(dreq, data->inode);
+	dprintk( "%s End\n", __FUNCTION__);
 }
 
 static const struct rpc_call_ops nfs_commit_direct_ops = {
@@ -476,6 +523,8 @@ static void nfs_direct_commit_schedule(struct nfs_direct_req *dreq)
 {
 	struct nfs_write_data *data = dreq->commit_data;
 
+	dprintk( "%s Begin\n", __FUNCTION__);
+
 	data->inode = dreq->inode;
 	data->cred = dreq->ctx->cred;
 
@@ -486,6 +535,8 @@ static void nfs_direct_commit_schedule(struct nfs_direct_req *dreq)
 	data->res.fattr = &data->fattr;
 	data->res.verf = &data->verf;
 
+	/* Do pNFS specific commit if needed */
+	if (!pnfs_use_write(data->inode, dreq->user_count)) {
 	rpc_init_task(&data->task, NFS_CLIENT(dreq->inode), RPC_TASK_ASYNC,
 				&nfs_commit_direct_ops, data);
 	NFS_PROTO(data->inode)->commit_setup(data, 0);
@@ -500,11 +551,17 @@ static void nfs_direct_commit_schedule(struct nfs_direct_req *dreq)
 	lock_kernel();
 	rpc_execute(&data->task);
 	unlock_kernel();
+	} else {
+		data->call_ops = &nfs_commit_direct_ops;
+		pnfs_commit(data->inode, NULL, RPC_TASK_ASYNC, data);
+	}
 }
 
 static void nfs_direct_write_complete(struct nfs_direct_req *dreq, struct inode *inode)
 {
 	int flags = dreq->flags;
+
+	dprintk( "%s Begin (flags %d)\n", __FUNCTION__, flags);
 
 	dreq->flags = 0;
 	switch (flags) {
@@ -515,6 +572,19 @@ static void nfs_direct_write_complete(struct nfs_direct_req *dreq, struct inode 
 			nfs_direct_write_reschedule(dreq);
 			break;
 		default:
+                       dprintk( "%s complete commit\n", __FUNCTION__);
+#if defined(CONFIG_NFS_V4)
+			/* pNFS: Update last byte written field for
+			* layout commit.  User user_count in pnfs_user_write
+			* since it was used originally.  Use count to
+			* update last byte since that is the amount written.
+			*/
+			if (dreq->count > 0 &&
+			    pnfs_use_write(dreq->inode, dreq->user_count))
+				pnfs_update_last_write(NFS_I(dreq->inode),
+								dreq->pos,
+								dreq->count);
+#endif
 			nfs_end_data_update(inode);
 			if (dreq->commit_data != NULL)
 #ifdef CONFIG_NFS_V4
@@ -567,6 +637,7 @@ static void nfs_direct_write_result(struct rpc_task *task, void *calldata)
 	else
 		dreq->error = task->tk_status;
 
+	if (pnfs_use_nfsv4_wproto(data->inode, dreq->user_count)) {
 	if (data->res.verf->committed != NFS_FILE_SYNC) {
 		switch (dreq->flags) {
 			case 0:
@@ -579,6 +650,10 @@ static void nfs_direct_write_result(struct rpc_task *task, void *calldata)
 					dreq->flags = NFS_ODIRECT_RESCHED_WRITES;
 				}
 		}
+	}
+	} else if (data->args.stable != NFS_FILE_SYNC) {
+		/* Set commit flag if the write wasn't stable. */
+		dreq->flags = NFS_ODIRECT_DO_COMMIT;
 	}
 
 	spin_unlock(&dreq->lock);
@@ -620,6 +695,8 @@ static ssize_t nfs_direct_write_schedule(struct nfs_direct_req *dreq, unsigned l
 
 	get_dreq(dreq);
 
+	dreq->user_count = count;
+	dreq->pos = pos;
 	do {
 		struct nfs_write_data *data;
 		size_t bytes;
@@ -665,6 +742,8 @@ static ssize_t nfs_direct_write_schedule(struct nfs_direct_req *dreq, unsigned l
 		data->res.count = bytes;
 		data->res.verf = &data->verf;
 
+		/* Only create an rpc request if utilizing NFSv4 I/O */
+		if (!pnfs_use_write(inode, dreq->user_count)) {
 		rpc_init_task(&data->task, NFS_CLIENT(inode), RPC_TASK_ASYNC,
 				&nfs_write_direct_ops, data);
 		NFS_PROTO(inode)->write_setup(data, sync);
@@ -682,7 +761,20 @@ static ssize_t nfs_direct_write_schedule(struct nfs_direct_req *dreq, unsigned l
 				(long long)NFS_FILEID(inode),
 				bytes,
 				(unsigned long long)data->args.offset);
-
+              } else {
+		/* Set stable arg. (from nfs4_proc_write_setup) */
+			int stable;
+			if (sync & FLUSH_STABLE) {
+				if (!NFS_I(inode)->ncommit)
+					stable = NFS_FILE_SYNC;
+				else
+					stable = NFS_DATA_SYNC;
+			} else
+				stable = NFS_UNSTABLE;
+				data->args.stable = stable;
+				data->call_ops = &nfs_write_direct_ops;
+				pnfs_writepages(data, sync);
+		}
 		started += bytes;
 		user_addr += bytes;
 		pos += bytes;
@@ -710,7 +802,11 @@ static ssize_t nfs_direct_write(struct kiocb *iocb, unsigned long user_addr, siz
 	struct inode *inode = iocb->ki_filp->f_mapping->host;
 	struct rpc_clnt *clnt = NFS_CLIENT(inode);
 	struct nfs_direct_req *dreq;
+#if defined(CONFIG_NFS_V4)
+	size_t wsize = NFS_SERVER(inode)->ds_wsize;
+#else
 	size_t wsize = NFS_SERVER(inode)->wsize;
+#endif
 	int sync = 0;
 
 	dreq = nfs_direct_req_alloc();
@@ -732,8 +828,21 @@ static ssize_t nfs_direct_write(struct kiocb *iocb, unsigned long user_addr, siz
 
 	rpc_clnt_sigmask(clnt, &oldset);
 	result = nfs_direct_write_schedule(dreq, user_addr, count, pos, sync);
-	if (!result)
+	if (result != 0)
+		goto out;
+	if (pnfs_use_nfsv4_wproto(inode, count))
 		result = nfs_direct_wait(dreq);
+	else {
+		/* TODO: Do I need a new pNFS callback to wait
+		* on outstanding requests?  How do I identify
+		* to the layout driver that they are all part
+		* of the same overall o_direct request.  For now
+		* assume I/O is sync.
+		*/
+		result = dreq->count;
+		kref_put(&dreq->kref, nfs_direct_req_release);
+	}
+out:
 	rpc_clnt_sigunmask(clnt, &oldset);
 
 	return result;

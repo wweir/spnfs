@@ -41,6 +41,7 @@
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
 #include <linux/nfs_fs.h>
+#include <linux/nfs4_pnfs.h>
 #include <linux/nfs_idmap.h>
 #include <linux/kthread.h>
 #include <linux/module.h>
@@ -50,6 +51,7 @@
 #include "nfs4_fs.h"
 #include "callback.h"
 #include "delegation.h"
+#include "pnfs.h"
 
 #define NFSDBG_FACILITY NFSDBG_VFS
 #define OPENOWNER_POOL_SIZE	8
@@ -108,6 +110,8 @@ nfs4_alloc_client(struct in_addr *addr)
 	clp->cl_rpcclient = ERR_PTR(-EINVAL);
 	clp->cl_boot_time = CURRENT_TIME;
 	clp->cl_state = 1 << NFS4CLNT_LEASE_EXPIRED;
+	clp->cl_session_flags = 0;
+	clp->cl_exchange_flags = 0;
 	return clp;
 }
 
@@ -523,8 +527,20 @@ void nfs4_close_state(struct nfs4_state *state, mode_t mode)
 	spin_unlock(&inode->i_lock);
 	spin_unlock(&owner->so_lock);
 
-	if (oldstate != newstate && nfs4_do_close(inode, state) == 0)
+	if (oldstate != newstate) {
+		if (pnfs_enabled_sb(NFS_SERVER(inode))) {
+			if (NFS_I(inode)->layoutcommit_ctx) {
+				pnfs_layoutcommit_inode(inode, 0);
+			}
+			/* TODO: make finer grained returns here */
+			if (NFS_I(inode)->current_layout &&
+			    NFS_I(inode)->current_layout->roc_iomode) {
+				pnfs_return_layout(inode);
+			}
+		}
+		if (nfs4_do_close(inode, state) == 0)
 		return;
+	}
 	nfs4_put_open_state(state);
 	nfs4_put_state_owner(owner);
 }
