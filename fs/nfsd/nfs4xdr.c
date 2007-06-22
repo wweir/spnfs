@@ -3166,8 +3166,9 @@ nfsd4_encode_devlist_item(struct nfsd4_compoundres *resp,
 	int len;
 	ENCODE_HEAD;
 
-	RESERVE_SPACE(4);
+	RESERVE_SPACE(8);
 	WRITE32(dlist->dev_id);
+	WRITE32(lotype);
 	ADJUST_ARGS();
 
 	if (ex_ops->devaddr_encode == NULL && lotype == LAYOUT_NFSV4_FILES) {
@@ -3243,7 +3244,8 @@ nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp, int nfserr,
 
 	printk("%s: err %d\n", __FUNCTION__, nfserr);
 	if (!nfserr) {
-		RESERVE_SPACE(4);
+		RESERVE_SPACE(8);
+		WRITE32(gdev->gd_type);
 		if (gdev->gd_ops->devaddr_encode == NULL &&
 					gdev->gd_type == LAYOUT_NFSV4_FILES) {
 			len = filelayout_encode_devaddr(p, resp->end,gdev->gd_devaddr);
