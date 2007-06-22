@@ -48,7 +48,7 @@ struct nfsd4_compound_state {
 	struct svc_fh current_fh;
 	struct svc_fh save_fh;
 	struct nfs4_stateowner *replay_owner;
-	struct sessionid_t *current_sid;	/* XXX Right place? */
+	sessionid_t *current_sid;
 };
 
 struct nfsd4_change_info {
@@ -345,10 +345,25 @@ struct nfsd4_write {
 	nfs4_verifier	wr_verifier;        /* response */
 };
 
+struct nfstime4 {
+	u64	seconds;
+	u32	nseconds;
+};
+
+struct impl_id4 {
+	u32		domain_len;
+	char *		domain;
+	u32		name_len;
+	char *		name;
+	struct nfstime4	date;
+};
+
 struct nfsd4_exchange_id {
         nfs4_verifier   verifier;
         u32             id_len;
         char *          id;
+	u32			flags;
+	struct impl_id4		impl_id;
         clientid_t      clientid;
         u32             seqid;
 };

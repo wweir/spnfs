@@ -1071,6 +1071,9 @@ out_copy:
         clid->clientid.cl_id = new->cl_clientid.cl_id;
 
         new->cl_seqid = clid->seqid = 1;
+        new->cl_exchange_flags = clid->flags;
+        clid->flags &= ~(EXCHGID4_FLAG_USE_PNFS_MDS | EXCHGID4_FLAG_USE_PNFS_DS);
+        clid->flags |= EXCHGID4_FLAG_USE_NON_PNFS;
 
         status = nfs_ok;
 

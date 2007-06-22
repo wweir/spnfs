@@ -2758,8 +2758,12 @@ nfsd4_encode_exchange_id(struct nfsd4_compoundres *resp, int nfserr, struct nfsd
 	ENCODE_HEAD;
 	char major_id[] = "fixme_please!";
 	char server_scope[] = "fixme_please!";
+	char domain[] = "fixme_please!";
+	char name[] = "fixme_please!";
 	int major_id_sz;
 	int server_scope_sz;
+	int domain_sz;
+	int name_sz;
 	uint64_t minor_id = 0;
 
 	/* XXX FIXME We currently use ia dummy  as the major id. Need to change
@@ -2768,10 +2772,14 @@ nfsd4_encode_exchange_id(struct nfsd4_compoundres *resp, int nfserr, struct nfsd
 	if (!nfserr) {
 		major_id_sz = strlen(major_id);
 		server_scope_sz = strlen(server_scope);
+		domain_sz = strlen(domain);
+		name_sz = strlen(name);
 
-		RESERVE_SPACE(8 + 4 + 8 + 4 + major_id_sz + 4 + server_scope_sz);
+		RESERVE_SPACE(8+4+4+8+4+major_id_sz+4+server_scope_sz);
 		WRITEMEM(&clid->clientid, 8);
 		WRITE32(clid->seqid);
+
+		WRITE32(clid->flags);
 
 		/* The server_owner struct */
 		WRITE64(minor_id);      /* Minor id */
@@ -2783,6 +2791,17 @@ nfsd4_encode_exchange_id(struct nfsd4_compoundres *resp, int nfserr, struct nfsd
 		WRITE32(server_scope_sz);
 		WRITEMEM(server_scope, server_scope_sz);
 		ADJUST_ARGS();
+
+		/* Implementation id */
+		RESERVE_SPACE(4+domain_sz+4+name_sz+8+4);
+		WRITE32(domain_sz);
+		WRITEMEM(domain, domain_sz);
+		WRITE32(name_sz);
+		WRITEMEM(name, name_sz);
+		WRITE64(clid->impl_id.date.seconds);
+		WRITE32(clid->impl_id.date.nseconds);
+
+                ADJUST_ARGS();
 	}
 
 }
