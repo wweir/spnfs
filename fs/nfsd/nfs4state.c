@@ -72,6 +72,8 @@ static stateid_t onestateid;              /* bits all 1 */
 #define ZERO_STATEID(stateid) (!memcmp((stateid), &zerostateid, sizeof(stateid_t)))
 #define ONE_STATEID(stateid)  (!memcmp((stateid), &onestateid, sizeof(stateid_t)))
 
+extern __u32 svc_max_payload(const struct svc_rqst *rqstp);
+
 /* forward declarations */
 static struct nfs4_stateid * find_stateid(stateid_t *stid, int flags);
 static struct nfs4_delegation * find_delegation_stateid(struct inode *ino, stateid_t *stid);
@@ -1206,6 +1208,7 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 	//u32 ip_addr = rqstp->rq_addr.sin_addr.s_addr;
         u32 ip_addr = svc_addr_in(rqstp)->sin_addr.s_addr;
 	struct nfs4_client *conf, *unconf;
+	__u32   max_blocksize = svc_max_payload(rqstp);
 	int status = 0;
 
 	if (STALE_CLIENTID(&session->clientid))
@@ -1254,6 +1257,13 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 out_replay:
 	memcpy(session->sessionid, conf->cl_sessionid, 16);
 	session->seqid = conf->cl_seqid;
+	session->fore_channel.maxreq_sz = max_blocksize;
+	session->fore_channel.maxresp_sz = max_blocksize;
+	session->fore_channel.maxresp_cached = max_blocksize;
+	session->back_channel.maxreq_sz = max_blocksize;
+	session->back_channel.maxresp_sz = max_blocksize;
+	session->back_channel.maxresp_cached = max_blocksize;
+
 out:
 	nfs4_unlock_state();
 	dprintk("%s returns %d\n", __FUNCTION__, status);
