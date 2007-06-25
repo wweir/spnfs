@@ -51,6 +51,7 @@
 #include <linux/namei.h>
 #include <linux/swap.h>
 #include <linux/mutex.h>
+#include <linux/crc32.h>
 #include <linux/lockd/bind.h>
 #include <linux/module.h>
 
@@ -320,25 +321,19 @@ struct sessionid_hashtbl_element {
         struct list_head hash_list;
 };
 
-static struct list_head sessionid_hashtbl[CLIENT_HASH_SIZE];
+/* Use a prime for hash table size */
+#define SESSION_HASH_SIZE       1031
+static struct list_head sessionid_hashtbl[SESSION_HASH_SIZE];
 
 static int
 hash_sessionid(sessionid_t *sessionid)
 {
-
-        u32 *ptr;
-        u32 hashval;
+        u32 csum = 0;
         int idx;
-        int i;
 
-        ptr = (u32 *)(*sessionid);
-        hashval = 0;
-        for (i = 0; i < sizeof(sessionid_t)/sizeof(u32);++i) {
-                hashval ^= ptr[i];
-        }
-
-        idx = hashval % CLIENT_HASH_SIZE;
-
+        csum = crc32(0, sessionid, sizeof(sessionid_t));
+        idx = csum % SESSION_HASH_SIZE;
+        dprintk("%s IDX: %u csum %u\n", __FUNCTION__, idx, csum);
         return idx;
 }
 
@@ -364,10 +359,9 @@ add_to_sessionid_hashtbl(clientid_t *clientid, sessionid_t *sessionid)
                 return -ENOMEM;
 
         memcpy(&new->clientid, clientid, sizeof(*clientid));
-        memcpy(&new->sessionid, *sessionid, sizeof(sessionid_t));
+        memcpy(&new->sessionid, sessionid, sizeof(sessionid_t));
 
         idx = hash_sessionid(sessionid);
-        dprintk("%s: idx is %d\n", __FUNCTION__, idx);
 
         list_add(&new->hash_list, &sessionid_hashtbl[idx]);
 
@@ -387,7 +381,7 @@ find_in_sessionid_hashtbl(sessionid_t *sessionid)
         /* Search in the appropriate list */
         list_for_each_entry(elem, &sessionid_hashtbl[idx], hash_list) {
                 dump_sessionid("list traversal", &elem->sessionid);
-                if (!memcmp(elem->sessionid, *sessionid, sizeof(sessionid_t))) {
+                if (!memcmp(elem->sessionid, sessionid, sizeof(sessionid_t))) {
                         found = 1;
                         break;
                 }
@@ -3478,6 +3472,8 @@ nfs4_state_init(void)
 		INIT_LIST_HEAD(&conf_str_hashtbl[i]);
 		INIT_LIST_HEAD(&unconf_str_hashtbl[i]);
 		INIT_LIST_HEAD(&unconf_id_hashtbl[i]);
+	}
+	for (i = 0; i < SESSION_HASH_SIZE; i++) {
 		INIT_LIST_HEAD(&sessionid_hashtbl[i]);
 	}
 	for (i = 0; i < FILE_HASH_SIZE; i++) {
