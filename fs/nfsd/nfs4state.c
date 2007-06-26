@@ -2161,7 +2161,8 @@ nfsd4_sequence(struct svc_rqst *r,
         }
 
 	memcpy(cstate->current_sid, &seq->sessionid, sizeof(sessionid_t));
-        return nfsd4_renew(r, cstate, &elem->se_client->cl_clientid);
+        renew_client(elem->se_client);
+        return nfs_ok;
 }
 
 __be32
