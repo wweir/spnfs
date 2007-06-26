@@ -46,7 +46,7 @@ typedef struct {
 	u32             cl_id;
 } clientid_t;
 
-typedef unsigned char sessionid_t[16];
+typedef unsigned char  sessionid_t[16];
 
 typedef struct {
 	u32             so_boot;
@@ -102,6 +102,15 @@ struct nfs4_callback {
 	struct rpc_program      cb_program;
 	struct rpc_stat         cb_stat;
 	struct rpc_clnt *       cb_client;
+};
+
+/*
+ * nfs41_sessionid
+ */
+struct nfs41_session {
+	struct list_head        se_hash;        /* hash by sessionid_t */
+	clientid_t              se_clientid;
+	sessionid_t             se_sessionid;
 };
 
 #define HEXDIR_LEN     33 /* hex version of 16 byte md5 of cl_name plus '\0' */

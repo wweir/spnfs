@@ -314,13 +314,6 @@ static struct list_head	unconf_id_hashtbl[CLIENT_HASH_SIZE];
 static struct list_head client_lru;
 static struct list_head close_lru;
 
-/* For sessionid -> clientid mapping */
-struct sessionid_hashtbl_element {
-        clientid_t clientid;
-        sessionid_t sessionid;
-        struct list_head hash_list;
-};
-
 /* Use a prime for hash table size */
 #define SESSION_HASH_SIZE       1031
 static struct list_head sessionid_hashtbl[SESSION_HASH_SIZE];
@@ -349,7 +342,7 @@ void dump_sessionid(const char *fn, sessionid_t *sessionid)
 static int
 add_to_sessionid_hashtbl(clientid_t *clientid, sessionid_t *sessionid)
 {
-        struct sessionid_hashtbl_element *new;
+        struct nfs41_session *new;
         int idx;
 
         //dump_sessionid(__FUNCTION__, sessionid);
@@ -358,20 +351,20 @@ add_to_sessionid_hashtbl(clientid_t *clientid, sessionid_t *sessionid)
         if (!new)
                 return -ENOMEM;
 
-        memcpy(&new->clientid, clientid, sizeof(*clientid));
-        memcpy(&new->sessionid, sessionid, sizeof(sessionid_t));
+        memcpy(&new->se_clientid, clientid, sizeof(*clientid));
+        memcpy(&new->se_sessionid, sessionid, sizeof(sessionid_t));
 
         idx = hash_sessionid(sessionid);
 
-        list_add(&new->hash_list, &sessionid_hashtbl[idx]);
+        list_add(&new->se_hash, &sessionid_hashtbl[idx]);
 
         return 0;
 }
 
-struct sessionid_hashtbl_element*
+struct nfs41_session*
 find_in_sessionid_hashtbl(sessionid_t *sessionid)
 {
-        struct sessionid_hashtbl_element *elem;
+        struct nfs41_session *elem;
         int idx;
         int found = 0;
 
@@ -379,9 +372,9 @@ find_in_sessionid_hashtbl(sessionid_t *sessionid)
         idx = hash_sessionid(sessionid);
         dprintk("%s: idx is %d\n", __FUNCTION__, idx);
         /* Search in the appropriate list */
-        list_for_each_entry(elem, &sessionid_hashtbl[idx], hash_list) {
-                dump_sessionid("list traversal", &elem->sessionid);
-                if (!memcmp(elem->sessionid, sessionid, sizeof(sessionid_t))) {
+        list_for_each_entry(elem, &sessionid_hashtbl[idx], se_hash) {
+                dump_sessionid("list traversal", &elem->se_sessionid);
+                if (!memcmp(elem->se_sessionid, sessionid, sizeof(sessionid_t))) {
                         found = 1;
                         break;
                 }
@@ -398,7 +391,7 @@ find_in_sessionid_hashtbl(sessionid_t *sessionid)
 void
 remove_from_sessionid_hashtbl(sessionid_t *sessionid)
 {
-        struct sessionid_hashtbl_element *elem;
+        struct nfs41_session *elem;
 
 	dump_sessionid(__FUNCTION__, sessionid);
         elem = find_in_sessionid_hashtbl(sessionid);
@@ -408,7 +401,7 @@ remove_from_sessionid_hashtbl(sessionid_t *sessionid)
 		return;
 	}
 
-        list_del(&elem->hash_list);
+        list_del(&elem->se_hash);
 
         kfree(elem);
 }
@@ -2160,7 +2153,7 @@ nfsd4_sequence(struct svc_rqst *r,
 		struct nfsd4_compound_state *cstate,
 		struct nfsd4_sequence *seq)
 {
-        struct sessionid_hashtbl_element *elem;
+        struct nfs41_session *elem;
         elem = find_in_sessionid_hashtbl(&seq->sessionid);
 
         if (!elem) {
@@ -2170,7 +2163,7 @@ nfsd4_sequence(struct svc_rqst *r,
         }
 
 	memcpy(cstate->current_sid, &seq->sessionid, sizeof(sessionid_t));
-        return nfsd4_renew(r, cstate, &elem->clientid);
+        return nfsd4_renew(r, cstate, &elem->se_clientid);
 }
 
 __be32
