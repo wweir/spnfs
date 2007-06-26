@@ -63,6 +63,7 @@ static time_t user_lease_time = 20;
 static time_t boot_time;
 static int in_grace = 1;
 static u32 current_clientid = 1;
+static u64 current_sessionid = 1;
 static u32 current_ownerid = 1;
 static u32 current_fileid = 1;
 static u32 current_delegid = 1;
@@ -339,26 +340,40 @@ void dump_sessionid(const char *fn, sessionid_t *sessionid)
         dprintk("%s: %u:%u:%u:%u\n", fn, ptr[0], ptr[1], ptr[2], ptr[3]);
 }
 
+static void
+gen_sessionid(struct nfs41_session *ses)
+{
+	struct nfs4_client *clp = ses->se_client;
+	u32 *p = (u32 *)ses->se_sessionid;
+	u64 *q;
+
+	*p++ = clp->cl_clientid.cl_boot;
+	*p++ = clp->cl_clientid.cl_id;
+	q = (u64 *)&ses->se_sessionid[8];
+	*q = current_sessionid++;
+}
+
 static int
-add_to_sessionid_hashtbl(clientid_t *clientid, sessionid_t *sessionid)
+alloc_init_session(struct nfs4_client *clp)
 {
         struct nfs41_session *new;
         int idx;
 
-        //dump_sessionid(__FUNCTION__, sessionid);
         new = kzalloc(sizeof(*new), GFP_KERNEL);
-
         if (!new)
-                return -ENOMEM;
+		return nfserr_resource;
 
-        memcpy(&new->se_clientid, clientid, sizeof(*clientid));
-        memcpy(&new->se_sessionid, sessionid, sizeof(sessionid_t));
+	new->se_client = clp;
+	gen_sessionid(new);
+	idx = hash_sessionid(&new->se_sessionid);
+	memcpy(&clp->cl_sessionid, &new->se_sessionid, sizeof(sessionid_t));
 
-        idx = hash_sessionid(sessionid);
-
+	INIT_LIST_HEAD(&new->se_hash);
+	INIT_LIST_HEAD(&new->se_perclnt);
         list_add(&new->se_hash, &sessionid_hashtbl[idx]);
+	list_add(&new->se_perclnt, &clp->cl_sessions);
 
-        return 0;
+	return nfs_ok;
 }
 
 struct nfs41_session*
@@ -389,21 +404,11 @@ find_in_sessionid_hashtbl(sessionid_t *sessionid)
 }
 
 void
-remove_from_sessionid_hashtbl(sessionid_t *sessionid)
+release_session(struct nfs41_session *ses)
 {
-        struct nfs41_session *elem;
-
-	dump_sessionid(__FUNCTION__, sessionid);
-        elem = find_in_sessionid_hashtbl(sessionid);
-
-        if (!elem) {
-		printk("%s NO SESSIONID FOUND\n",__FUNCTION__);
-		return;
-	}
-
-        list_del(&elem->se_hash);
-
-        kfree(elem);
+	list_del(&ses->se_hash);
+	list_del(&ses->se_perclnt);
+	kfree(ses);
 }
 
 static inline void
@@ -487,6 +492,7 @@ expire_client(struct nfs4_client *clp)
 {
 	struct nfs4_stateowner *sop;
 	struct nfs4_delegation *dp;
+	struct nfs41_session  *ses;
 	struct list_head reaplist;
 
 	dprintk("NFSD: expire_client cl_count %d\n",
@@ -514,7 +520,10 @@ expire_client(struct nfs4_client *clp)
 		sop = list_entry(clp->cl_openowners.next, struct nfs4_stateowner, so_perclient);
 		release_stateowner(sop);
 	}
-	remove_from_sessionid_hashtbl(&clp->cl_sessionid);
+	while (!list_empty(&clp->cl_sessions)) {
+		ses = list_entry(clp->cl_sessions.next, struct nfs41_session, se_perclnt);
+		release_session(ses);
+	}
 	put_nfs4_client(clp);
 }
 
@@ -531,6 +540,7 @@ create_client(struct xdr_netobj name, char *recdir) {
 	INIT_LIST_HEAD(&clp->cl_strhash);
 	INIT_LIST_HEAD(&clp->cl_openowners);
 	INIT_LIST_HEAD(&clp->cl_delegations);
+	INIT_LIST_HEAD(&clp->cl_sessions);
 	INIT_LIST_HEAD(&clp->cl_lru);
 out:
 	return clp;
@@ -596,18 +606,6 @@ gen_confirm(struct nfs4_client *clp) {
 	p = (u32 *)clp->cl_confirm.data;
 	*p++ = tv.tv_sec;
 	*p++ = tv.tv_nsec;
-}
-static void
-gen_sessionid(struct nfs4_client *clp)
-{
-        u32 *p = (u32 *)clp->cl_sessionid;
-        u64 *q;
-        static u64 sessionid_ctr = 0;
-
-        *p++ = clp->cl_clientid.cl_boot;
-        *p++ = clp->cl_clientid.cl_id;
-        q = (u64 *)&clp->cl_sessionid[8];
-        *q = sessionid_ctr++;
 }
 
 static int
@@ -1218,8 +1216,10 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 			goto out;
 		}
 
-		dprintk("Got a create_session replay!\n");
-		goto out_replay;
+		if (conf->cl_seqid == session->seqid) {
+			dprintk("Got a create_session replay!\n");
+			goto out_replay;
+		}
 
 	} else if (unconf) {
 		if (!same_creds(&unconf->cl_cred, &rqstp->rq_cred) || (ip_addr != unconf->cl_addr)) {
@@ -1233,13 +1233,11 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 		}
 
 		unconf->cl_seqid++;
-		gen_sessionid(unconf);
-
 		move_to_confirmed(unconf);
 		nfsd4_probe_callback(unconf);
 		conf = unconf;
 	}
-	add_to_sessionid_hashtbl(&conf->cl_clientid, &conf->cl_sessionid);
+	status = alloc_init_session(conf);
 
 out_replay:
 	memcpy(session->sessionid, conf->cl_sessionid, 16);
@@ -2163,7 +2161,7 @@ nfsd4_sequence(struct svc_rqst *r,
         }
 
 	memcpy(cstate->current_sid, &seq->sessionid, sizeof(sessionid_t));
-        return nfsd4_renew(r, cstate, &elem->se_clientid);
+        return nfsd4_renew(r, cstate, &elem->se_client->cl_clientid);
 }
 
 __be32
