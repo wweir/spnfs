@@ -354,26 +354,46 @@ gen_sessionid(struct nfs41_session *ses)
 }
 
 static int
-alloc_init_session(struct nfs4_client *clp)
+alloc_init_session(struct nfs4_client *clp, struct nfsd4_create_session *cses)
 {
         struct nfs41_session *new;
-        int idx;
+	int idx, status, slotsize;
 
         new = kzalloc(sizeof(*new), GFP_KERNEL);
         if (!new)
-		return nfserr_resource;
+		goto out;
+
+	if (cses->fore_channel.maxreqs >= NFS41_MAX_SLOTS)
+		cses->fore_channel.maxreqs = NFS41_MAX_SLOTS;
+	new->se_fnumslots = cses->fore_channel.maxreqs;
+	slotsize = new->se_fnumslots * sizeof(struct nfs41_slot);
+
+	new->se_slots = kzalloc(slotsize, GFP_KERNEL);
+	if (!new->se_slots)
+		goto out_free;
 
 	new->se_client = clp;
 	gen_sessionid(new);
 	idx = hash_sessionid(&new->se_sessionid);
 	memcpy(&clp->cl_sessionid, &new->se_sessionid, sizeof(sessionid_t));
 
+	/* for now, accept the client values */
+	new->se_fmaxreq_sz = cses->fore_channel.maxreq_sz;
+	new->se_fmaxresp_sz = cses->fore_channel.maxresp_sz;
+	new->se_fmaxresp_cached = cses->fore_channel.maxresp_cached;
+	new->se_fmaxops = cses->fore_channel.maxops;
+
 	INIT_LIST_HEAD(&new->se_hash);
 	INIT_LIST_HEAD(&new->se_perclnt);
-        list_add(&new->se_hash, &sessionid_hashtbl[idx]);
+	list_add(&new->se_hash, &sessionid_hashtbl[idx]);
 	list_add(&new->se_perclnt, &clp->cl_sessions);
 
-	return nfs_ok;
+	status = nfs_ok;
+out:
+	return status;
+out_free:
+	kfree(new);
+	goto out;
 }
 
 struct nfs41_session*
@@ -408,6 +428,8 @@ release_session(struct nfs41_session *ses)
 {
 	list_del(&ses->se_hash);
 	list_del(&ses->se_perclnt);
+	if (ses->se_slots)
+		kfree(ses->se_slots);
 	kfree(ses);
 }
 
@@ -1237,7 +1259,7 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 		nfsd4_probe_callback(unconf);
 		conf = unconf;
 	}
-	status = alloc_init_session(conf);
+	status = alloc_init_session(conf, session);
 
 out_replay:
 	memcpy(session->sessionid, conf->cl_sessionid, 16);

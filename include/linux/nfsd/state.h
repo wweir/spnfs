@@ -105,6 +105,31 @@ struct nfs4_callback {
 };
 
 /*
+ * nfs41_channel
+ *
+ * for both forward and back channels
+ */
+struct nfs41_channel {
+	u32     ch_maxreq_sz;
+	u32     ch_maxresp_sz;
+	u32     ch_maxresp_cached;
+	u32     ch_maxops;
+	u32     ch_maxreqs;    /* number of slots */
+};
+
+/* Maximum number of slots per session - XXX arbitrary */ 
+#define NFS41_MAX_SLOTS                64
+
+/*
+ * nfs41_slot
+ *
+ * for now, just slot sequence number - will hold DRC for this slot.
+ */
+struct nfs41_slot {
+	u32                             sl_seqid;
+};
+
+/*
  * nfs41_sessionid
  */
 struct nfs41_session {
@@ -112,7 +137,15 @@ struct nfs41_session {
 	struct list_head	se_perclnt;
 	struct nfs4_client	*se_client;	/* for expire_client */
 	sessionid_t             se_sessionid;
+	struct nfs41_channel    se_forward;
+	struct nfs41_slot       *se_slots;      /* forward channel slots */
 };
+
+#define se_fmaxreq_sz          se_forward.ch_maxreq_sz
+#define se_fmaxresp_sz         se_forward.ch_maxresp_sz
+#define se_fmaxresp_cached     se_forward.ch_maxresp_cached
+#define se_fmaxops             se_forward.ch_maxops
+#define se_fnumslots           se_forward.ch_maxreqs
 
 #define HEXDIR_LEN     33 /* hex version of 16 byte md5 of cl_name plus '\0' */
 
