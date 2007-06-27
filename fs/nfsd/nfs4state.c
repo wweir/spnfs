@@ -1208,6 +1208,25 @@ out:
 	return status;
 }
 
+/*
+ * XXX Need slot->sl_seqid wraparound code.
+ */
+static int
+check_slot_seqid(u32 seqid, struct nfs41_slot *slot)
+{
+	dprintk("%s enter. seqid %d slot->sl_seqid %d\n", __FUNCTION__,
+		seqid, slot->sl_seqid);
+	/* Normal */
+	if (seqid == slot->sl_seqid +1)
+		return nfs_ok;
+	/* Replay */
+	else if (seqid == slot->sl_seqid)
+		return NFSERR_REPLAY_ME;
+	/* Misordered replay or misordered new request */
+	else
+		return nfserr_seq_misordered;
+}
+
 __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 			struct nfsd4_compound_state *cstate,
 			struct nfsd4_create_session *session)
@@ -2174,17 +2193,47 @@ nfsd4_sequence(struct svc_rqst *r,
 		struct nfsd4_sequence *seq)
 {
         struct nfs41_session *elem;
-        elem = find_in_sessionid_hashtbl(&seq->sessionid);
+	struct nfs41_slot *slot;
+	int status;
 
-        if (!elem) {
-                printk(KERN_EMERG "stale clientid supplied to sequence!!\n");
-                dump_sessionid(__FUNCTION__, &seq->sessionid);
+	if (STALE_CLIENTID((clientid_t *)seq->sessionid))
                 return nfserr_stale_clientid;
-        }
+
+	nfs4_lock_state();
+	status = nfserr_badsession;
+	elem = find_in_sessionid_hashtbl(&seq->sessionid);
+	if (!elem) {
+		dprintk("NFSD: %s Stale clientid supplied to sequence!!\n");
+		dump_sessionid(__FUNCTION__, &seq->sessionid);
+		goto out;
+	}
+	status = nfserr_badslot;
+	if (seq->slotid >= elem->se_fnumslots)
+		goto out;
+
+	slot = &elem->se_slots[seq->slotid];
+	dprintk("%s slotid %d \n", __FUNCTION__, seq->slotid);
+	status = check_slot_seqid(seq->seqid, slot);
+	if (status == NFSERR_REPLAY_ME)
+		goto replay;
+	else if (status)
+		goto out;
+
+	/* Success! bump slot seqid */
+	slot->sl_seqid++;
 
 	memcpy(cstate->current_sid, &seq->sessionid, sizeof(sessionid_t));
         renew_client(elem->se_client);
-        return nfs_ok;
+	status = nfs_ok;
+out:
+	dprintk("%s returns %d\n", __FUNCTION__, status);
+	nfs4_unlock_state();
+	return status;
+replay:
+	dprintk("%s REPLAY - AKKKK! no code yet! return BAD SESSION\n",
+		__FUNCTION__);
+	status = nfserr_badsession;
+	goto out;
 }
 
 __be32
