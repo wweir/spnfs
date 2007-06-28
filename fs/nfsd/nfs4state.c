@@ -353,11 +353,23 @@ gen_sessionid(struct nfs41_session *ses)
 	*q = current_sessionid++;
 }
 
+int
+nfs41_get_slot_state(struct nfs41_slot *slot)
+{
+	return atomic_read(&slot->sl_state);
+}
+
+void
+nfs41_set_slot_state(struct nfs41_slot *slot, int state)
+{
+	atomic_set(&slot->sl_state, state);
+}
+
 static int
 alloc_init_session(struct nfs4_client *clp, struct nfsd4_create_session *cses)
 {
         struct nfs41_session *new;
-	int idx, status, slotsize;
+	int idx, status, slotsize, i;
 
         new = kzalloc(sizeof(*new), GFP_KERNEL);
         if (!new)
@@ -372,6 +384,11 @@ alloc_init_session(struct nfs4_client *clp, struct nfsd4_create_session *cses)
 	if (!new->se_slots)
 		goto out_free;
 
+	for (i = 0; i < new->se_fnumslots; i++) {
+		new->se_slots[i].sl_session = new;
+		nfs41_set_slot_state(&new->se_slots[i], NFS4_SLOT_AVAILABLE);
+	}
+
 	new->se_client = clp;
 	gen_sessionid(new);
 	idx = hash_sessionid(&new->se_sessionid);
@@ -383,6 +400,7 @@ alloc_init_session(struct nfs4_client *clp, struct nfsd4_create_session *cses)
 	new->se_fmaxresp_cached = cses->fore_channel.maxresp_cached;
 	new->se_fmaxops = cses->fore_channel.maxops;
 
+	kref_init(&new->se_ref);
 	INIT_LIST_HEAD(&new->se_hash);
 	INIT_LIST_HEAD(&new->se_perclnt);
 	list_add(&new->se_hash, &sessionid_hashtbl[idx]);
@@ -423,14 +441,28 @@ find_in_sessionid_hashtbl(sessionid_t *sessionid)
         return elem;
 }
 
-void
-release_session(struct nfs41_session *ses)
+static void
+release_session(struct kref *kref)
 {
+	struct nfs41_session *ses = container_of(kref, struct nfs41_session, se_ref);
+
 	list_del(&ses->se_hash);
 	list_del(&ses->se_perclnt);
 	if (ses->se_slots)
 		kfree(ses->se_slots);
 	kfree(ses);
+}
+
+inline void
+nfs41_put_session(struct nfs41_session *ses)
+{
+	kref_put(&ses->se_ref, release_session);
+}
+
+static inline void
+nfs41_get_session(struct nfs41_session *ses)
+{
+	kref_get(&ses->se_ref);
 }
 
 static inline void
@@ -544,7 +576,7 @@ expire_client(struct nfs4_client *clp)
 	}
 	while (!list_empty(&clp->cl_sessions)) {
 		ses = list_entry(clp->cl_sessions.next, struct nfs41_session, se_perclnt);
-		release_session(ses);
+		nfs41_put_session(ses);
 	}
 	put_nfs4_client(clp);
 }
@@ -2194,6 +2226,7 @@ nfsd4_sequence(struct svc_rqst *r,
 {
         struct nfs41_session *elem;
 	struct nfs41_slot *slot;
+	struct current_session *c_ses = cstate->current_ses;
 	int status;
 
 	if (STALE_CLIENTID((clientid_t *)seq->sessionid))
@@ -2203,7 +2236,7 @@ nfsd4_sequence(struct svc_rqst *r,
 	status = nfserr_badsession;
 	elem = find_in_sessionid_hashtbl(&seq->sessionid);
 	if (!elem) {
-		dprintk("NFSD: %s Stale clientid supplied to sequence!!\n");
+		dprintk("NFSD: SessionID not found!!\n");
 		dump_sessionid(__FUNCTION__, &seq->sessionid);
 		goto out;
 	}
@@ -2213,6 +2246,11 @@ nfsd4_sequence(struct svc_rqst *r,
 
 	slot = &elem->se_slots[seq->slotid];
 	dprintk("%s slotid %d \n", __FUNCTION__, seq->slotid);
+
+	status = nfs_ok;
+	if (nfs41_get_slot_state(slot) != NFS4_SLOT_AVAILABLE)
+		goto out;
+
 	status = check_slot_seqid(seq->seqid, slot);
 	if (status == NFSERR_REPLAY_ME)
 		goto replay;
@@ -2221,8 +2259,15 @@ nfsd4_sequence(struct svc_rqst *r,
 
 	/* Success! bump slot seqid */
 	slot->sl_seqid++;
+	nfs41_set_slot_state(slot, NFS4_SLOT_INPROGRESS);
 
-	memcpy(cstate->current_sid, &seq->sessionid, sizeof(sessionid_t));
+	/* Set current_session. hold reference until done processing compound.
+	 * nfs41_put_session called only if cs_slot is set
+	 */
+	memcpy(c_ses->cs_sid, &seq->sessionid, sizeof(sessionid_t));
+	c_ses->cs_slot = slot;
+	nfs41_get_session(slot->sl_session);
+
         renew_client(elem->se_client);
 	status = nfs_ok;
 out:

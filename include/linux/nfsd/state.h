@@ -120,19 +120,28 @@ struct nfs41_channel {
 /* Maximum number of slots per session - XXX arbitrary */ 
 #define NFS41_MAX_SLOTS                64
 
+/* slot states */
+enum {
+	NFS4_SLOT_AVAILABLE,
+	NFS4_SLOT_INPROGRESS
+};
+
 /*
  * nfs41_slot
  *
  * for now, just slot sequence number - will hold DRC for this slot.
  */
 struct nfs41_slot {
-	u32                             sl_seqid;
+	atomic_t		sl_state;
+	struct nfs41_session * 	sl_session;
+	u32             	sl_seqid;
 };
 
 /*
  * nfs41_sessionid
  */
 struct nfs41_session {
+	struct kref		se_ref;
 	struct list_head        se_hash;        /* hash by sessionid_t */
 	struct list_head	se_perclnt;
 	struct nfs4_client	*se_client;	/* for expire_client */
@@ -146,6 +155,11 @@ struct nfs41_session {
 #define se_fmaxresp_cached     se_forward.ch_maxresp_cached
 #define se_fmaxops             se_forward.ch_maxops
 #define se_fnumslots           se_forward.ch_maxreqs
+
+struct current_session {
+	sessionid_t		cs_sid;
+	struct nfs41_slot	*cs_slot;
+};
 
 #define HEXDIR_LEN     33 /* hex version of 16 byte md5 of cl_name plus '\0' */
 
@@ -348,6 +362,8 @@ extern int nfs4_has_reclaimed_state(const char *name);
 extern void nfsd4_recdir_purge_old(void);
 extern int nfsd4_create_clid_dir(struct nfs4_client *clp);
 extern void nfsd4_remove_clid_dir(struct nfs4_client *clp);
+extern void nfs41_put_session(struct nfs41_session *);
+extern void nfs41_set_slot_state(struct nfs41_slot *, int);
 
 static inline void
 nfs4_put_stateowner(struct nfs4_stateowner *so)

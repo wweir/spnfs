@@ -850,10 +850,10 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 		    struct nfsd4_compoundargs *args,
 		    struct nfsd4_compoundres *resp)
 {
-	struct nfsd4_op	*op;
+	struct nfsd4_op	*op = NULL;
 	struct nfsd4_operation *opdesc;
 	struct nfsd4_compound_state *cstate = NULL;
-	sessionid_t	*current_sid = NULL;
+        struct current_session  *current_ses = NULL;
 	int		slack_bytes;
 	__be32		status;
 
@@ -862,10 +862,10 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	if (cstate == NULL)
 		goto out;
 
-	current_sid = kzalloc(sizeof(*current_sid), GFP_KERNEL);
-	if (current_sid == NULL)
+	current_ses = kzalloc(sizeof(*current_ses), GFP_KERNEL);
+	if (current_ses == NULL)
 		goto out;
-	cstate->current_sid = current_sid;
+	cstate->current_ses = current_ses;
 
 	resp->xbuf = &rqstp->rq_res;
 	resp->p = rqstp->rq_res.head[0].iov_base + rqstp->rq_res.head[0].iov_len;
@@ -952,8 +952,18 @@ encode_op:
 
 out:
 	nfsd4_release_compoundargs(args);
-	if (cstate->current_sid)
-		kfree(cstate->current_sid);
+        if (cstate->current_ses) {
+                if (cstate->current_ses->cs_slot) {
+                        if (op && op->status != nfserr_dropit) {
+                                dprintk("%s SET SLOT STATE TO AVAILABLE\n",
+                                                                __FUNCTION__);
+                                nfs41_set_slot_state(current_ses->cs_slot,
+                                                        NFS4_SLOT_AVAILABLE);
+                        }
+                        nfs41_put_session(cstate->current_ses->cs_slot->sl_session);
+                }
+                kfree(cstate->current_ses);
+        }
 	cstate_free(cstate);
 	return status;
 }
