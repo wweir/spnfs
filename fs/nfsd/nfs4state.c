@@ -2241,9 +2241,17 @@ nfsd4_sequence(struct svc_rqst *r,
 	slot = &elem->se_slots[seq->slotid];
 	dprintk("%s slotid %d \n", __FUNCTION__, seq->slotid);
 
-	status = nfs_ok;
-	if (nfs41_get_slot_state(slot) != NFS4_SLOT_AVAILABLE)
-		goto out;
+	/* Server post op_sequence compound processing had an upcall which
+	 * resulted in replaying the compound processing including the
+	 * already processed op_sequence. Set current_session
+	 * but don't bump slot->sl_seqid which was incremented in successful
+	 * op_sequence processing prior to upcall.
+	 */
+	if (nfs41_get_slot_state(slot) == NFS4_SLOT_INPROGRESS) {
+		dprintk("%s NFS4_SLOT_INPROGRESS. set current_session\n",
+			__FUNCTION__);
+		goto set_curr_ses;
+	}
 
 	status = check_slot_seqid(seq->seqid, slot);
 	if (status == NFSERR_REPLAY_ME)
@@ -2251,10 +2259,13 @@ nfsd4_sequence(struct svc_rqst *r,
 	else if (status)
 		goto out;
 
-	/* Success! bump slot seqid */
+	/* Success! bump slot seqid and renew clientid */
 	slot->sl_seqid++;
+	renew_client(elem->se_client);
+	dprintk("%s set NFS4_SLOT_INPROGRESS\n",__FUNCTION__);
 	nfs41_set_slot_state(slot, NFS4_SLOT_INPROGRESS);
 
+set_curr_ses:
 	/* Set current_session. hold reference until done processing compound.
 	 * nfs41_put_session called only if cs_slot is set
 	 */
@@ -2262,7 +2273,6 @@ nfsd4_sequence(struct svc_rqst *r,
 	c_ses->cs_slot = slot;
 	nfs41_get_session(slot->sl_session);
 
-        renew_client(elem->se_client);
 	status = nfs_ok;
 out:
 	dprintk("%s returns %d\n", __FUNCTION__, status);
