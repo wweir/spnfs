@@ -905,6 +905,7 @@ nfsd4_decode_setclientid(struct nfsd4_compoundargs *argp, struct nfsd4_setclient
 static __be32
 nfsd4_decode_exchange_id(struct nfsd4_compoundargs *argp, struct nfsd4_exchange_id *clid)
 {
+        int dummy;
 	DECODE_HEAD;
 
 	READ_BUF(NFS4_VERIFIER_SIZE);
@@ -916,7 +917,34 @@ nfsd4_decode_exchange_id(struct nfsd4_compoundargs *argp, struct nfsd4_exchange_
 	READ_BUF(clid->id_len);
 	SAVEMEM(clid->id, clid->id_len);
 
-	DECODE_TAIL;
+        READ_BUF(4);
+        READ32(clid->flags);
+
+        /* Ignore Implementation ID */
+        READ_BUF(4);    /* nfs_impl_id4 array length */
+        READ32(dummy);
+
+        if (dummy > 1)
+                return -EINVAL;
+
+        if (dummy == 1) {
+                READ_BUF(4);
+                READ32(dummy);
+                READ_BUF(dummy);
+                p += XDR_QUADLEN(dummy);
+
+                READ_BUF(4);
+                READ32(dummy);
+                READ_BUF(dummy);
+                p += XDR_QUADLEN(dummy);
+
+                READ_BUF(12);
+                p += 12;
+
+                READ_BUF(12);
+                p += 12;
+        }
+        DECODE_TAIL;
 }
 
 static __be32
