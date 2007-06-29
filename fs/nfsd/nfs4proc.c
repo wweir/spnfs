@@ -951,7 +951,6 @@ encode_op:
 	}
 
 out:
-	nfsd4_release_compoundargs(args);
         if (cstate->current_ses) {
                 if (cstate->current_ses->cs_slot) {
                         if (op && op->status != nfserr_dropit) {
