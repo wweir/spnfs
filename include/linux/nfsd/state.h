@@ -194,7 +194,6 @@ struct nfs4_client {
 	/* NFSv4.1 create_session slot */
 	u32			cl_seqid;	/* seqid for create_session */
 	sessionid_t		cl_sessionid;	/* prev create_sessions id */
-	u32			cl_session_flags;
 	u32                     cl_exchange_flags;
 };
 

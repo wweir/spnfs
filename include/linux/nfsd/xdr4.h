@@ -362,8 +362,7 @@ struct nfsd4_exchange_id {
         nfs4_verifier   verifier;
         u32             id_len;
         char *          id;
-	u32			flags;
-	struct impl_id4		impl_id;
+	u32		flags;
         clientid_t      clientid;
         u32             seqid;
 };
