@@ -345,12 +345,12 @@ gen_sessionid(struct nfs41_session *ses)
 {
 	struct nfs4_client *clp = ses->se_client;
 	u32 *p = (u32 *)ses->se_sessionid;
-	u64 *q;
 
 	*p++ = clp->cl_clientid.cl_boot;
 	*p++ = clp->cl_clientid.cl_id;
-	q = (u64 *)&ses->se_sessionid[8];
-	*q = current_sessionid++;
+	*p++ = (u32)boot_time;
+	*p++ = current_sessionid++;
+	BUG_ON((char *)p - (char *)ses->se_sessionid != sizeof(ses->se_sessionid));
 }
 
 int

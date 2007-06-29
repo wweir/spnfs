@@ -771,7 +771,7 @@ struct nfs_impl_id4 {
 struct nfs41_exchange_id_args {
 	nfs4_verifier *			verifier;
 	unsigned int 			id_len;
-	char 				id[256];
+	char 				id[48];
 	u32				flags;
 	struct nfs_impl_id4		impl_id;
 	clientid4			clientid;
