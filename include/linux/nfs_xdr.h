@@ -755,10 +755,27 @@ struct nfs4_setclientid {
 	u32				sc_cb_ident;      /* request */
 };
 
+struct nfstime4 {
+	u64	seconds;
+	u32	nseconds;
+};
+
+struct nfs_impl_id4 {
+	u32		domain_len;
+	char 		domain[NFS4_OPAQUE_LIMIT];
+	u32		name_len;
+	char 		name[NFS4_OPAQUE_LIMIT];
+	struct nfstime4	date;
+};
+
 struct nfs41_exchange_id_args {
 	nfs4_verifier *			verifier;
 	unsigned int 			id_len;
-	char 				id[NFS4_OPAQUE_LIMIT];
+	char 				id[256];
+	u32				flags;
+	struct nfs_impl_id4		impl_id;
+	clientid4			clientid;
+	u32				seqid;
 };
 
 struct server_owner {
@@ -774,6 +791,7 @@ struct server_scope {
 
 struct nfs41_exchange_id_res {
 	struct nfs4_client *		client;
+	u32				flags;
 	struct server_owner		server_owner;
 	struct server_scope		server_scope;
 };
