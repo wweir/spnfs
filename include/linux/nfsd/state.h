@@ -156,6 +156,19 @@ struct nfs41_session {
 #define se_fmaxops             se_forward.ch_maxops
 #define se_fnumslots           se_forward.ch_maxreqs
 
+static inline void
+nfs41_put_session(struct nfs41_session *ses)
+{
+	extern void release_session(struct kref *kref);
+	kref_put(&ses->se_ref, release_session);
+}
+
+static inline void
+nfs41_get_session(struct nfs41_session *ses)
+{
+	kref_get(&ses->se_ref);
+}
+
 struct current_session {
 	sessionid_t		cs_sid;
 	struct nfs41_slot	*cs_slot;
@@ -361,7 +374,6 @@ extern int nfs4_has_reclaimed_state(const char *name);
 extern void nfsd4_recdir_purge_old(void);
 extern int nfsd4_create_clid_dir(struct nfs4_client *clp);
 extern void nfsd4_remove_clid_dir(struct nfs4_client *clp);
-extern void nfs41_put_session(struct nfs41_session *);
 extern void nfs41_set_slot_state(struct nfs41_slot *, int);
 
 static inline void

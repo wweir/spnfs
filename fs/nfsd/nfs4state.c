@@ -441,7 +441,7 @@ find_in_sessionid_hashtbl(sessionid_t *sessionid)
         return elem;
 }
 
-static void
+void
 release_session(struct kref *kref)
 {
 	struct nfs41_session *ses = container_of(kref, struct nfs41_session, se_ref);
@@ -451,18 +451,6 @@ release_session(struct kref *kref)
 	if (ses->se_slots)
 		kfree(ses->se_slots);
 	kfree(ses);
-}
-
-inline void
-nfs41_put_session(struct nfs41_session *ses)
-{
-	kref_put(&ses->se_ref, release_session);
-}
-
-static inline void
-nfs41_get_session(struct nfs41_session *ses)
-{
-	kref_get(&ses->se_ref);
 }
 
 static inline void
