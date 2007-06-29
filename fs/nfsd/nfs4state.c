@@ -441,13 +441,19 @@ find_in_sessionid_hashtbl(sessionid_t *sessionid)
         return elem;
 }
 
+static void
+destroy_session(struct nfs41_session *ses)
+{
+        list_del(&ses->se_hash);
+        list_del(&ses->se_perclnt);
+        nfs41_put_session(ses);
+}
+
 void
-release_session(struct kref *kref)
+free_session(struct kref *kref)
 {
 	struct nfs41_session *ses = container_of(kref, struct nfs41_session, se_ref);
 
-	list_del(&ses->se_hash);
-	list_del(&ses->se_perclnt);
 	if (ses->se_slots)
 		kfree(ses->se_slots);
 	kfree(ses);
@@ -564,7 +570,7 @@ expire_client(struct nfs4_client *clp)
 	}
 	while (!list_empty(&clp->cl_sessions)) {
 		ses = list_entry(clp->cl_sessions.next, struct nfs41_session, se_perclnt);
-		nfs41_put_session(ses);
+		destroy_session(ses);
 	}
 	put_nfs4_client(clp);
 }

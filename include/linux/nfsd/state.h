@@ -159,8 +159,8 @@ struct nfs41_session {
 static inline void
 nfs41_put_session(struct nfs41_session *ses)
 {
-	extern void release_session(struct kref *kref);
-	kref_put(&ses->se_ref, release_session);
+	extern void free_session(struct kref *kref);
+	kref_put(&ses->se_ref, free_session);
 }
 
 static inline void
