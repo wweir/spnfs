@@ -2813,10 +2813,7 @@ nfsd4_encode_exchange_id(struct nfsd4_compoundres *resp, int nfserr, struct nfsd
 		WRITEMEM(server_scope, server_scope_sz);
 
 		/* Implementation id */
-                WRITE32(0);     /* domain length */
-                WRITE32(0);     /* product name length */
-                WRITE64((u64)0);        /* date seconds */
-                WRITE32(0);     /* date nano seconds */
+                WRITE32(0);     /* zero length nfs_impl_id4 array */
                 ADJUST_ARGS();
 	}
 }
