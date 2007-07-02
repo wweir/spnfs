@@ -380,28 +380,28 @@ struct nfsd4_channel {
 };
 
 struct nfsd4_create_session {
-        clientid_t              clientid;
-        sessionid_t             sessionid;
-        u32                     seqid;
-        u32                     header_padding;
-        struct nfsd4_channel    fore_channel;
-        struct nfsd4_channel    back_channel;
-        u32                     callback_prog;
-        u32                     uid;
-        u32                     gid;
+	clientid_t              clientid;
+	nfs41_sessionid         sessionid;
+	u32                     seqid;
+	u32                     header_padding;
+	struct nfsd4_channel    fore_channel;
+	struct nfsd4_channel    back_channel;
+	u32                     callback_prog;
+	u32                     uid;
+	u32                     gid;
 };
 
 struct nfsd4_sequence {
-        sessionid_t             sessionid;
-        u32                     seqid;
-        u32                     slotid;
-        u32                     maxslots;
-        u32                     target_maxslots;
-        u32                     status_flags;
+	nfs41_sessionid         sessionid;
+	u32                     seqid;
+	u32                     slotid;
+	u32                     maxslots;
+	u32                     target_maxslots;
+	u32                     status_flags;
 };
 
 struct nfsd4_destroy_session {
-        sessionid_t             sessionid;
+	nfs41_sessionid         sessionid;
 };
 
 struct nfsd4_op {

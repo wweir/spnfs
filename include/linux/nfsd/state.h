@@ -40,13 +40,19 @@
 #include <linux/list.h>
 #include <linux/kref.h>
 #include <linux/sunrpc/clnt.h>
+#include <linux/nfs4.h>
 
 typedef struct {
 	u32             cl_boot;
 	u32             cl_id;
 } clientid_t;
 
-typedef unsigned char  sessionid_t[16];
+/* formatted contents of nfs41_sessionid */
+typedef struct {
+        clientid_t      clientid;
+        u32             boot_time;
+        u32             sequence;
+} nfsd_sessionid_t;
 
 typedef struct {
 	u32             so_boot;
@@ -138,14 +144,14 @@ struct nfs41_slot {
 };
 
 /*
- * nfs41_sessionid
+ * nfs41_session
  */
 struct nfs41_session {
 	struct kref		se_ref;
 	struct list_head        se_hash;        /* hash by sessionid_t */
 	struct list_head	se_perclnt;
 	struct nfs4_client	*se_client;	/* for expire_client */
-	sessionid_t             se_sessionid;
+	nfs41_sessionid		se_sessionid;
 	struct nfs41_channel    se_forward;
 	struct nfs41_slot       *se_slots;      /* forward channel slots */
 };
@@ -170,7 +176,7 @@ nfs41_get_session(struct nfs41_session *ses)
 }
 
 struct current_session {
-	sessionid_t		cs_sid;
+	nfsd_sessionid_t	cs_sid;
 	struct nfs41_slot	*cs_slot;
 };
 
@@ -206,7 +212,7 @@ struct nfs4_client {
 	u32			cl_firststate;	/* recovery dir creation */
 	/* NFSv4.1 create_session slot */
 	u32			cl_seqid;	/* seqid for create_session */
-	sessionid_t		cl_sessionid;	/* prev create_sessions id */
+	nfs41_sessionid		cl_sessionid;	/* prev create_sessions id */
 	u32                     cl_exchange_flags;
 };
 

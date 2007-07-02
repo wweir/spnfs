@@ -438,6 +438,8 @@ enum {
 	NFSPROC4_CLNT_GET_LEASE_TIME,
 };
 
+typedef unsigned char nfs41_sessionid[16];
+
 #endif
 #endif
 

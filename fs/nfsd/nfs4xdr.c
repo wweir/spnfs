@@ -1,5 +1,5 @@
 /*
- *  fs/nfs/nfs4xdr.c
+ *  fs/nfsd/nfs4xdr.c
  *
  *  Server-side XDR for NFSv4
  *

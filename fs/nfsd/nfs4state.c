@@ -319,19 +319,32 @@ static struct list_head close_lru;
 #define SESSION_HASH_SIZE       1031
 static struct list_head sessionid_hashtbl[SESSION_HASH_SIZE];
 
+int
+nfs41_get_slot_state(struct nfs41_slot *slot)
+{
+	return atomic_read(&slot->sl_state);
+}
+
+void
+nfs41_set_slot_state(struct nfs41_slot *slot, int state)
+{
+	atomic_set(&slot->sl_state, state);
+}
+
 static int
-hash_sessionid(sessionid_t *sessionid)
+hash_sessionid(nfs41_sessionid *sessionid)
 {
         u32 csum = 0;
         int idx;
 
-        csum = crc32(0, sessionid, sizeof(sessionid_t));
+	csum = crc32(0, sessionid, sizeof(*sessionid));
         idx = csum % SESSION_HASH_SIZE;
         dprintk("%s IDX: %u csum %u\n", __FUNCTION__, idx, csum);
         return idx;
 }
 
-void dump_sessionid(const char *fn, sessionid_t *sessionid)
+void
+dump_sessionid(const char *fn, nfs41_sessionid *sessionid)
 {
         u32 *ptr;
 
@@ -351,18 +364,6 @@ gen_sessionid(struct nfs41_session *ses)
 	*p++ = (u32)boot_time;
 	*p++ = current_sessionid++;
 	BUG_ON((char *)p - (char *)ses->se_sessionid != sizeof(ses->se_sessionid));
-}
-
-int
-nfs41_get_slot_state(struct nfs41_slot *slot)
-{
-	return atomic_read(&slot->sl_state);
-}
-
-void
-nfs41_set_slot_state(struct nfs41_slot *slot, int state)
-{
-	atomic_set(&slot->sl_state, state);
 }
 
 static int
@@ -392,7 +393,7 @@ alloc_init_session(struct nfs4_client *clp, struct nfsd4_create_session *cses)
 	new->se_client = clp;
 	gen_sessionid(new);
 	idx = hash_sessionid(&new->se_sessionid);
-	memcpy(&clp->cl_sessionid, &new->se_sessionid, sizeof(sessionid_t));
+	memcpy(&clp->cl_sessionid, &new->se_sessionid, sizeof(nfs41_sessionid));
 
 	/* for now, accept the client values */
 	new->se_fmaxreq_sz = cses->fore_channel.maxreq_sz;
@@ -414,8 +415,8 @@ out_free:
 	goto out;
 }
 
-struct nfs41_session*
-find_in_sessionid_hashtbl(sessionid_t *sessionid)
+struct nfs41_session *
+find_in_sessionid_hashtbl(nfs41_sessionid *sessionid)
 {
         struct nfs41_session *elem;
         int idx;
@@ -427,7 +428,8 @@ find_in_sessionid_hashtbl(sessionid_t *sessionid)
         /* Search in the appropriate list */
         list_for_each_entry(elem, &sessionid_hashtbl[idx], se_hash) {
                 dump_sessionid("list traversal", &elem->se_sessionid);
-                if (!memcmp(elem->se_sessionid, sessionid, sizeof(sessionid_t))) {
+		if (!memcmp(elem->se_sessionid, sessionid,
+		            sizeof(nfs41_sessionid))) {
                         found = 1;
                         break;
                 }
@@ -2269,7 +2271,8 @@ set_curr_ses:
 	/* Set current_session. hold reference until done processing compound.
 	 * nfs41_put_session called only if cs_slot is set
 	 */
-	memcpy(c_ses->cs_sid, &seq->sessionid, sizeof(sessionid_t));
+	memcpy(&c_ses->cs_sid, &seq->sessionid, sizeof(c_ses->cs_sid));
+	BUG_ON(sizeof(c_ses->cs_sid) != sizeof(seq->sessionid));
 	c_ses->cs_slot = slot;
 	nfs41_get_session(slot->sl_session);
 
