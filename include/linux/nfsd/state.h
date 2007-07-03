@@ -150,6 +150,7 @@ struct nfs41_session {
 	struct kref		se_ref;
 	struct list_head        se_hash;        /* hash by sessionid_t */
 	struct list_head	se_perclnt;
+	u32			se_flags;
 	struct nfs4_client	*se_client;	/* for expire_client */
 	nfs41_sessionid		se_sessionid;
 	struct nfs41_channel    se_forward;

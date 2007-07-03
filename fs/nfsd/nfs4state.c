@@ -395,6 +395,8 @@ alloc_init_session(struct nfs4_client *clp, struct nfsd4_create_session *cses)
 	idx = hash_sessionid(&new->se_sessionid);
 	memcpy(&clp->cl_sessionid, &new->se_sessionid, sizeof(nfs41_sessionid));
 
+	new->se_flags = cses->flags;
+
 	/* for now, accept the client values */
 	new->se_fmaxreq_sz = cses->fore_channel.maxreq_sz;
 	new->se_fmaxresp_sz = cses->fore_channel.maxresp_sz;

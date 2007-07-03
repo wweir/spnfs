@@ -373,8 +373,6 @@ struct nfsd4_channel {
         u32             maxresp_cached;
         u32             maxops;
         u32             maxreqs;
-        u32             nr_stream_attrs;
-        u32             stream_attrs;
         u32             nr_rdma_attrs;
         u32             rdma_attrs;
 };
@@ -383,6 +381,7 @@ struct nfsd4_create_session {
 	clientid_t              clientid;
 	nfs41_sessionid         sessionid;
 	u32                     seqid;
+	u32			flags;
 	u32                     header_padding;
 	struct nfsd4_channel    fore_channel;
 	struct nfsd4_channel    back_channel;

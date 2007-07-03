@@ -969,18 +969,16 @@ nfsd4_decode_create_session(struct nfsd4_compoundargs *argp, struct nfsd4_create
         int i;
 	int nr_secflavs;
 
-        READ_BUF(28);
+        READ_BUF(20);
 
         COPYMEM(&sess->clientid, 8);
         READ32(sess->seqid);
-        READ32(dummy);
+        READ32(sess->flags);
         READ32(sess->header_padding);
-        READ32(dummy);
-        READ32(dummy);
 
+	/* conn_binding4args */
         READ_BUF(4);
         READ32(dummy);
-
         if (dummy) {
                 printk(KERN_EMERG "cba_enforce = 1 not supported!\n");
                 return -1;
@@ -993,18 +991,6 @@ nfsd4_decode_create_session(struct nfsd4_compoundargs *argp, struct nfsd4_create
         READ32(sess->fore_channel.maxresp_cached);
         READ32(sess->fore_channel.maxops);
         READ32(sess->fore_channel.maxreqs);
-
-        READ_BUF(4);
-        READ32(sess->fore_channel.nr_stream_attrs);
-
-        if (sess->fore_channel.nr_stream_attrs == 1) {
-                READ_BUF(4);
-                READ32(sess->fore_channel.stream_attrs);
-        }
-        else if (sess->fore_channel.nr_stream_attrs > 1) {
-                printk (KERN_NOTICE "Too many channel attr bitmaps!\n");
-                return -1;
-        }
 
         READ_BUF(4);
         READ32(sess->fore_channel.nr_rdma_attrs);
@@ -1025,18 +1011,6 @@ nfsd4_decode_create_session(struct nfsd4_compoundargs *argp, struct nfsd4_create
         READ32(sess->back_channel.maxresp_cached);
         READ32(sess->back_channel.maxops);
         READ32(sess->back_channel.maxreqs);
-
-        READ_BUF(4);
-        READ32(sess->back_channel.nr_stream_attrs);
-
-        if (sess->back_channel.nr_stream_attrs == 1) {
-                READ_BUF(4);
-                READ32(sess->back_channel.stream_attrs);
-        }
-        else if (sess->back_channel.nr_stream_attrs > 1) {
-                printk (KERN_NOTICE "Too many channel attr bitmaps!\n");
-                return -1;
-        }
 
         READ_BUF(4);
         READ32(sess->back_channel.nr_rdma_attrs);
@@ -2824,13 +2798,11 @@ nfsd4_encode_create_session(struct nfsd4_compoundres *resp, int nfserr, struct n
 	ENCODE_HEAD;
 
 	if (!nfserr) {
-		RESERVE_SPACE(40);
+		RESERVE_SPACE(32);
 		WRITEMEM(sess->sessionid, sizeof(sess->sessionid));
 		WRITE32(sess->seqid);
-		WRITE32(1);
+		WRITE32(sess->flags);
 		WRITE32(sess->header_padding);
-		WRITE32(1);
-		WRITE32(0);
 		WRITE32(0);
 		ADJUST_ARGS();
 
@@ -2841,16 +2813,6 @@ nfsd4_encode_create_session(struct nfsd4_compoundres *resp, int nfserr, struct n
 		WRITE32(sess->fore_channel.maxops);
 		WRITE32(sess->fore_channel.maxreqs);
 		ADJUST_ARGS();
-
-		RESERVE_SPACE(4);
-		WRITE32(sess->fore_channel.nr_stream_attrs);
-		ADJUST_ARGS();
-
-		if (sess->fore_channel.nr_stream_attrs) {
-			RESERVE_SPACE(4);
-			WRITE32(sess->fore_channel.stream_attrs);
-			ADJUST_ARGS();
-		}
 
 		RESERVE_SPACE(4);
 		WRITE32(sess->fore_channel.nr_rdma_attrs);
@@ -2869,16 +2831,6 @@ nfsd4_encode_create_session(struct nfsd4_compoundres *resp, int nfserr, struct n
 		WRITE32(sess->back_channel.maxops);
 		WRITE32(sess->back_channel.maxreqs);
 		ADJUST_ARGS();
-
-		RESERVE_SPACE(4);
-		WRITE32(sess->back_channel.nr_stream_attrs);
-		ADJUST_ARGS();
-
-		if (sess->back_channel.nr_stream_attrs) {
-			RESERVE_SPACE(4);
-			WRITE32(sess->back_channel.stream_attrs);
-			ADJUST_ARGS();
-		}
 
 		RESERVE_SPACE(4);
 		WRITE32(sess->back_channel.nr_rdma_attrs);
