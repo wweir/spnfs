@@ -63,13 +63,15 @@ static time_t user_lease_time = 20;
 static time_t boot_time;
 static int in_grace = 1;
 static u32 current_clientid = 1;
-static u64 current_sessionid = 1;
 static u32 current_ownerid = 1;
 static u32 current_fileid = 1;
 static u32 current_delegid = 1;
 static u32 nfs4_init;
 static stateid_t zerostateid;             /* bits all 0 */
 static stateid_t onestateid;              /* bits all 1 */
+#if defined(CONFIG_NFSD_V4_1)
+static u64 current_sessionid = 1;
+#endif
 
 #define ZERO_STATEID(stateid) (!memcmp((stateid), &zerostateid, sizeof(stateid_t)))
 #define ONE_STATEID(stateid)  (!memcmp((stateid), &onestateid, sizeof(stateid_t)))
@@ -315,6 +317,7 @@ static struct list_head	unconf_id_hashtbl[CLIENT_HASH_SIZE];
 static struct list_head client_lru;
 static struct list_head close_lru;
 
+#if defined(CONFIG_NFSD_V4_1)
 /* Use a prime for hash table size */
 #define SESSION_HASH_SIZE       1031
 static struct list_head sessionid_hashtbl[SESSION_HASH_SIZE];
@@ -462,6 +465,7 @@ free_session(struct kref *kref)
 		kfree(ses->se_slots);
 	kfree(ses);
 }
+#endif /* CONFIG_NFSD_V4_1 */
 
 static inline void
 renew_client(struct nfs4_client *clp)
@@ -544,7 +548,9 @@ expire_client(struct nfs4_client *clp)
 {
 	struct nfs4_stateowner *sop;
 	struct nfs4_delegation *dp;
+#if defined(CONFIG_NFSD_V4_1)
 	struct nfs41_session  *ses;
+#endif
 	struct list_head reaplist;
 
 	dprintk("NFSD: expire_client cl_count %d\n",
@@ -572,10 +578,12 @@ expire_client(struct nfs4_client *clp)
 		sop = list_entry(clp->cl_openowners.next, struct nfs4_stateowner, so_perclient);
 		release_stateowner(sop);
 	}
+#if defined(CONFIG_NFSD_V4_1)
 	while (!list_empty(&clp->cl_sessions)) {
 		ses = list_entry(clp->cl_sessions.next, struct nfs41_session, se_perclnt);
 		destroy_session(ses);
 	}
+#endif
 	put_nfs4_client(clp);
 }
 
@@ -1018,6 +1026,7 @@ void nfsd4_setup_callback_channel(void)
         return;
 }
 
+#if defined(CONFIG_NFSD_V4_1)
 __be32 nfsd4_exchange_id(struct svc_rqst *rqstp,
 			struct nfsd4_compound_state *cstate,
 			struct nfsd4_exchange_id *clid)
@@ -1122,6 +1131,7 @@ out:
         dprintk("nfsd4_exchange_id returns %d\n", status);
         return status;
 }
+#endif /* CONFIG_NFSD_V4_1 */
 
 /*
  * RFC 3010 has a complex implmentation description of processing a
@@ -1238,6 +1248,7 @@ out:
 	return status;
 }
 
+#if defined(CONFIG_NFSD_V4_1)
 /*
  * XXX Need slot->sl_seqid wraparound code.
  */
@@ -1325,7 +1336,7 @@ out:
 	dprintk("%s returns %d\n", __FUNCTION__, status);
 	return status;
 }
-
+#endif /* CONFIG_NFSD_V4_1 */
 
 /* OPEN Share state helper functions */
 static inline struct nfs4_file *
@@ -2217,6 +2228,7 @@ out:
 	return status;
 }
 
+#if defined(CONFIG_NFSD_V4_1)
 __be32
 nfsd4_sequence(struct svc_rqst *r,
 		struct nfsd4_compound_state *cstate,
@@ -2297,6 +2309,7 @@ nfsd4_destroy_session(struct svc_rqst *r,
 {
         return 0;
 }
+#endif /* CONFIG_NFSD_V4_1 */
 
 static void
 end_grace(void)
@@ -3487,6 +3500,7 @@ alloc_reclaim(void)
 	return kmalloc(sizeof(struct nfs4_client_reclaim), GFP_KERNEL);
 }
 
+#if defined(CONFIG_NFSD_V4_1)
 int
 nfs4_has_reclaimed_state(const char *name)
 {
@@ -3535,6 +3549,7 @@ nfs4_release_reclaim(void)
 	}
 	BUG_ON(reclaim_str_hashtbl_size);
 }
+#endif /* CONFIG_NFSD_V4_1 */
 
 /*
  * called from OPEN, CLAIM_PREVIOUS with a new clientid. */
@@ -3590,9 +3605,11 @@ nfs4_state_init(void)
 		INIT_LIST_HEAD(&unconf_str_hashtbl[i]);
 		INIT_LIST_HEAD(&unconf_id_hashtbl[i]);
 	}
+#if defined(CONFIG_NFSD_V4_1)
 	for (i = 0; i < SESSION_HASH_SIZE; i++) {
 		INIT_LIST_HEAD(&sessionid_hashtbl[i]);
 	}
+#endif
 	for (i = 0; i < FILE_HASH_SIZE; i++) {
 		INIT_LIST_HEAD(&file_hashtbl[i]);
 	}
