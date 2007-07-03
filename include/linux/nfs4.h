@@ -440,6 +440,11 @@ enum {
 
 typedef unsigned char nfs41_sessionid[16];
 
+/* Create Session Flags */
+#define SESSION4_PERSIST	 0x001
+#define SESSION4_BACK_CHAN 	 0x002
+#define SESSION4_RDMA		 0x004
+
 #endif
 #endif
 

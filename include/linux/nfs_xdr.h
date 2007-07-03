@@ -799,20 +799,14 @@ struct nfs41_exchange_id_res {
 struct nfs41_create_session_args {
 	struct nfs4_client *		client;
 	struct nfs4_session *		session;
-	uint32_t			persist;
+	uint32_t			flags;
 	uint32_t			header_padding;
-	uint32_t			use_for_backchannel;
-	uint32_t			use_for_rdma;
 	uint32_t			cb_program;
 };
 
 struct nfs41_create_session_res {
 	struct nfs4_client *		client;
 	struct nfs4_session *		session;
-	uint32_t			persist;
-	uint32_t			header_padding;
-	uint32_t			use_for_backchannel;
-	uint32_t			use_for_rdma;
 };
 
 struct nfs41_sequence_args {

@@ -17,7 +17,6 @@ struct nfs4_channel_attrs {
 	u32			max_resp_sz_cached;
 	u32			max_ops;
 	u32			max_reqs;
-	streamchannel_attrs	stream_attrs;
 	rdmachannel_attrs	rdma_attrs;
 };
 
@@ -45,12 +44,10 @@ struct nfs4_session {
 	nfs41_sessionid			sess_id;
 	u32				seqid;	/* The seqid returned by
 						   exchange_id */
-	u32				persist;
+	u32				flags;
 	u32				header_padding;
 	u32				hash_alg;
 	u32				ssv_len;
-	u32				use_for_back_chan;
-	u32				rdma_mode;
 
 	/* The fore and back channel */
 	struct nfs4_channel		fore_channel;
