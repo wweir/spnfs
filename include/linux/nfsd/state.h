@@ -217,6 +217,13 @@ struct nfs4_client {
 	u32			cl_seqid;	/* seqid for create_session */
 	nfs41_sessionid		cl_sessionid;	/* prev create_sessions id */
 	u32                     cl_exchange_flags;
+
+#if defined(CONFIG_NFSD_V4_1)
+        /*
+         * For the v4.1 callback path setup
+         */
+        struct svc_sock *       svsk;
+#endif
 };
 
 /* struct nfs4_client_reset
