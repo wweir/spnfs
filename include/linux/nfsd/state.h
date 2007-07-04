@@ -110,6 +110,7 @@ struct nfs4_callback {
 	struct rpc_clnt *       cb_client;
 };
 
+#if defined(CONFIG_NFSD_V4_1)
 /*
  * nfs41_channel
  *
@@ -180,6 +181,7 @@ struct current_session {
 	nfsd_sessionid_t	cs_sid;
 	struct nfs41_slot	*cs_slot;
 };
+#endif /* CONFIG_NFSD_V4_1 */
 
 #define HEXDIR_LEN     33 /* hex version of 16 byte md5 of cl_name plus '\0' */
 
@@ -357,10 +359,12 @@ struct nfs4_stateid {
 	((err) != nfserr_stale_stateid) &&      \
 	((err) != nfserr_bad_stateid))
 
+#if defined (CONFIG_NFSD_V4_1)
 //extern struct nfsd4_sequence;
 //extern __be32 nfsd4_sequence(struct svc_rqst *, struct nfsd4_compound_state *,
 //		struct nfsd4_sequence *);
-
+extern void nfs41_set_slot_state(struct nfs41_slot *, int);
+#endif /* CONFIG_NFSD_V4_1 */
 extern __be32 nfs4_preprocess_stateid_op(struct svc_fh *current_fh,
 		stateid_t *stateid, int flags, struct file **filp);
 extern void nfs4_lock_state(void);
@@ -370,6 +374,7 @@ extern __be32 nfs4_check_open_reclaim(clientid_t *clid);
 extern void put_nfs4_client(struct nfs4_client *clp);
 extern void nfs4_free_stateowner(struct kref *kref);
 extern void nfsd4_probe_callback(struct nfs4_client *clp);
+extern void nfsd41_probe_callback(struct nfs4_client *clp);
 extern void nfsd4_cb_recall(struct nfs4_delegation *dp);
 extern void nfs4_put_delegation(struct nfs4_delegation *dp);
 extern __be32 nfs4_make_rec_clidname(char *clidname, struct xdr_netobj *clname);
@@ -381,7 +386,6 @@ extern int nfs4_has_reclaimed_state(const char *name);
 extern void nfsd4_recdir_purge_old(void);
 extern int nfsd4_create_clid_dir(struct nfs4_client *clp);
 extern void nfsd4_remove_clid_dir(struct nfs4_client *clp);
-extern void nfs41_set_slot_state(struct nfs41_slot *, int);
 
 static inline void
 nfs4_put_stateowner(struct nfs4_stateowner *so)

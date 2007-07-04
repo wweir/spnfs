@@ -358,6 +358,7 @@ struct impl_id4 {
 	struct nfstime4	date;
 };
 
+#if defined(CONFIG_NFSD_V4_1)
 struct nfsd4_exchange_id {
         nfs4_verifier   verifier;
         u32             id_len;
@@ -402,6 +403,7 @@ struct nfsd4_sequence {
 struct nfsd4_destroy_session {
 	nfs41_sessionid         sessionid;
 };
+#endif /* CONFIG_NFSD_V4_1 */
 
 struct nfsd4_op {
 	int					opnum;
@@ -437,10 +439,12 @@ struct nfsd4_op {
 		struct nfsd4_verify		verify;
 		struct nfsd4_write		write;
 		struct nfsd4_release_lockowner	release_lockowner;
+#if defined(CONFIG_NFSD_V4_1)
 		struct nfsd4_exchange_id	exchange_id;
 		struct nfsd4_create_session	create_session;
 		struct nfsd4_sequence		sequence;
 		struct nfsd4_destroy_session	destroy_session;
+#endif /* CONFIG_NFSD_V4_1 */
 	} u;
 	struct nfs4_replay *			replay;
 };
@@ -511,6 +515,7 @@ extern __be32 nfsd4_setclientid(struct svc_rqst *rqstp,
 extern __be32 nfsd4_setclientid_confirm(struct svc_rqst *rqstp,
 		struct nfsd4_compound_state *,
 		struct nfsd4_setclientid_confirm *setclientid_confirm);
+#if defined(CONFIG_NFSD_V4_1)
 extern __be32 nfsd4_exchange_id(struct svc_rqst *rqstp,
 		struct nfsd4_compound_state *,
                 struct nfsd4_exchange_id *clid);
@@ -523,6 +528,7 @@ extern __be32 nfsd4_sequence(struct svc_rqst *,
 extern __be32 nfsd4_destroy_session(struct svc_rqst *,
 		struct nfsd4_compound_state *,
 		struct nfsd4_destroy_session *);
+#endif /* CONFIG_NFSD_V4_1 */
 extern __be32 nfsd4_process_open1(struct nfsd4_open *open);
 extern __be32 nfsd4_process_open2(struct svc_rqst *rqstp,
 		struct svc_fh *current_fh, struct nfsd4_open *open);
