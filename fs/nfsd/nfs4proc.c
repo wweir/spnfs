@@ -853,19 +853,23 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	struct nfsd4_op	*op = NULL;
 	struct nfsd4_operation *opdesc;
 	struct nfsd4_compound_state *cstate = NULL;
-        struct current_session  *current_ses = NULL;
 	int		slack_bytes;
 	__be32		status;
+#if defined(CONFIG_NFSD_V4_1)
+	struct current_session *current_ses = NULL;
+#endif
 
 	status = nfserr_resource;
 	cstate = cstate_alloc();
 	if (cstate == NULL)
 		goto out;
 
+#if defined(CONFIG_NFSD_V4_1)
 	current_ses = kzalloc(sizeof(*current_ses), GFP_KERNEL);
 	if (current_ses == NULL)
 		goto out;
 	cstate->current_ses = current_ses;
+#endif
 
 	resp->xbuf = &rqstp->rq_res;
 	resp->p = rqstp->rq_res.head[0].iov_base + rqstp->rq_res.head[0].iov_len;
@@ -951,6 +955,7 @@ encode_op:
 	}
 
 out:
+#if defined(CONFIG_NFSD_V4_1)
         if (cstate->current_ses) {
                 if (cstate->current_ses->cs_slot) {
                         if (op && op->status != nfserr_dropit) {
@@ -963,6 +968,7 @@ out:
                 }
                 kfree(cstate->current_ses);
         }
+#endif
 	cstate_free(cstate);
 	return status;
 }
@@ -1082,6 +1088,7 @@ static struct nfsd4_operation nfsd4_ops[OP_SEQUENCE+1] = {
 		.op_func = (nfsd4op_func)nfsd4_release_lockowner,
 		.op_flags = ALLOWED_WITHOUT_FH | ALLOWED_ON_ABSENT_FS,
 	},
+#if defined(CONFIG_NFSD_V4_1)
 	[OP_EXCHANGE_ID] = {
 		.op_func = (nfsd4op_func)nfsd4_exchange_id,
 		.op_flags = ALLOWED_WITHOUT_FH,
@@ -1098,6 +1105,7 @@ static struct nfsd4_operation nfsd4_ops[OP_SEQUENCE+1] = {
 		.op_func = (nfsd4op_func)nfsd4_destroy_session,
 		.op_flags = ALLOWED_WITHOUT_FH,
 	},
+#endif /* CONFIG_NFSD_V4_1 */
 };
 
 #define nfs4svc_decode_voidargs		NULL
