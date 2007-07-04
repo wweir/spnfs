@@ -397,6 +397,7 @@ struct nfsd4_sequence {
 	u32                     slotid;
 	u32                     maxslots;
 	u32                     target_maxslots;
+	u32                     catchthis;
 	u32                     status_flags;
 };
 

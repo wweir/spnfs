@@ -828,11 +828,12 @@ static __be32 nfsd4_decode_sequence(struct nfsd4_compoundargs *argp, struct nfsd
 {
         DECODE_HEAD;
 
-        READ_BUF(NFS4_MAX_SESSIONID_LEN + 12);
+        READ_BUF(NFS4_MAX_SESSIONID_LEN + 16);
         COPYMEM(seq->sessionid, NFS4_MAX_SESSIONID_LEN);
         READ32(seq->seqid);
         READ32(seq->slotid);
         READ32(seq->maxslots);
+        READ32(seq->catchthis);
 
         DECODE_TAIL;
 }
