@@ -571,9 +571,9 @@ expire_client(struct nfs4_client *clp)
 		list_del_init(&dp->dl_recall_lru);
 		unhash_delegation(dp);
 	}
-	list_del(&clp->cl_idhash);
-	list_del(&clp->cl_strhash);
-	list_del(&clp->cl_lru);
+	list_del_init(&clp->cl_idhash);
+	list_del_init(&clp->cl_strhash);
+	list_del_init(&clp->cl_lru);
 	while (!list_empty(&clp->cl_openowners)) {
 		sop = list_entry(clp->cl_openowners.next, struct nfs4_stateowner, so_perclient);
 		release_stateowner(sop);
