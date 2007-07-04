@@ -928,7 +928,7 @@ nfsd4_decode_exchange_id(struct nfsd4_compoundargs *argp, struct nfsd4_exchange_
         READ32(dummy);
 
         if (dummy > 1)
-                return -EINVAL;
+                return nfserr_inval;
 
         if (dummy == 1) {
                 READ_BUF(4);
@@ -940,9 +940,6 @@ nfsd4_decode_exchange_id(struct nfsd4_compoundargs *argp, struct nfsd4_exchange_
                 READ32(dummy);
                 READ_BUF(dummy);
                 p += XDR_QUADLEN(dummy);
-
-                READ_BUF(12);
-                p += 12;
 
                 READ_BUF(12);
                 p += 12;
