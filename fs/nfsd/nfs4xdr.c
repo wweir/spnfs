@@ -965,113 +965,120 @@ nfsd4_decode_setclientid_confirm(struct nfsd4_compoundargs *argp, struct nfsd4_s
 static int
 nfsd4_decode_create_session(struct nfsd4_compoundargs *argp, struct nfsd4_create_session *sess)
 {
-        DECODE_HEAD;
+	DECODE_HEAD;
 
-        u32 dummy;
-        char *machine_name;
-        int i;
+	u32 dummy;
+	char *machine_name;
+	int i;
 	int nr_secflavs;
 
-        READ_BUF(20);
-
-        COPYMEM(&sess->clientid, 8);
-        READ32(sess->seqid);
-        READ32(sess->flags);
-        READ32(sess->header_padding);
+	READ_BUF(20);
+	COPYMEM(&sess->clientid, 8);
+	READ32(sess->seqid);
+	READ32(sess->flags);
+	READ32(sess->header_padding);
 
 	/* conn_binding4args */
-        READ_BUF(4);
-        READ32(dummy);
-        if (dummy) {
-                printk(KERN_EMERG "cba_enforce = 1 not supported!\n");
-                return -1;
-        }
+	READ_BUF(4);
+	READ32(dummy);
+	if (dummy) {
+		/* skip sec_oid4 */
+		dprintk("cba_enforce = 1 not supported!\n");
+		READ_BUF(4);
+		READ32(dummy);
+		READ_BUF(dummy);
+	}
 
-        /* Fore channel attrs */
-        READ_BUF(20);
-        READ32(sess->fore_channel.maxreq_sz);
-        READ32(sess->fore_channel.maxresp_sz);
-        READ32(sess->fore_channel.maxresp_cached);
-        READ32(sess->fore_channel.maxops);
-        READ32(sess->fore_channel.maxreqs);
+	/* Fore channel attrs */
+	READ_BUF(20);
+	READ32(sess->fore_channel.maxreq_sz);
+	READ32(sess->fore_channel.maxresp_sz);
+	READ32(sess->fore_channel.maxresp_cached);
+	READ32(sess->fore_channel.maxops);
+	READ32(sess->fore_channel.maxreqs);
+	READ_BUF(4);
+	READ32(sess->fore_channel.nr_rdma_attrs);
+	if (sess->fore_channel.nr_rdma_attrs == 1) {
+		READ_BUF(4);
+		READ32(sess->fore_channel.rdma_attrs);
+	} else if (sess->fore_channel.nr_rdma_attrs > 1) {
+		dprintk("Too many fore channel attr bitmaps!\n");
+		return nfserr_inval;
+	}
 
-        READ_BUF(4);
-        READ32(sess->fore_channel.nr_rdma_attrs);
+	/* Back channel attrs */
+	READ_BUF(20);
+	READ32(sess->back_channel.maxreq_sz);
+	READ32(sess->back_channel.maxresp_sz);
+	READ32(sess->back_channel.maxresp_cached);
+	READ32(sess->back_channel.maxops);
+	READ32(sess->back_channel.maxreqs);
+	READ_BUF(4);
+	READ32(sess->back_channel.nr_rdma_attrs);
+	if (sess->back_channel.nr_rdma_attrs == 1) {
+		READ_BUF(4);
+		READ32(sess->back_channel.rdma_attrs);
+	} else if (sess->back_channel.nr_rdma_attrs > 1) {
+		dprintk("Too many back channel attr bitmaps!\n");
+		return nfserr_inval;
+	}
 
-        if (sess->fore_channel.nr_rdma_attrs == 1) {
-                READ_BUF(4);
-                READ32(sess->fore_channel.rdma_attrs);
-        }
-        else if (sess->fore_channel.nr_rdma_attrs > 1) {
-                printk (KERN_NOTICE "Too many channel attr bitmaps!\n");
-                return -1;
-        }
+	READ_BUF(4);
+	READ32(sess->callback_prog);
 
-        /* Back channel attrs */
-        READ_BUF(20);
-        READ32(sess->back_channel.maxreq_sz);
-        READ32(sess->back_channel.maxresp_sz);
-        READ32(sess->back_channel.maxresp_cached);
-        READ32(sess->back_channel.maxops);
-        READ32(sess->back_channel.maxreqs);
-
-        READ_BUF(4);
-        READ32(sess->back_channel.nr_rdma_attrs);
-
-        if (sess->back_channel.nr_rdma_attrs == 1) {
-                READ_BUF(4);
-                READ32(sess->back_channel.rdma_attrs);
-        }
-        else if (sess->back_channel.nr_rdma_attrs > 1) {
-                printk (KERN_NOTICE "Too many channel attr bitmaps!\n");
-                return -1;
-        }
-
-        READ_BUF(4);
-        READ32(sess->callback_prog);
-
-        READ_BUF(4);
+	/* callback_sec_params4 */
+	READ_BUF(4);
 	READ32(nr_secflavs);
-
-        for (i = 0;i < nr_secflavs; ++i) {
-                READ_BUF(4);
-                READ32(dummy);
-
-                switch(dummy) {
-                        case RPC_AUTH_UNIX:
-			        READ_BUF(8);
-
-			        /* stamp */
-			        READ32(dummy);
-
-			        /* machine name len */
-			        READ32(dummy);
-
-			        READ_BUF(dummy);
-			        SAVEMEM(machine_name, dummy);
-
-			        READ_BUF(8);
-			        READ32(sess->uid);
-			        READ32(sess->gid);
-
-			        /* more gids */
-			        READ_BUF(4);
-			        READ32(dummy);
-
-			        for (i=0;i<dummy;++i) {
-			                READ32(dummy);
-				}
-				break;
+	for (i = 0;i < nr_secflavs; ++i) {
+		READ_BUF(4);
+		READ32(dummy);
+		switch(dummy) {
 			case RPC_AUTH_NULL:
 				/* Nothing to read */
 				break;
+			case RPC_AUTH_UNIX:
+				READ_BUF(8);
+				/* stamp */
+				READ32(dummy);
+
+				/* machine name */
+				READ32(dummy);
+				READ_BUF(dummy);
+				SAVEMEM(machine_name, dummy);
+
+				/* uid, gid */
+				READ_BUF(8);
+				READ32(sess->uid);
+				READ32(sess->gid);
+
+				/* more gids */
+				READ_BUF(4);
+				READ32(dummy);
+				for (i=0;i<dummy;++i) {
+					READ_BUF(4);
+					READ32(dummy);
+				}
+				break;
+			case RPC_AUTH_GSS:
+				dprintk("RPC_AUTH_GSS callback secflavor not supported!\n");
+				READ_BUF(8);
+				/* service */
+				READ32(dummy);
+				/* server handle */
+				READ_BUF(dummy);
+				p += XDR_QUADLEN(dummy);
+				/* client handle */
+				READ_BUF(4);
+				READ32(dummy);
+				READ_BUF(dummy);
+				p += XDR_QUADLEN(dummy);
+				break;
 			default:
-				printk(KERN_NOTICE "Only AUTH_UNIX or AUTH_NONE\
-							supported!\n");
-				return -1;
+				dprintk("Illegal callback secflavor\n");
+				return nfserr_inval;
 		}
 	}
-      DECODE_TAIL;
+	DECODE_TAIL;
 }
 #endif /* CONFIG_NFSD_V4_1 */
 
