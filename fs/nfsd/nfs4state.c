@@ -529,6 +529,11 @@ shutdown_callback_client(struct nfs4_client *clp)
 static inline void
 free_client(struct nfs4_client *clp)
 {
+	BUG_ON(!list_empty(&clp->cl_idhash));
+	BUG_ON(!list_empty(&clp->cl_strhash));
+	BUG_ON(!list_empty(&clp->cl_lru));
+	BUG_ON(!list_empty(&clp->cl_delegations));
+	BUG_ON(!list_empty(&clp->cl_openowners));
 	shutdown_callback_client(clp);
 	if (clp->cl_cred.cr_group_info)
 		put_group_info(clp->cl_cred.cr_group_info);
