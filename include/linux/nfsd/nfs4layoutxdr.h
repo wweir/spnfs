@@ -69,7 +69,7 @@ struct nfsd4_pnfs_layoutlist {
 	u32                             dev_layout_type;
 	u32				dev_id;
 	u32                             dev_index;
-	struct knfsd_fh                 *fhp;
+	struct knfsd_fh                 dev_fh;
 };
 
 struct nfsd4_pnfs_filelayout {
