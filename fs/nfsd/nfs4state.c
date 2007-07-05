@@ -4132,7 +4132,7 @@ free_nfs4_layout(struct kref *kref)
 	lr.lr_reclaim = 0;
 	lr.lr_layout_type = lp->lo_layout_type;
 	lr.lr_iomode = lp->lo_iomode;
-	lr.lr_return_type = LAYOUTRETURN_FILE;
+	lr.lr_return_type = RETURN_FILE;
 	lr.lr_offset = lp->lo_offset;
 	lr.lr_length = lp->lo_length;
 	lr.lr_flags = 0; /* last return */
@@ -4323,7 +4323,7 @@ int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
 		lr.lr_reclaim = 0;
 		lr.lr_layout_type = lgp->lg_type;
 		lr.lr_iomode = lgp->lg_iomode;
-		lr.lr_return_type = LAYOUTRETURN_FILE;
+		lr.lr_return_type = RETURN_FILE;
 		lr.lr_offset = lgp->lg_offset;
 		lr.lr_length = lgp->lg_length;
 		lr.lr_flags = lgp->lg_flags;
