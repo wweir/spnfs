@@ -66,7 +66,6 @@ struct pnfs_filelayout_devaddr {
 };
 
 struct nfsd4_pnfs_layoutlist {
-	u32                             dev_layout_type;
 	u32				dev_id;
 	u32                             dev_index;
 	struct knfsd_fh                 dev_fh;
