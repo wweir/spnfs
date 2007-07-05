@@ -1373,7 +1373,7 @@ nfsd4_decode_layoutreturn(struct nfsd4_compoundargs *argp,
 	READ32(lrp->lr_layout_type);
 	READ32(lrp->lr_iomode);
 	READ32(lrp->lr_return_type);
-	if (lrp->lr_return_type == LAYOUTRETURN_FILE) {
+	if (lrp->lr_return_type == RETURN_FILE) {
 		READ64(lrp->lr_offset);
 		READ64(lrp->lr_length);
 	}
