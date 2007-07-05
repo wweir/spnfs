@@ -1110,7 +1110,7 @@ __be32 nfsd4_exchange_id(struct svc_rqst *rqstp,
         if (unconf) {
                 status = nfs_ok;
                 /* Found an unconfirmed record */
-                if (!same_creds(&conf->cl_cred, &rqstp->rq_cred)) {
+                if (!same_creds(&unconf->cl_cred, &rqstp->rq_cred)) {
                         /* Principal changed: update to the new principal and send
                          * nfs_ok */
                         copy_cred(&unconf->cl_cred, &rqstp->rq_cred);
