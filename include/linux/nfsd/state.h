@@ -248,6 +248,11 @@ struct nfs4_client {
 #endif /* CONFIG_NFSD_V4_1 */
 };
 
+struct nfs4_fsid {
+        u64     major;
+        u64     minor;
+};
+
 #if defined(CONFIG_PNFSD)
 
 struct nfs4_cb_layout {
@@ -382,6 +387,12 @@ struct nfs4_file {
 	u32                     fi_id;      /* used with stateowner->so_id 
 					     * for stateid_hashtbl hash */
 	bool			fi_had_conflict;
+#if defined(CONFIG_PNFSD)
+	/* used by layoutget / layoutrecall */
+	struct nfs4_fsid	fi_fsid;
+	u32			fi_fhlen;
+	u8			fi_fhval[NFS4_FHSIZE];
+#endif /* CONFIG_PNFS */
 };
 
 #if defined(CONFIG_PNFSD)
