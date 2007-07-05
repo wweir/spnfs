@@ -488,6 +488,34 @@ enum state_protect_how4 {
 };
 #endif /* CONFIG_NFS_V4_1 */
 
+#if defined(CONFIG_PNFS) || defined(CONFIG_PNFSD)
+enum pnfs_layouttype {
+	LAYOUT_NFSV4_FILES  = 1,
+	LAYOUT_OSD2_OBJECTS = 2,
+	LAYOUT_BLOCK_VOLUME = 3,
+	LAYOUT_PVFS2        = 4
+};
+
+/* FIXME: should recall and return types be combined? */
+enum pnfs_layoutrecall_type {
+	RECALL_FILE = 1,
+	RECALL_FSID = 2,
+	RECALL_ALL  = 3
+};
+
+enum pnfs_layoutreturn_type {
+	RETURN_FILE = 1,
+	RETURN_FSID = 2,
+	RETURN_ALL  = 3
+};
+
+enum pnfs_iomode {
+	IOMODE_READ = 1,
+	IOMODE_RW = 2,
+	IOMODE_ANY = 3,
+};
+#endif /* defined(CONFIG_PNFS) || defined(CONFIG_PNFSD) */
+
 #endif
 #endif
 

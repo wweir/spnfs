@@ -247,11 +247,6 @@ struct nfs4_client {
 };
 
 #if defined(CONFIG_PNFSD)
-enum layout_recall_type {
-	RECALL_FILE = 1,
-	RECALL_FSID = 2,
-	RECALL_ALL  = 3
-};
 
 struct nfs4_cb_layout {
 	struct super_block	*cbl_sb;

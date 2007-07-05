@@ -171,18 +171,10 @@ extern void pnfs_unregister_layoutdriver(struct pnfs_layoutdriver_type *);
 #define NFS4_PNFS_MAX_LAYOUTS 4
 #define NFS4_PNFS_PRIVATE_LAYOUT 0x80000000
 
-enum pnfs_layouttype4 {
-	LAYOUT_NFSV4_FILES  = 1,
-	LAYOUT_OSD2_OBJECTS = 2,
-	LAYOUT_BLOCK_VOLUME = 3,
-	LAYOUT_PVFS2        = 4
-};
-
 enum file_layout_device_type {
 	FILE_SIMPLE  = 1,
 	FILE_COMPLEX = 2
 };
-
 #endif /* defined(CONFIG_PNFS) || defined(CONFIG_PNFSD) */
 
 #endif /* LINUX_NFS4_PNFS_H */
