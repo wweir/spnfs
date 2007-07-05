@@ -992,20 +992,40 @@ nfsd4_layoutget(struct svc_rqst *rqstp,
 	/* check to see if requested layout type is supported. */
 	status = nfserr_unknown_layouttype;
 	if (!sb->s_export_op->layout_type ||
-	    sb->s_export_op->layout_type() != lgp->lg_type) {
+	    sb->s_export_op->layout_type() != lgp->lg_seg.layout_type) {
 		printk("pNFS %s: requested layout type %d "
 		       "does not match suppored type %d\n",
-			__FUNCTION__, lgp->lg_type,
+			__FUNCTION__, lgp->lg_seg.layout_type,
 			sb->s_export_op->layout_type());
+		goto out;
+	}
+
+	status = nfserr_layoutunavailable;
+	if (!sb->s_export_op->layout_get) {
+		dprintk("pNFS %s: layout_get not implemented for layout "
+			"type %d\n", __FUNCTION__, lgp->lg_seg.layout_type);
+		goto out;
+	}
+
+	status = nfserr_inval;
+	if (lgp->lg_seg.iomode != IOMODE_READ &&
+	    lgp->lg_seg.iomode != IOMODE_RW &&
+	    lgp->lg_seg.iomode != IOMODE_ANY) {
+		dprintk("pNFS %s: invalid iomode %d\n", __FUNCTION__,
+			lgp->lg_seg.iomode);
+		goto out;
+	}
+
+	status = nfserr_badiomode;
+	if (lgp->lg_seg.iomode == IOMODE_ANY) {
+		dprintk("pNFS %s: IOMODE_ANY is not allowed\n", __FUNCTION__);
 		goto out;
 	}
 
 	/* set the export ops for encoding the devaddr */
 	lgp->lg_ops = sb->s_export_op;
 
-	/* Set file handle and clientid */
-	memcpy(&lgp->lg_fh, &current_fh->fh_handle, sizeof(struct knfsd_fh));
-	memcpy(&lgp->lg_clientid, &current_ses->cs_sid.clientid, sizeof(clientid_t));
+	lgp->lg_seg.clientid = *(u64 *)&current_ses->cs_sid.clientid;
 
 	status = nfs4_pnfs_get_layout(sb, current_fh, lgp);
 out:
@@ -1021,6 +1041,7 @@ nfsd4_layoutcommit(struct svc_rqst *rqstp,
 	struct inode *ino = NULL;
 	struct iattr ia;
 	struct super_block *sb;
+	struct current_session *current_ses = cstate->current_ses;
 	struct svc_fh *current_fh = &cstate->current_fh;
 
 	dprintk("NFSD: nfsd4_layoutcommit \n");
@@ -1047,6 +1068,9 @@ nfsd4_layoutcommit(struct svc_rqst *rqstp,
 		fh_unlock(current_fh);
 		goto out;
 	}
+
+	/* Set clientid from sessionid */
+	lcp->lc_seg.clientid = *(u64 *)&current_ses->cs_sid.clientid;
 
 	/* Try our best to update the file size */
 	dprintk("%s: Modifying file size\n", __FUNCTION__);
@@ -1101,20 +1125,20 @@ nfsd4_layoutreturn(struct svc_rqst *rqstp,
 	/* check to see if requested layout type is supported. */
 	status = nfserr_unknown_layouttype;
 	if (!sb->s_export_op->layout_type ||
-	    sb->s_export_op->layout_type() != lrp->lr_layout_type) {
+	    sb->s_export_op->layout_type() != lrp->lr_seg.layout_type) {
 		printk("pNFS %s: requested layout type %d "
 		       "does not match suppored type %d\n",
-			__FUNCTION__, lrp->lr_layout_type,
+			__FUNCTION__, lrp->lr_seg.layout_type,
 			sb->s_export_op->layout_type());
 		goto out;
 	}
 
 	/* Set clientid from sessionid */
-	memcpy(&lrp->lr_clientid, &current_ses->cs_sid.clientid, sizeof(clientid_t));
+	lrp->lr_seg.clientid = *(u64 *)&current_ses->cs_sid.clientid;
 	status = nfs4_pnfs_return_layout(sb, current_fh, lrp);
 out:
 	dprintk("pNFS %s: status %d layout_type %d\n",
-		__FUNCTION__, status, lrp->lr_layout_type);
+		__FUNCTION__, status, lrp->lr_seg.layout_type);
 	return status;
 }
 
