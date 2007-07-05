@@ -94,7 +94,6 @@ filelayout_encode_layoutlist_item(u32 *p, u32 *end,
 	len = 16 + fhlen;
 	if (p + XDR_QUADLEN(len) > end)
 		return -ENOMEM;
-	WRITE32(item->dev_layout_type);
 	WRITE32(item->dev_id);
 	WRITE32(item->dev_index);
 	WRITE32(fhlen);
@@ -130,7 +129,6 @@ filelayout_encode_layout(u32 *p, u32 *end, void *layout)
 	WRITE32(flp->lg_llistlen);
 	for (i = 0; i < flp->lg_llistlen; i++) {
 		item = &flp->lg_llist[i];
-		item->dev_layout_type = flp->lg_layout_type;
 		len = filelayout_encode_layoutlist_item(p, end, item);
 		if (len > 0) {
 			p += XDR_QUADLEN(len);
