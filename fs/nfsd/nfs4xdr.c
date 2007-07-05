@@ -929,7 +929,7 @@ nfsd4_decode_exchange_id(struct nfsd4_compoundargs *argp, struct nfsd4_exchange_
         READ32(dummy);
 
         if (dummy > 1)
-                return nfserr_inval;
+                goto xdr_error;
 
         if (dummy == 1) {
                 READ_BUF(4);
@@ -1003,7 +1003,7 @@ nfsd4_decode_create_session(struct nfsd4_compoundargs *argp, struct nfsd4_create
 		READ32(sess->fore_channel.rdma_attrs);
 	} else if (sess->fore_channel.nr_rdma_attrs > 1) {
 		dprintk("Too many fore channel attr bitmaps!\n");
-		return nfserr_inval;
+		goto xdr_error;
 	}
 
 	/* Back channel attrs */
@@ -1020,7 +1020,7 @@ nfsd4_decode_create_session(struct nfsd4_compoundargs *argp, struct nfsd4_create
 		READ32(sess->back_channel.rdma_attrs);
 	} else if (sess->back_channel.nr_rdma_attrs > 1) {
 		dprintk("Too many back channel attr bitmaps!\n");
-		return nfserr_inval;
+		goto xdr_error;
 	}
 
 	READ_BUF(4);
