@@ -1494,7 +1494,7 @@ out:
 
 /* OPEN Share state helper functions */
 static inline struct nfs4_file *
-alloc_init_file(struct inode *ino)
+alloc_init_file(struct inode *ino, struct svc_fh *current_fh)
 {
 	struct nfs4_file *fp;
 	unsigned int hashval = file_hashval(ino);
@@ -1512,6 +1512,14 @@ alloc_init_file(struct inode *ino)
 		fp->fi_inode = igrab(ino);
 		fp->fi_id = current_fileid++;
 		fp->fi_had_conflict = false;
+#ifdef CONFIG_PNFS
+		fp->fi_fsid.major = current_fh->fh_export->ex_fsid;
+		fp->fi_fsid.minor = 0;
+		fp->fi_fhlen = current_fh->fh_handle.fh_size;
+		BUG_ON(fp->fi_fhlen > sizeof(fp->fi_fhval));
+		memcpy(fp->fi_fhval, &current_fh->fh_handle.fh_base,
+		       fp->fi_fhlen);
+#endif /* CONFIG_PNFS */
 		return fp;
 	}
 	return NULL;
@@ -2338,7 +2346,7 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 		if (open->op_claim_type == NFS4_OPEN_CLAIM_DELEGATE_CUR)
 			goto out;
 		status = nfserr_resource;
-		fp = alloc_init_file(ino);
+		fp = alloc_init_file(ino, current_fh);
 		if (fp == NULL)
 			goto out;
 	}
@@ -4263,7 +4271,7 @@ int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
 
 	fp = find_file(ino);
 	if (!fp) {
-		fp = alloc_init_file(ino);
+		fp = alloc_init_file(ino, current_fh);
 		if (fp == NULL)
 			goto out;
 	}
