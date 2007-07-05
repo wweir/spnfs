@@ -87,6 +87,7 @@ struct nfsd4_pnfs_layoutget {
 	u32				lg_mxcnt;	/* request */
 	struct export_operations	*lg_ops;
 
+	struct knfsd_fh                 *lg_fh;
 	u32				lg_return_on_close; /* response */
 	void				*lg_layout;	/* response callback encoded */
 };
