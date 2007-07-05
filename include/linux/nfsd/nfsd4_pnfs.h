@@ -72,53 +72,46 @@ struct nfsd4_pnfs_getdevinfo {
 	void				*gd_devaddr;	/*response */
 };
 
+struct nfsd4_layout_seg {
+	u64			clientid;
+	u32			layout_type;
+	u32			iomode;
+	u64			offset;
+	u64			length;
+};
+
 struct nfsd4_pnfs_layoutget {
-	u64				lg_clientid;	/* request */
+	struct nfsd4_layout_seg		lg_seg;		/* request/response */
 	u32				lg_signal;	/* request */
-	u32				lg_type;	/* request - response */
-	u32				lg_iomode;	/* request - response*/
-	u64				lg_offset;	/* request - response */
-	u64				lg_length;	/* request - response */
 	u64				lg_minlength;	/* request */
 	u32				lg_mxcnt;	/* request */
-	u32				lg_flags;	/* request */
 	struct export_operations	*lg_ops;
-
-	/* only for cluster fs file layout 'struct knfsd_fh' */
-	unsigned char			lg_fh[NFS_MAXFHSIZE];
 
 	u32				lg_return_on_close; /* response */
 	void				*lg_layout;	/* response callback encoded */
 };
 
-struct nfsd4_pnfs_lo_up{
-	u32				up_type;
-	u32				up_len;		/* layout length */
-	void				*up_layout;	/* decoded by callback */
-};
-
 struct nfsd4_pnfs_layoutcommit {
-	u64				lc_clientid;	/* request */
-	u64				lc_offset;	/* request */
-	u64				lc_length;	/* request */
+	struct nfsd4_layout_seg		lc_seg;		/* request */
 	u32				lc_reclaim;	/* request */
 	u32				lc_newoffset;	/* request */
 	u64				lc_last_wr;	/* request */
 	struct nfstime4			lc_mtime;	/* request */
 	struct nfstime4			lc_atime;	/* request */
-	struct nfsd4_pnfs_lo_up		lc_loup;	/* request */
+	u32				lc_up_len;	/* layout length */
+	void				*lc_up_layout;	/* decoded by callback */
 	u32				lc_size_chg;	/* boolean for response */
 	u64				lc_newsize;	/* response */
 };
 
+enum layoutreturn_flags {
+	LR_FLAG_INTERN = 1 << 0
+};
+
 struct nfsd4_pnfs_layoutreturn {
-	u64				lr_clientid;	/* request */
-	u32				lr_reclaim;	/* request */
-	u32				lr_layout_type;	/* request */
-	u32				lr_iomode;	/* request */
 	u32				lr_return_type;	/* request */
-	u64				lr_offset;	/* request */
-	u64				lr_length;	/* request */
+	struct nfsd4_layout_seg		lr_seg;		/* request */
+	u32				lr_reclaim;	/* request */
 	u32				lr_flags;
 };
 
