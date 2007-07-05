@@ -4323,6 +4323,7 @@ int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
 	}
 
 	BUG_ON(!sb->s_export_op->layout_get);
+	lgp->lg_fh = &current_fh->fh_handle;
 	status = sb->s_export_op->layout_get(current_fh->fh_dentry->d_inode,
 				(void *)lgp);
 
