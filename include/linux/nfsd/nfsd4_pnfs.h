@@ -39,6 +39,7 @@
 #if defined(CONFIG_PNFSD)
 
 #include <linux/nfs.h>
+#include <linux/nfs_xdr.h>
 
 /* pNFS structs */
 
@@ -103,10 +104,8 @@ struct nfsd4_pnfs_layoutcommit {
 	u32				lc_reclaim;	/* request */
 	u32				lc_newoffset;	/* request */
 	u64				lc_last_wr;	/* request */
-	u64				lc_modify_sec;	/* request */
-	u32				lc_modify_nsec;	/* request */
-	u64				lc_access_sec;	/* request */
-	u32				lc_access_nsec; /* request */
+	struct nfstime4			lc_mtime;	/* request */
+	struct nfstime4			lc_atime;	/* request */
 	struct nfsd4_pnfs_lo_up		lc_loup;	/* request */
 	u32				lc_size_chg;	/* boolean for response */
 	u64				lc_newsize;	/* response */
