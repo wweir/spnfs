@@ -91,7 +91,7 @@ filelayout_encode_layoutlist_item(u32 *p, u32 *end,
 	int len;
 	unsigned int fhlen = item->dev_fh.fh_size;
 
-	len = 16 + fhlen;
+	len = 12 + fhlen;
 	if (p + XDR_QUADLEN(len) > end)
 		return -ENOMEM;
 	WRITE32(item->dev_id);
