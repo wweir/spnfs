@@ -1057,7 +1057,7 @@ __be32 nfsd4_exchange_id(struct svc_rqst *rqstp,
 	dprintk("%s ip_addr=%u\n", __FUNCTION__, ip_addr);
 	dprintk("nfsd4_exchange_id flags %x\n", clid->flags);
 
-        if (!check_name(clname))
+	if (!check_name(clname) || (clid->flags & EXCHGID4_INVAL_FLAG_MASK))
                 return nfserr_inval;
 	dprintk("%s check_name returned okay\n", __FUNCTION__);
 
