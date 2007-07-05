@@ -132,6 +132,8 @@ struct export_operations {
 		 * Arg: layout - file system defined
 		 */
 	void (*layout_free)(void *layout);
+		/* can layout segments be merged for this layout type? */
+	int (*can_merge_layouts)(u32 layout_type);
 		/* pNFS: returns the opaque layout
 		 * Arg: buf - struct nfsd4_pnfs_layoutget
 		 */
