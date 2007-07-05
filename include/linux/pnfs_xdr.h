@@ -19,21 +19,9 @@
 #define PNFS_LAYOUT_MAXSIZE 4096
 #define PNFS_MAX_NUM_LAYOUT_TYPES 2
 
-enum layoutreturn_type {
-	LAYOUTRETURN_FILE = 1,
-	LAYOUTRETURN_FSID = 2,
-	LAYOUTRETURN_ALL = 3,
-};
-
 struct nfs4_pnfs_layout {
 	__u32 len;
 	void *buf;
-};
-
-enum pnfs_iomode {
-	IOMODE_READ = 1,
-	IOMODE_RW = 2,
-	IOMODE_ANY = 3,
 };
 
 struct nfs4_pnfs_layoutget_arg {
