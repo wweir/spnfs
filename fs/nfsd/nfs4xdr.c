@@ -1319,7 +1319,7 @@ nfsd4_decode_layoutcommit(struct nfsd4_compoundargs *argp,
 			  struct nfsd4_pnfs_layoutcommit *lcp)
 {
 	DECODE_HEAD;
-	u32 timechange, dummy32;
+	u32 timechange;
 
 	READ_BUF(36);
 	READ64(lcp->lc_offset);
@@ -1330,21 +1330,21 @@ nfsd4_decode_layoutcommit(struct nfsd4_compoundargs *argp,
 	READ32(timechange);
 	if (timechange) {
 		READ_BUF(12);
-		READ32(dummy32);
-		if (dummy32)
-			return nfserr_inval;
-		READ32(lcp->lc_modify_sec);
-		READ32(lcp->lc_modify_nsec);
+		READ64(lcp->lc_mtime.seconds);
+		READ32(lcp->lc_mtime.nseconds);
+	} else {
+		lcp->lc_mtime.seconds = 0;
+		lcp->lc_mtime.nseconds = 0;
 	}
 	READ_BUF(4);
 	READ32(timechange);
 	if (timechange) {
 		READ_BUF(12);
-		READ32(dummy32);
-		if (dummy32)
-			return nfserr_inval;
-		READ32(lcp->lc_access_sec);
-		READ32(lcp->lc_access_nsec);
+		READ64(lcp->lc_atime.seconds);
+		READ32(lcp->lc_atime.nseconds);
+	} else {
+		lcp->lc_atime.seconds = 0;
+		lcp->lc_atime.nseconds = 0;
 	}
 	READ_BUF(8);
 	READ32(lcp->lc_loup.up_type);
