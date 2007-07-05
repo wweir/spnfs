@@ -99,6 +99,8 @@
 #define EXCHGID4_FLAG_USE_PNFS_MDS      0x00020000
 #define EXCHGID4_FLAG_USE_PNFS_DS       0x00040000
 
+#define NFS4_LENGTH_EOF (~(u64)0)
+
 enum nfs4_acl_whotype {
 	NFS4_ACL_WHO_NAMED = 0,
 	NFS4_ACL_WHO_OWNER,
