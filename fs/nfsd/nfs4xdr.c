@@ -1290,10 +1290,10 @@ nfsd4_decode_layoutget(struct nfsd4_compoundargs *argp,
 
 	READ_BUF(40);
 	READ32(lgp->lg_signal);
-	READ32(lgp->lg_type);
-	READ32(lgp->lg_iomode);
-	READ64(lgp->lg_offset);
-	READ64(lgp->lg_length);
+	READ32(lgp->lg_seg.layout_type);
+	READ32(lgp->lg_seg.iomode);
+	READ64(lgp->lg_seg.offset);
+	READ64(lgp->lg_seg.length);
 	READ64(lgp->lg_minlength);
 	READ32(lgp->lg_mxcnt);
 
@@ -1325,8 +1325,8 @@ nfsd4_decode_layoutcommit(struct nfsd4_compoundargs *argp,
 	u32 timechange;
 
 	READ_BUF(36);
-	READ64(lcp->lc_offset);
-	READ64(lcp->lc_length);
+	READ64(lcp->lc_seg.offset);
+	READ64(lcp->lc_seg.length);
 	READ32(lcp->lc_reclaim);
 	READ32(lcp->lc_newoffset);
 	READ64(lcp->lc_last_wr);
@@ -1350,16 +1350,16 @@ nfsd4_decode_layoutcommit(struct nfsd4_compoundargs *argp,
 		lcp->lc_atime.nseconds = 0;
 	}
 	READ_BUF(8);
-	READ32(lcp->lc_loup.up_type);
+	READ32(lcp->lc_seg.layout_type);
 	/* XXX: saving XDR'ed layout update. Since we don't have the
 	 * current_fh yet, and therefore no export_ops, we can't call
 	 * the layout specific decode routines. File and pVFS2
 	 * do not use the layout update....
 	 */
-	READ32(lcp->lc_loup.up_len);
-	if (lcp->lc_loup.up_len > 0) {
-		READ_BUF(lcp->lc_loup.up_len);
-		READMEM(lcp->lc_loup.up_layout, lcp->lc_loup.up_len);
+	READ32(lcp->lc_up_len);
+	if (lcp->lc_up_len > 0) {
+		READ_BUF(lcp->lc_up_len);
+		READMEM(lcp->lc_up_layout, lcp->lc_up_len);
 	}
 
 	DECODE_TAIL;
@@ -1373,12 +1373,12 @@ nfsd4_decode_layoutreturn(struct nfsd4_compoundargs *argp,
 
 	READ_BUF(32);
 	READ32(lrp->lr_reclaim);
-	READ32(lrp->lr_layout_type);
-	READ32(lrp->lr_iomode);
+	READ32(lrp->lr_seg.layout_type);
+	READ32(lrp->lr_seg.iomode);
 	READ32(lrp->lr_return_type);
 	if (lrp->lr_return_type == RETURN_FILE) {
-		READ64(lrp->lr_offset);
-		READ64(lrp->lr_length);
+		READ64(lrp->lr_seg.offset);
+		READ64(lrp->lr_seg.length);
 	}
 
 	DECODE_TAIL;
@@ -3280,13 +3280,13 @@ nfsd4_encode_layoutget(struct nfsd4_compoundres *resp, int nfserr,
 	if (!nfserr) {
 		RESERVE_SPACE(32);
 		WRITE32(lgp->lg_return_on_close);
-		WRITE64(lgp->lg_offset);
-		WRITE64(lgp->lg_length);
-		WRITE32(lgp->lg_iomode);
-		WRITE32(lgp->lg_type);
+		WRITE64(lgp->lg_seg.offset);
+		WRITE64(lgp->lg_seg.length);
+		WRITE32(lgp->lg_seg.iomode);
+		WRITE32(lgp->lg_seg.layout_type);
 		ADJUST_ARGS();
 		if (lgp->lg_ops->layout_encode == NULL &&
-				lgp->lg_type == LAYOUT_NFSV4_FILES) {
+		    lgp->lg_seg.layout_type == LAYOUT_NFSV4_FILES) {
 			len = filelayout_encode_layout(p, resp->end, lgp->lg_layout);
 			filelayout_free_layout(lgp->lg_layout);
 		} else {

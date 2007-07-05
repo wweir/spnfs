@@ -215,7 +215,7 @@ struct nfs4_client {
 	struct list_head	cl_openowners;
 	struct list_head	cl_delegations;
 #if defined(CONFIG_PNFSD)
-	struct list_head	cl_layouts;
+	struct list_head	cl_layouts;	/* outstanding layouts */
 #endif
 	struct list_head	cl_sessions;
 	struct list_head        cl_lru;         /* tail queue */
@@ -253,6 +253,8 @@ struct nfs4_fsid {
 
 #if defined(CONFIG_PNFSD)
 
+#include <linux/nfsd/nfsd4_pnfs.h>
+
 struct nfs4_cb_layout {
 	struct super_block	*cbl_sb;
 	struct nfs4_client	*cbl_client;
@@ -268,26 +270,16 @@ struct nfs4_cb_layout {
 	u32			cbl_fhval[NFS4_FHSIZE];
 };
 
+/* outstanding layout */
 struct nfs4_layout {
-	struct kref		lo_ref;
 	struct list_head	lo_perfile;    /* hash by f_id */
 	struct list_head	lo_perclnt;    /* hash by clientid */
 	struct list_head	lo_recall_lru; /* when in recall */
 	struct nfs4_file        *lo_file;      /* backpointer */
 	struct nfs4_client      *lo_client;
-	time_t                  lo_time;       /* time recall started */
-	struct nfs4_cb_layout	lo_cb_layout;
+	struct nfsd4_layout_seg lo_seg;
 };
 
-#define lo_clienti      lo_cb_layout.cbl_client
-#define lo_sb           lo_cb_layout.cbl_sb
-#define lo_ident        lo_cb_layout.cbl_ident
-#define lo_fhlen        lo_cb_layout.cbl_fhlen
-#define lo_fhval        lo_cb_layout.cbl_fhval
-#define lo_layout_type  lo_cb_layout.cbl_layout_type
-#define lo_iomode       lo_cb_layout.cbl_iomode
-#define lo_offset       lo_cb_layout.cbl_offset
-#define lo_length       lo_cb_layout.cbl_length
 #endif /* CONFIG_PNFSD */
 
 /* struct nfs4_client_reset
