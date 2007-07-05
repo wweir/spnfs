@@ -1037,6 +1037,24 @@ void nfsd4_setup_callback_channel(void)
 }
 
 #if defined(CONFIG_NFSD_V4_1)
+/*
+ * Set the exchange_id flags returned by the server.
+ */
+void
+nfsd4_set_ex_flags(struct nfs4_client *new, struct nfsd4_exchange_id *clid)
+{
+	/* if sessions only, ignore the wire_flags from client */
+
+	/* Referrals are supported, Migration is not. */
+	new->cl_exchange_flags |= EXCHGID4_FLAG_SUPP_MOVED_REFER;
+
+	/* pNFS is not supported */
+	new->cl_exchange_flags |=  EXCHGID4_FLAG_USE_NON_PNFS;
+
+	/* set the wire flags to return to client. */
+	clid->flags = new->cl_exchange_flags;
+}
+
 __be32 nfsd4_exchange_id(struct svc_rqst *rqstp,
 			struct nfsd4_compound_state *cstate,
 			struct nfsd4_exchange_id *clid)
@@ -1128,11 +1146,11 @@ out_copy:
         clid->clientid.cl_boot = new->cl_clientid.cl_boot;
         clid->clientid.cl_id = new->cl_clientid.cl_id;
 
-        new->cl_seqid = clid->seqid = 1;
-        new->cl_exchange_flags = clid->flags;
-        clid->flags &= ~(EXCHGID4_FLAG_USE_PNFS_MDS | EXCHGID4_FLAG_USE_PNFS_DS);
-        clid->flags |= EXCHGID4_FLAG_USE_NON_PNFS;
+	new->cl_seqid = clid->seqid = 1;
+	nfsd4_set_ex_flags(new, clid);
 
+	dprintk("nfsd4_exchange_id seqid %d flags %x\n",
+				new->cl_seqid, new->cl_exchange_flags);
         status = nfs_ok;
 
 out:
