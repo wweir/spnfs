@@ -89,7 +89,7 @@ filelayout_encode_layoutlist_item(u32 *p, u32 *end,
 				  struct nfsd4_pnfs_layoutlist *item)
 {
 	int len;
-	unsigned int fhlen = item->fhp->fh_size;
+	unsigned int fhlen = item->dev_fh.fh_size;
 
 	len = 16 + fhlen;
 	if (p + XDR_QUADLEN(len) > end)
@@ -98,7 +98,7 @@ filelayout_encode_layoutlist_item(u32 *p, u32 *end,
 	WRITE32(item->dev_id);
 	WRITE32(item->dev_index);
 	WRITE32(fhlen);
-	WRITEMEM(&item->fhp->fh_base, fhlen);
+	WRITEMEM(&item->dev_fh.fh_base, fhlen);
 	return len;
 }
 
@@ -151,20 +151,12 @@ void
 filelayout_free_layout(void *layout)
 {
 	struct nfsd4_pnfs_filelayout *flp;
-	struct nfsd4_pnfs_layoutlist *item;
-	int i;
 
 	flp = (struct nfsd4_pnfs_filelayout *)layout;
 
 	if (!flp || !flp->lg_llist)
 		return;
-	item = flp->lg_llist;
-	for (i = 0; i < flp->lg_llistlen; i++) {
-#if 0 /* the fh is part of nfsd4_pnfs_layoutget struct */
-		kfree(item->fhp);
-#endif
-		item++;
-	}
+
 	kfree(flp->lg_llist);
 }
 EXPORT_SYMBOL(filelayout_free_layout);
