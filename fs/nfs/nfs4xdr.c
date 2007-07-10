@@ -238,43 +238,43 @@ static int nfs4_stat_to_errno(int);
 				(encode_getattr_maxsz)
 #define decode_fs_locations_maxsz \
 				(0)
-#define NFS4_enc_compound_sz	(1024)  /* XXX: large enough? */
-#define NFS4_dec_compound_sz	(1024)  /* XXX: large enough? */
-#define NFS4_enc_read_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_compound_sz	(1024)  /* XXX: large enough? */
+#define NFS40_dec_compound_sz	(1024)  /* XXX: large enough? */
+#define NFS40_enc_read_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_read_maxsz)
-#define NFS4_dec_read_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_read_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_read_maxsz)
-#define NFS4_enc_readlink_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_readlink_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_readlink_maxsz)
-#define NFS4_dec_readlink_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_readlink_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_readlink_maxsz)
-#define NFS4_enc_readdir_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_readdir_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_readdir_maxsz)
-#define NFS4_dec_readdir_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_readdir_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_readdir_maxsz)
-#define NFS4_enc_write_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_write_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_write_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_write_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_write_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_write_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_commit_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_commit_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_commit_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_commit_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_commit_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_commit_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_open_sz        (compound_encode_hdr_maxsz + \
+#define NFS40_enc_open_sz        (compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_savefh_maxsz + \
 				encode_open_maxsz + \
@@ -282,7 +282,7 @@ static int nfs4_stat_to_errno(int);
 				encode_getattr_maxsz + \
 				encode_restorefh_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_open_sz        (compound_decode_hdr_maxsz + \
+#define NFS40_dec_open_sz        (compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_savefh_maxsz + \
 				decode_open_maxsz + \
@@ -290,131 +290,131 @@ static int nfs4_stat_to_errno(int);
 				decode_getattr_maxsz + \
 				decode_restorefh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_open_confirm_sz \
+#define NFS40_enc_open_confirm_sz \
 				(compound_encode_hdr_maxsz + \
 				 encode_putfh_maxsz + \
 				 encode_open_confirm_maxsz)
-#define NFS4_dec_open_confirm_sz \
+#define NFS40_dec_open_confirm_sz \
 				(compound_decode_hdr_maxsz + \
 				 decode_putfh_maxsz + \
 				 decode_open_confirm_maxsz)
-#define NFS4_enc_open_noattr_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_open_noattr_sz	(compound_encode_hdr_maxsz + \
 					encode_putfh_maxsz + \
 					encode_open_maxsz + \
 					encode_getattr_maxsz)
-#define NFS4_dec_open_noattr_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_open_noattr_sz	(compound_decode_hdr_maxsz + \
 					decode_putfh_maxsz + \
 					decode_open_maxsz + \
 					decode_getattr_maxsz)
-#define NFS4_enc_open_downgrade_sz \
+#define NFS40_enc_open_downgrade_sz \
 				(compound_encode_hdr_maxsz + \
 				 encode_putfh_maxsz + \
 				 encode_open_downgrade_maxsz + \
 				 encode_getattr_maxsz)
-#define NFS4_dec_open_downgrade_sz \
+#define NFS40_dec_open_downgrade_sz \
 				(compound_decode_hdr_maxsz + \
 				 decode_putfh_maxsz + \
 				 decode_open_downgrade_maxsz + \
 				 decode_getattr_maxsz)
-#define NFS4_enc_close_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_close_sz	(compound_encode_hdr_maxsz + \
 				 encode_putfh_maxsz + \
 				 encode_close_maxsz + \
 				 encode_getattr_maxsz)
-#define NFS4_dec_close_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_close_sz	(compound_decode_hdr_maxsz + \
 				 decode_putfh_maxsz + \
 				 decode_close_maxsz + \
 				 decode_getattr_maxsz)
-#define NFS4_enc_setattr_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_setattr_sz	(compound_encode_hdr_maxsz + \
 				 encode_putfh_maxsz + \
 				 encode_setattr_maxsz + \
 				 encode_getattr_maxsz)
-#define NFS4_dec_setattr_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_setattr_sz	(compound_decode_hdr_maxsz + \
 				 decode_putfh_maxsz + \
 				 decode_setattr_maxsz + \
 				 decode_getattr_maxsz)
-#define NFS4_enc_fsinfo_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_fsinfo_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_fsinfo_maxsz)
-#define NFS4_dec_fsinfo_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_fsinfo_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_fsinfo_maxsz)
-#define NFS4_enc_renew_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_renew_sz	(compound_encode_hdr_maxsz + \
 				encode_renew_maxsz)
-#define NFS4_dec_renew_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_renew_sz	(compound_decode_hdr_maxsz + \
 				decode_renew_maxsz)
-#define NFS4_enc_setclientid_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_setclientid_sz	(compound_encode_hdr_maxsz + \
 				encode_setclientid_maxsz)
-#define NFS4_dec_setclientid_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_setclientid_sz	(compound_decode_hdr_maxsz + \
 				decode_setclientid_maxsz)
-#define NFS4_enc_setclientid_confirm_sz \
+#define NFS40_enc_setclientid_confirm_sz \
 				(compound_encode_hdr_maxsz + \
 				encode_setclientid_confirm_maxsz + \
 				encode_putrootfh_maxsz + \
 				encode_fsinfo_maxsz)
-#define NFS4_dec_setclientid_confirm_sz \
+#define NFS40_dec_setclientid_confirm_sz \
 				(compound_decode_hdr_maxsz + \
 				decode_setclientid_confirm_maxsz + \
 				decode_putrootfh_maxsz + \
 				decode_fsinfo_maxsz)
-#define NFS4_enc_lock_sz        (compound_encode_hdr_maxsz + \
+#define NFS40_enc_lock_sz        (compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_lock_maxsz)
-#define NFS4_dec_lock_sz        (compound_decode_hdr_maxsz + \
+#define NFS40_dec_lock_sz        (compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_lock_maxsz)
-#define NFS4_enc_lockt_sz       (compound_encode_hdr_maxsz + \
+#define NFS40_enc_lockt_sz       (compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_lockt_maxsz)
-#define NFS4_dec_lockt_sz       (compound_decode_hdr_maxsz + \
+#define NFS40_dec_lockt_sz       (compound_decode_hdr_maxsz + \
 				 decode_putfh_maxsz + \
 				 decode_lockt_maxsz)
-#define NFS4_enc_locku_sz       (compound_encode_hdr_maxsz + \
+#define NFS40_enc_locku_sz       (compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_locku_maxsz)
-#define NFS4_dec_locku_sz       (compound_decode_hdr_maxsz + \
+#define NFS40_dec_locku_sz       (compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_locku_maxsz)
-#define NFS4_enc_access_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_access_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_access_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_access_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_access_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_access_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_getattr_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_getattr_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_getattr_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_getattr_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_lookup_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_lookup_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_lookup_maxsz + \
 				encode_getattr_maxsz + \
 				encode_getfh_maxsz)
-#define NFS4_dec_lookup_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_lookup_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_lookup_maxsz + \
 				decode_getattr_maxsz + \
 				decode_getfh_maxsz)
-#define NFS4_enc_lookup_root_sz (compound_encode_hdr_maxsz + \
+#define NFS40_enc_lookup_root_sz (compound_encode_hdr_maxsz + \
 				encode_putrootfh_maxsz + \
 				encode_getattr_maxsz + \
 				encode_getfh_maxsz)
-#define NFS4_dec_lookup_root_sz (compound_decode_hdr_maxsz + \
+#define NFS40_dec_lookup_root_sz (compound_decode_hdr_maxsz + \
 				decode_putrootfh_maxsz + \
 				decode_getattr_maxsz + \
 				decode_getfh_maxsz)
-#define NFS4_enc_remove_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_remove_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_remove_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_remove_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_remove_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + 5 + \
 				decode_getattr_maxsz)
-#define NFS4_enc_rename_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_rename_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_savefh_maxsz + \
 				encode_putfh_maxsz + \
@@ -422,7 +422,7 @@ static int nfs4_stat_to_errno(int);
 				encode_getattr_maxsz + \
 				encode_restorefh_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_rename_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_rename_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_savefh_maxsz + \
 				decode_putfh_maxsz + \
@@ -430,7 +430,7 @@ static int nfs4_stat_to_errno(int);
 				decode_getattr_maxsz + \
 				decode_restorefh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_link_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_link_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_savefh_maxsz + \
 				encode_putfh_maxsz + \
@@ -438,7 +438,7 @@ static int nfs4_stat_to_errno(int);
 				decode_getattr_maxsz + \
 				encode_restorefh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_dec_link_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_link_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_savefh_maxsz + \
 				decode_putfh_maxsz + \
@@ -446,17 +446,17 @@ static int nfs4_stat_to_errno(int);
 				decode_getattr_maxsz + \
 				decode_restorefh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_symlink_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_symlink_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_symlink_maxsz + \
 				encode_getattr_maxsz + \
 				encode_getfh_maxsz)
-#define NFS4_dec_symlink_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_symlink_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_symlink_maxsz + \
 				decode_getattr_maxsz + \
 				decode_getfh_maxsz)
-#define NFS4_enc_create_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_create_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_savefh_maxsz + \
 				encode_create_maxsz + \
@@ -464,7 +464,7 @@ static int nfs4_stat_to_errno(int);
 				encode_getattr_maxsz + \
 				encode_restorefh_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_create_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_create_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_savefh_maxsz + \
 				decode_create_maxsz + \
@@ -472,49 +472,49 @@ static int nfs4_stat_to_errno(int);
 				decode_getattr_maxsz + \
 				decode_restorefh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_pathconf_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_pathconf_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_pathconf_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_pathconf_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_statfs_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_statfs_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_statfs_maxsz)
-#define NFS4_dec_statfs_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_statfs_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_statfs_maxsz)
-#define NFS4_enc_server_caps_sz (compound_encode_hdr_maxsz + \
+#define NFS40_enc_server_caps_sz (compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_server_caps_sz (compound_decode_hdr_maxsz + \
+#define NFS40_dec_server_caps_sz (compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_delegreturn_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_delegreturn_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_delegreturn_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_delegreturn_sz (compound_decode_hdr_maxsz + \
+#define NFS40_dec_delegreturn_sz (compound_decode_hdr_maxsz + \
 				decode_delegreturn_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_getacl_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_getacl_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_getacl_maxsz)
-#define NFS4_dec_getacl_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_getacl_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_getacl_maxsz)
-#define NFS4_enc_setacl_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_setacl_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_setacl_maxsz)
-#define NFS4_dec_setacl_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_setacl_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_setacl_maxsz)
-#define NFS4_enc_fs_locations_sz \
+#define NFS40_enc_fs_locations_sz \
 				(compound_encode_hdr_maxsz + \
 				 encode_putfh_maxsz + \
 				 encode_lookup_maxsz + \
 				 encode_fs_locations_maxsz)
-#define NFS4_dec_fs_locations_sz \
+#define NFS40_dec_fs_locations_sz \
 				(compound_decode_hdr_maxsz + \
 				 decode_putfh_maxsz + \
 				 decode_lookup_maxsz + \
@@ -1373,7 +1373,7 @@ static int encode_delegreturn(struct xdr_stream *xdr, const nfs4_stateid *statei
 /*
  * Encode an ACCESS request
  */
-static int nfs4_xdr_enc_access(struct rpc_rqst *req, __be32 *p, const struct nfs4_accessargs *args)
+static int nfs40_xdr_enc_access(struct rpc_rqst *req, __be32 *p, const struct nfs4_accessargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1397,7 +1397,7 @@ out:
 /*
  * Encode LOOKUP request
  */
-static int nfs4_xdr_enc_lookup(struct rpc_rqst *req, __be32 *p, const struct nfs4_lookup_arg *args)
+static int nfs40_xdr_enc_lookup(struct rpc_rqst *req, __be32 *p, const struct nfs4_lookup_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1421,7 +1421,7 @@ out:
 /*
  * Encode LOOKUP_ROOT request
  */
-static int nfs4_xdr_enc_lookup_root(struct rpc_rqst *req, __be32 *p, const struct nfs4_lookup_root_arg *args)
+static int nfs40_xdr_enc_lookup_root(struct rpc_rqst *req, __be32 *p, const struct nfs4_lookup_root_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1442,7 +1442,7 @@ out:
 /*
  * Encode REMOVE request
  */
-static int nfs4_xdr_enc_remove(struct rpc_rqst *req, __be32 *p, const struct nfs_removeargs *args)
+static int nfs40_xdr_enc_remove(struct rpc_rqst *req, __be32 *p, const struct nfs_removeargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1464,7 +1464,7 @@ out:
 /*
  * Encode RENAME request
  */
-static int nfs4_xdr_enc_rename(struct rpc_rqst *req, __be32 *p, const struct nfs4_rename_arg *args)
+static int nfs40_xdr_enc_rename(struct rpc_rqst *req, __be32 *p, const struct nfs4_rename_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1494,7 +1494,7 @@ out:
 /*
  * Encode LINK request
  */
-static int nfs4_xdr_enc_link(struct rpc_rqst *req, __be32 *p, const struct nfs4_link_arg *args)
+static int nfs40_xdr_enc_link(struct rpc_rqst *req, __be32 *p, const struct nfs4_link_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1524,7 +1524,7 @@ out:
 /*
  * Encode CREATE request
  */
-static int nfs4_xdr_enc_create(struct rpc_rqst *req, __be32 *p, const struct nfs4_create_arg *args)
+static int nfs40_xdr_enc_create(struct rpc_rqst *req, __be32 *p, const struct nfs4_create_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1554,15 +1554,15 @@ out:
 /*
  * Encode SYMLINK request
  */
-static int nfs4_xdr_enc_symlink(struct rpc_rqst *req, __be32 *p, const struct nfs4_create_arg *args)
+static int nfs40_xdr_enc_symlink(struct rpc_rqst *req, __be32 *p, const struct nfs4_create_arg *args)
 {
-	return nfs4_xdr_enc_create(req, p, args);
+	return nfs40_xdr_enc_create(req, p, args);
 }
 
 /*
  * Encode GETATTR request
  */
-static int nfs4_xdr_enc_getattr(struct rpc_rqst *req, __be32 *p, const struct nfs4_getattr_arg *args)
+static int nfs40_xdr_enc_getattr(struct rpc_rqst *req, __be32 *p, const struct nfs4_getattr_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1580,7 +1580,7 @@ static int nfs4_xdr_enc_getattr(struct rpc_rqst *req, __be32 *p, const struct nf
 /*
  * Encode a CLOSE request
  */
-static int nfs4_xdr_enc_close(struct rpc_rqst *req, __be32 *p, struct nfs_closeargs *args)
+static int nfs40_xdr_enc_close(struct rpc_rqst *req, __be32 *p, struct nfs_closeargs *args)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr = {
@@ -1604,7 +1604,7 @@ out:
 /*
  * Encode an OPEN request
  */
-static int nfs4_xdr_enc_open(struct rpc_rqst *req, __be32 *p, struct nfs_openargs *args)
+static int nfs40_xdr_enc_open(struct rpc_rqst *req, __be32 *p, struct nfs_openargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1640,7 +1640,7 @@ out:
 /*
  * Encode an OPEN_CONFIRM request
  */
-static int nfs4_xdr_enc_open_confirm(struct rpc_rqst *req, __be32 *p, struct nfs_open_confirmargs *args)
+static int nfs40_xdr_enc_open_confirm(struct rpc_rqst *req, __be32 *p, struct nfs_open_confirmargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1661,7 +1661,7 @@ out:
 /*
  * Encode an OPEN request with no attributes.
  */
-static int nfs4_xdr_enc_open_noattr(struct rpc_rqst *req, __be32 *p, struct nfs_openargs *args)
+static int nfs40_xdr_enc_open_noattr(struct rpc_rqst *req, __be32 *p, struct nfs_openargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1685,7 +1685,7 @@ out:
 /*
  * Encode an OPEN_DOWNGRADE request
  */
-static int nfs4_xdr_enc_open_downgrade(struct rpc_rqst *req, __be32 *p, struct nfs_closeargs *args)
+static int nfs40_xdr_enc_open_downgrade(struct rpc_rqst *req, __be32 *p, struct nfs_closeargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1709,7 +1709,7 @@ out:
 /*
  * Encode a LOCK request
  */
-static int nfs4_xdr_enc_lock(struct rpc_rqst *req, __be32 *p, struct nfs_lock_args *args)
+static int nfs40_xdr_enc_lock(struct rpc_rqst *req, __be32 *p, struct nfs_lock_args *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1730,7 +1730,7 @@ out:
 /*
  * Encode a LOCKT request
  */
-static int nfs4_xdr_enc_lockt(struct rpc_rqst *req, __be32 *p, struct nfs_lockt_args *args)
+static int nfs40_xdr_enc_lockt(struct rpc_rqst *req, __be32 *p, struct nfs_lockt_args *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1751,7 +1751,7 @@ out:
 /*
  * Encode a LOCKU request
  */
-static int nfs4_xdr_enc_locku(struct rpc_rqst *req, __be32 *p, struct nfs_locku_args *args)
+static int nfs40_xdr_enc_locku(struct rpc_rqst *req, __be32 *p, struct nfs_locku_args *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1772,7 +1772,7 @@ out:
 /*
  * Encode a READLINK request
  */
-static int nfs4_xdr_enc_readlink(struct rpc_rqst *req, __be32 *p, const struct nfs4_readlink *args)
+static int nfs40_xdr_enc_readlink(struct rpc_rqst *req, __be32 *p, const struct nfs4_readlink *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1793,7 +1793,7 @@ static int nfs4_xdr_enc_readlink(struct rpc_rqst *req, __be32 *p, const struct n
 	 *    toplevel_status + taglen + rescount + OP_PUTFH + status
 	 *      + OP_READLINK + status + string length = 8
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS4_dec_readlink_sz) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS40_dec_readlink_sz) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen, args->pages,
 			args->pgbase, args->pglen);
 
@@ -1804,7 +1804,7 @@ out:
 /*
  * Encode a READDIR request
  */
-static int nfs4_xdr_enc_readdir(struct rpc_rqst *req, __be32 *p, const struct nfs4_readdir_arg *args)
+static int nfs40_xdr_enc_readdir(struct rpc_rqst *req, __be32 *p, const struct nfs4_readdir_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1825,7 +1825,7 @@ static int nfs4_xdr_enc_readdir(struct rpc_rqst *req, __be32 *p, const struct nf
 	 *    toplevel_status + taglen + rescount + OP_PUTFH + status
 	 *      + OP_READDIR + status + verifer(2)  = 9
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS4_dec_readdir_sz) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS40_dec_readdir_sz) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen, args->pages,
 			 args->pgbase, args->count);
 	dprintk("%s: inlined page args = (%u, %p, %u, %u)\n",
@@ -1839,7 +1839,7 @@ out:
 /*
  * Encode a READ request
  */
-static int nfs4_xdr_enc_read(struct rpc_rqst *req, __be32 *p, struct nfs_readargs *args)
+static int nfs40_xdr_enc_read(struct rpc_rqst *req, __be32 *p, struct nfs_readargs *args)
 {
 	struct rpc_auth *auth = req->rq_task->tk_msg.rpc_cred->cr_auth;
 	struct xdr_stream xdr;
@@ -1861,7 +1861,7 @@ static int nfs4_xdr_enc_read(struct rpc_rqst *req, __be32 *p, struct nfs_readarg
 	 *    toplevel status + taglen=0 + rescount + OP_PUTFH + status
 	 *       + OP_READ + status + eof + datalen = 9
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS4_dec_read_sz) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS40_dec_read_sz) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen,
 			 args->pages, args->pgbase, args->count);
 	req->rq_rcv_buf.flags |= XDRBUF_READ;
@@ -1872,7 +1872,7 @@ out:
 /*
  * Encode an SETATTR request
  */
-static int nfs4_xdr_enc_setattr(struct rpc_rqst *req, __be32 *p, struct nfs_setattrargs *args)
+static int nfs40_xdr_enc_setattr(struct rpc_rqst *req, __be32 *p, struct nfs_setattrargs *args)
 
 {
         struct xdr_stream xdr;
@@ -1898,7 +1898,7 @@ out:
  * Encode a GETACL request
  */
 static int
-nfs4_xdr_enc_getacl(struct rpc_rqst *req, __be32 *p,
+nfs40_xdr_enc_getacl(struct rpc_rqst *req, __be32 *p,
 		struct nfs_getaclargs *args)
 {
 	struct xdr_stream xdr;
@@ -1915,7 +1915,7 @@ nfs4_xdr_enc_getacl(struct rpc_rqst *req, __be32 *p,
 		goto out;
 	status = encode_getattr_two(&xdr, FATTR4_WORD0_ACL, 0);
 	/* set up reply buffer: */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS4_dec_getacl_sz) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS40_dec_getacl_sz) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen,
 		args->acl_pages, args->acl_pgbase, args->acl_len);
 out:
@@ -1925,7 +1925,7 @@ out:
 /*
  * Encode a WRITE request
  */
-static int nfs4_xdr_enc_write(struct rpc_rqst *req, __be32 *p, struct nfs_writeargs *args)
+static int nfs40_xdr_enc_write(struct rpc_rqst *req, __be32 *p, struct nfs_writeargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1950,7 +1950,7 @@ out:
 /*
  *  a COMMIT request
  */
-static int nfs4_xdr_enc_commit(struct rpc_rqst *req, __be32 *p, struct nfs_writeargs *args)
+static int nfs40_xdr_enc_commit(struct rpc_rqst *req, __be32 *p, struct nfs_writeargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1974,7 +1974,7 @@ out:
 /*
  * FSINFO request
  */
-static int nfs4_xdr_enc_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs4_fsinfo_arg *args)
+static int nfs40_xdr_enc_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs4_fsinfo_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -1993,7 +1993,7 @@ static int nfs4_xdr_enc_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs4_fsin
 /*
  * a PATHCONF request
  */
-static int nfs4_xdr_enc_pathconf(struct rpc_rqst *req, __be32 *p, const struct nfs4_pathconf_arg *args)
+static int nfs40_xdr_enc_pathconf(struct rpc_rqst *req, __be32 *p, const struct nfs4_pathconf_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -2013,7 +2013,7 @@ static int nfs4_xdr_enc_pathconf(struct rpc_rqst *req, __be32 *p, const struct n
 /*
  * a STATFS request
  */
-static int nfs4_xdr_enc_statfs(struct rpc_rqst *req, __be32 *p, const struct nfs4_statfs_arg *args)
+static int nfs40_xdr_enc_statfs(struct rpc_rqst *req, __be32 *p, const struct nfs4_statfs_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -2034,7 +2034,7 @@ static int nfs4_xdr_enc_statfs(struct rpc_rqst *req, __be32 *p, const struct nfs
 /*
  * GETATTR_BITMAP request
  */
-static int nfs4_xdr_enc_server_caps(struct rpc_rqst *req, __be32 *p, const struct nfs_fh *fhandle)
+static int nfs40_xdr_enc_server_caps(struct rpc_rqst *req, __be32 *p, const struct nfs_fh *fhandle)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -2056,7 +2056,7 @@ static int nfs4_xdr_enc_server_caps(struct rpc_rqst *req, __be32 *p, const struc
 /*
  * a RENEW request
  */
-static int nfs4_xdr_enc_renew(struct rpc_rqst *req, __be32 *p, struct nfs_client *clp)
+static int nfs40_xdr_enc_renew(struct rpc_rqst *req, __be32 *p, struct nfs_client *clp)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -2071,7 +2071,7 @@ static int nfs4_xdr_enc_renew(struct rpc_rqst *req, __be32 *p, struct nfs_client
 /*
  * a SETCLIENTID request
  */
-static int nfs4_xdr_enc_setclientid(struct rpc_rqst *req, __be32 *p, struct nfs4_setclientid *sc)
+static int nfs40_xdr_enc_setclientid(struct rpc_rqst *req, __be32 *p, struct nfs4_setclientid *sc)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -2086,7 +2086,7 @@ static int nfs4_xdr_enc_setclientid(struct rpc_rqst *req, __be32 *p, struct nfs4
 /*
  * a SETCLIENTID_CONFIRM request
  */
-static int nfs4_xdr_enc_setclientid_confirm(struct rpc_rqst *req, __be32 *p, struct nfs_client *clp)
+static int nfs40_xdr_enc_setclientid_confirm(struct rpc_rqst *req, __be32 *p, struct nfs_client *clp)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -2108,7 +2108,7 @@ static int nfs4_xdr_enc_setclientid_confirm(struct rpc_rqst *req, __be32 *p, str
 /*
  * DELEGRETURN request
  */
-static int nfs4_xdr_enc_delegreturn(struct rpc_rqst *req, __be32 *p, const struct nfs4_delegreturnargs *args)
+static int nfs40_xdr_enc_delegreturn(struct rpc_rqst *req, __be32 *p, const struct nfs4_delegreturnargs *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -2132,7 +2132,7 @@ out:
 /*
  * Encode FS_LOCATIONS request
  */
-static int nfs4_xdr_enc_fs_locations(struct rpc_rqst *req, __be32 *p, struct nfs4_fs_locations_arg *args)
+static int nfs40_xdr_enc_fs_locations(struct rpc_rqst *req, __be32 *p, struct nfs4_fs_locations_arg *args)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
@@ -3755,7 +3755,7 @@ static int decode_delegreturn(struct xdr_stream *xdr)
 /*
  * Decode OPEN_DOWNGRADE response
  */
-static int nfs4_xdr_dec_open_downgrade(struct rpc_rqst *rqstp, __be32 *p, struct nfs_closeres *res)
+static int nfs40_xdr_dec_open_downgrade(struct rpc_rqst *rqstp, __be32 *p, struct nfs_closeres *res)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr;
@@ -3783,7 +3783,7 @@ out:
 /*
  * Decode ACCESS response
  */
-static int nfs4_xdr_dec_access(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_accessres *res)
+static int nfs40_xdr_dec_access(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_accessres *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -3806,7 +3806,7 @@ out:
 /*
  * Decode LOOKUP response
  */
-static int nfs4_xdr_dec_lookup(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_lookup_res *res)
+static int nfs40_xdr_dec_lookup(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_lookup_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -3829,7 +3829,7 @@ out:
 /*
  * Decode LOOKUP_ROOT response
  */
-static int nfs4_xdr_dec_lookup_root(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_lookup_res *res)
+static int nfs40_xdr_dec_lookup_root(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_lookup_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -3849,7 +3849,7 @@ out:
 /*
  * Decode REMOVE response
  */
-static int nfs4_xdr_dec_remove(struct rpc_rqst *rqstp, __be32 *p, struct nfs_removeres *res)
+static int nfs40_xdr_dec_remove(struct rpc_rqst *rqstp, __be32 *p, struct nfs_removeres *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -3870,7 +3870,7 @@ out:
 /*
  * Decode RENAME response
  */
-static int nfs4_xdr_dec_rename(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_rename_res *res)
+static int nfs40_xdr_dec_rename(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_rename_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -3900,7 +3900,7 @@ out:
 /*
  * Decode LINK response
  */
-static int nfs4_xdr_dec_link(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_link_res *res)
+static int nfs40_xdr_dec_link(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_link_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -3933,7 +3933,7 @@ out:
 /*
  * Decode CREATE response
  */
-static int nfs4_xdr_dec_create(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_create_res *res)
+static int nfs40_xdr_dec_create(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_create_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -3962,15 +3962,15 @@ out:
 /*
  * Decode SYMLINK response
  */
-static int nfs4_xdr_dec_symlink(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_create_res *res)
+static int nfs40_xdr_dec_symlink(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_create_res *res)
 {
-	return nfs4_xdr_dec_create(rqstp, p, res);
+	return nfs40_xdr_dec_create(rqstp, p, res);
 }
 
 /*
  * Decode GETATTR response
  */
-static int nfs4_xdr_dec_getattr(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_getattr_res *res)
+static int nfs40_xdr_dec_getattr(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_getattr_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -3993,7 +3993,7 @@ out:
  * Encode an SETACL request
  */
 static int
-nfs4_xdr_enc_setacl(struct rpc_rqst *req, __be32 *p, struct nfs_setaclargs *args)
+nfs40_xdr_enc_setacl(struct rpc_rqst *req, __be32 *p, struct nfs_setaclargs *args)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr = {
@@ -4014,7 +4014,7 @@ out:
  * Decode SETACL response
  */
 static int
-nfs4_xdr_dec_setacl(struct rpc_rqst *rqstp, __be32 *p, void *res)
+nfs40_xdr_dec_setacl(struct rpc_rqst *rqstp, __be32 *p, void *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4036,7 +4036,7 @@ out:
  * Decode GETACL response
  */
 static int
-nfs4_xdr_dec_getacl(struct rpc_rqst *rqstp, __be32 *p, size_t *acl_len)
+nfs40_xdr_dec_getacl(struct rpc_rqst *rqstp, __be32 *p, size_t *acl_len)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4058,7 +4058,7 @@ out:
 /*
  * Decode CLOSE response
  */
-static int nfs4_xdr_dec_close(struct rpc_rqst *rqstp, __be32 *p, struct nfs_closeres *res)
+static int nfs40_xdr_dec_close(struct rpc_rqst *rqstp, __be32 *p, struct nfs_closeres *res)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr;
@@ -4088,7 +4088,7 @@ out:
 /*
  * Decode OPEN response
  */
-static int nfs4_xdr_dec_open(struct rpc_rqst *rqstp, __be32 *p, struct nfs_openres *res)
+static int nfs40_xdr_dec_open(struct rpc_rqst *rqstp, __be32 *p, struct nfs_openres *res)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr;
@@ -4121,7 +4121,7 @@ out:
 /*
  * Decode OPEN_CONFIRM response
  */
-static int nfs4_xdr_dec_open_confirm(struct rpc_rqst *rqstp, __be32 *p, struct nfs_open_confirmres *res)
+static int nfs40_xdr_dec_open_confirm(struct rpc_rqst *rqstp, __be32 *p, struct nfs_open_confirmres *res)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr;
@@ -4142,7 +4142,7 @@ out:
 /*
  * Decode OPEN response
  */
-static int nfs4_xdr_dec_open_noattr(struct rpc_rqst *rqstp, __be32 *p, struct nfs_openres *res)
+static int nfs40_xdr_dec_open_noattr(struct rpc_rqst *rqstp, __be32 *p, struct nfs_openres *res)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr;
@@ -4166,7 +4166,7 @@ out:
 /*
  * Decode SETATTR response
  */
-static int nfs4_xdr_dec_setattr(struct rpc_rqst *rqstp, __be32 *p, struct nfs_setattrres *res)
+static int nfs40_xdr_dec_setattr(struct rpc_rqst *rqstp, __be32 *p, struct nfs_setattrres *res)
 {
         struct xdr_stream xdr;
         struct compound_hdr hdr;
@@ -4192,7 +4192,7 @@ out:
 /*
  * Decode LOCK response
  */
-static int nfs4_xdr_dec_lock(struct rpc_rqst *rqstp, __be32 *p, struct nfs_lock_res *res)
+static int nfs40_xdr_dec_lock(struct rpc_rqst *rqstp, __be32 *p, struct nfs_lock_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4213,7 +4213,7 @@ out:
 /*
  * Decode LOCKT response
  */
-static int nfs4_xdr_dec_lockt(struct rpc_rqst *rqstp, __be32 *p, struct nfs_lockt_res *res)
+static int nfs40_xdr_dec_lockt(struct rpc_rqst *rqstp, __be32 *p, struct nfs_lockt_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4234,7 +4234,7 @@ out:
 /*
  * Decode LOCKU response
  */
-static int nfs4_xdr_dec_locku(struct rpc_rqst *rqstp, __be32 *p, struct nfs_locku_res *res)
+static int nfs40_xdr_dec_locku(struct rpc_rqst *rqstp, __be32 *p, struct nfs_locku_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4255,7 +4255,7 @@ out:
 /*
  * Decode READLINK response
  */
-static int nfs4_xdr_dec_readlink(struct rpc_rqst *rqstp, __be32 *p, void *res)
+static int nfs40_xdr_dec_readlink(struct rpc_rqst *rqstp, __be32 *p, void *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4276,7 +4276,7 @@ out:
 /*
  * Decode READDIR response
  */
-static int nfs4_xdr_dec_readdir(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_readdir_res *res)
+static int nfs40_xdr_dec_readdir(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_readdir_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4297,7 +4297,7 @@ out:
 /*
  * Decode Read response
  */
-static int nfs4_xdr_dec_read(struct rpc_rqst *rqstp, __be32 *p, struct nfs_readres *res)
+static int nfs40_xdr_dec_read(struct rpc_rqst *rqstp, __be32 *p, struct nfs_readres *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4320,7 +4320,7 @@ out:
 /*
  * Decode WRITE response
  */
-static int nfs4_xdr_dec_write(struct rpc_rqst *rqstp, __be32 *p, struct nfs_writeres *res)
+static int nfs40_xdr_dec_write(struct rpc_rqst *rqstp, __be32 *p, struct nfs_writeres *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4346,7 +4346,7 @@ out:
 /*
  * Decode COMMIT response
  */
-static int nfs4_xdr_dec_commit(struct rpc_rqst *rqstp, __be32 *p, struct nfs_writeres *res)
+static int nfs40_xdr_dec_commit(struct rpc_rqst *rqstp, __be32 *p, struct nfs_writeres *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4370,7 +4370,7 @@ out:
 /*
  * FSINFO request
  */
-static int nfs4_xdr_dec_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs_fsinfo *fsinfo)
+static int nfs40_xdr_dec_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs_fsinfo *fsinfo)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4390,7 +4390,7 @@ static int nfs4_xdr_dec_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs_fsinf
 /*
  * PATHCONF request
  */
-static int nfs4_xdr_dec_pathconf(struct rpc_rqst *req, __be32 *p, struct nfs_pathconf *pathconf)
+static int nfs40_xdr_dec_pathconf(struct rpc_rqst *req, __be32 *p, struct nfs_pathconf *pathconf)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4408,7 +4408,7 @@ static int nfs4_xdr_dec_pathconf(struct rpc_rqst *req, __be32 *p, struct nfs_pat
 /*
  * STATFS request
  */
-static int nfs4_xdr_dec_statfs(struct rpc_rqst *req, __be32 *p, struct nfs_fsstat *fsstat)
+static int nfs40_xdr_dec_statfs(struct rpc_rqst *req, __be32 *p, struct nfs_fsstat *fsstat)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4426,7 +4426,7 @@ static int nfs4_xdr_dec_statfs(struct rpc_rqst *req, __be32 *p, struct nfs_fssta
 /*
  * GETATTR_BITMAP request
  */
-static int nfs4_xdr_dec_server_caps(struct rpc_rqst *req, __be32 *p, struct nfs4_server_caps_res *res)
+static int nfs40_xdr_dec_server_caps(struct rpc_rqst *req, __be32 *p, struct nfs4_server_caps_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4445,7 +4445,7 @@ out:
 /*
  * Decode RENEW response
  */
-static int nfs4_xdr_dec_renew(struct rpc_rqst *rqstp, __be32 *p, void *dummy)
+static int nfs40_xdr_dec_renew(struct rpc_rqst *rqstp, __be32 *p, void *dummy)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4461,7 +4461,7 @@ static int nfs4_xdr_dec_renew(struct rpc_rqst *rqstp, __be32 *p, void *dummy)
 /*
  * a SETCLIENTID request
  */
-static int nfs4_xdr_dec_setclientid(struct rpc_rqst *req, __be32 *p,
+static int nfs40_xdr_dec_setclientid(struct rpc_rqst *req, __be32 *p,
 		struct nfs_client *clp)
 {
 	struct xdr_stream xdr;
@@ -4480,7 +4480,7 @@ static int nfs4_xdr_dec_setclientid(struct rpc_rqst *req, __be32 *p,
 /*
  * a SETCLIENTID_CONFIRM request
  */
-static int nfs4_xdr_dec_setclientid_confirm(struct rpc_rqst *req, __be32 *p, struct nfs_fsinfo *fsinfo)
+static int nfs40_xdr_dec_setclientid_confirm(struct rpc_rqst *req, __be32 *p, struct nfs_fsinfo *fsinfo)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4502,7 +4502,7 @@ static int nfs4_xdr_dec_setclientid_confirm(struct rpc_rqst *req, __be32 *p, str
 /*
  * DELEGRETURN request
  */
-static int nfs4_xdr_dec_delegreturn(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_delegreturnres *res)
+static int nfs40_xdr_dec_delegreturn(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_delegreturnres *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4524,7 +4524,7 @@ out:
 /*
  * FS_LOCATIONS request
  */
-static int nfs4_xdr_dec_fs_locations(struct rpc_rqst *req, __be32 *p, struct nfs4_fs_locations *res)
+static int nfs40_xdr_dec_fs_locations(struct rpc_rqst *req, __be32 *p, struct nfs4_fs_locations *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -4667,52 +4667,52 @@ nfs4_stat_to_errno(int stat)
 	return stat;
 }
 
-#define PROC(proc, argtype, restype)				\
+#define PROC(proc, argtype, restype, minorversion)				\
 [NFSPROC4_CLNT_##proc] = {					\
 	.p_proc   = NFSPROC4_COMPOUND,				\
-	.p_encode = (kxdrproc_t) nfs4_xdr_##argtype,		\
-	.p_decode = (kxdrproc_t) nfs4_xdr_##restype,		\
-	.p_arglen = NFS4_##argtype##_sz,			\
-	.p_replen = NFS4_##restype##_sz,			\
+	.p_encode = (kxdrproc_t) nfs4##minorversion##_xdr_##argtype,		\
+	.p_decode = (kxdrproc_t) nfs4##minorversion##_xdr_##restype,		\
+	.p_arglen = NFS4##minorversion##_##argtype##_sz,			\
+	.p_replen = NFS4##minorversion##_##restype##_sz,			\
 	.p_statidx = NFSPROC4_CLNT_##proc,			\
 	.p_name   = #proc,					\
     }
 
 struct rpc_procinfo	nfs4_procedures[] = {
-  PROC(READ,		enc_read,	dec_read),
-  PROC(WRITE,		enc_write,	dec_write),
-  PROC(COMMIT,		enc_commit,	dec_commit),
-  PROC(OPEN,		enc_open,	dec_open),
-  PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm),
-  PROC(OPEN_NOATTR,	enc_open_noattr,	dec_open_noattr),
-  PROC(OPEN_DOWNGRADE,	enc_open_downgrade,	dec_open_downgrade),
-  PROC(CLOSE,		enc_close,	dec_close),
-  PROC(SETATTR,		enc_setattr,	dec_setattr),
-  PROC(FSINFO,		enc_fsinfo,	dec_fsinfo),
-  PROC(RENEW,		enc_renew,	dec_renew),
-  PROC(SETCLIENTID,	enc_setclientid,	dec_setclientid),
-  PROC(SETCLIENTID_CONFIRM,	enc_setclientid_confirm,	dec_setclientid_confirm),
-  PROC(LOCK,            enc_lock,       dec_lock),
-  PROC(LOCKT,           enc_lockt,      dec_lockt),
-  PROC(LOCKU,           enc_locku,      dec_locku),
-  PROC(ACCESS,		enc_access,	dec_access),
-  PROC(GETATTR,		enc_getattr,	dec_getattr),
-  PROC(LOOKUP,		enc_lookup,	dec_lookup),
-  PROC(LOOKUP_ROOT,	enc_lookup_root,	dec_lookup_root),
-  PROC(REMOVE,		enc_remove,	dec_remove),
-  PROC(RENAME,		enc_rename,	dec_rename),
-  PROC(LINK,		enc_link,	dec_link),
-  PROC(SYMLINK,		enc_symlink,	dec_symlink),
-  PROC(CREATE,		enc_create,	dec_create),
-  PROC(PATHCONF,	enc_pathconf,	dec_pathconf),
-  PROC(STATFS,		enc_statfs,	dec_statfs),
-  PROC(READLINK,	enc_readlink,	dec_readlink),
-  PROC(READDIR,		enc_readdir,	dec_readdir),
-  PROC(SERVER_CAPS,	enc_server_caps, dec_server_caps),
-  PROC(DELEGRETURN,	enc_delegreturn, dec_delegreturn),
-  PROC(GETACL,		enc_getacl,	dec_getacl),
-  PROC(SETACL,		enc_setacl,	dec_setacl),
-  PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations),
+  PROC(READ,		enc_read,	dec_read, 0),
+  PROC(WRITE,		enc_write,	dec_write, 0),
+  PROC(COMMIT,		enc_commit,	dec_commit, 0),
+  PROC(OPEN,		enc_open,	dec_open, 0),
+  PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm, 0),
+  PROC(OPEN_NOATTR,	enc_open_noattr,	dec_open_noattr, 0),
+  PROC(OPEN_DOWNGRADE,	enc_open_downgrade,	dec_open_downgrade, 0),
+  PROC(CLOSE,		enc_close,	dec_close, 0),
+  PROC(SETATTR,		enc_setattr,	dec_setattr, 0),
+  PROC(FSINFO,		enc_fsinfo,	dec_fsinfo, 0),
+  PROC(RENEW,		enc_renew,	dec_renew, 0),
+  PROC(SETCLIENTID,	enc_setclientid,	dec_setclientid, 0),
+  PROC(SETCLIENTID_CONFIRM,	enc_setclientid_confirm,	dec_setclientid_confirm, 0),
+  PROC(LOCK,            enc_lock,       dec_lock, 0),
+  PROC(LOCKT,           enc_lockt,      dec_lockt, 0),
+  PROC(LOCKU,           enc_locku,      dec_locku, 0),
+  PROC(ACCESS,		enc_access,	dec_access, 0),
+  PROC(GETATTR,		enc_getattr,	dec_getattr, 0),
+  PROC(LOOKUP,		enc_lookup,	dec_lookup, 0),
+  PROC(LOOKUP_ROOT,	enc_lookup_root,	dec_lookup_root, 0),
+  PROC(REMOVE,		enc_remove,	dec_remove, 0),
+  PROC(RENAME,		enc_rename,	dec_rename, 0),
+  PROC(LINK,		enc_link,	dec_link, 0),
+  PROC(SYMLINK,		enc_symlink,	dec_symlink, 0),
+  PROC(CREATE,		enc_create,	dec_create, 0),
+  PROC(PATHCONF,	enc_pathconf,	dec_pathconf, 0),
+  PROC(STATFS,		enc_statfs,	dec_statfs, 0),
+  PROC(READLINK,	enc_readlink,	dec_readlink, 0),
+  PROC(READDIR,		enc_readdir,	dec_readdir, 0),
+  PROC(SERVER_CAPS,	enc_server_caps, dec_server_caps, 0),
+  PROC(DELEGRETURN,	enc_delegreturn, dec_delegreturn, 0),
+  PROC(GETACL,		enc_getacl,	dec_getacl, 0),
+  PROC(SETACL,		enc_setacl,	dec_setacl, 0),
+  PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations, 0),
 };
 
 struct rpc_version		nfs_version4 = {
