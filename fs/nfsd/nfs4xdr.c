@@ -148,6 +148,10 @@ xdr_error:					\
 	}					\
 } while (0)
 
+static int zero_clientid(clientid_t *clid) {
+        return ((clid->cl_boot == 0) && (clid->cl_id == 0));
+}
+
 static __be32 *read_buf(struct nfsd4_compoundargs *argp, int nbytes)
 {
 	/* We want more bytes than seem to be available.
@@ -443,6 +447,9 @@ nfsd4_decode_close(struct nfsd4_compoundargs *argp, struct nfsd4_close *close)
 	READ32(close->cl_stateid.si_generation);
 	COPYMEM(&close->cl_stateid.si_opaque, sizeof(stateid_opaque_t));
 
+	if (argp->minorversion == 1 && close->cl_seqid != 0)
+		return nfserr_inval;
+
 	DECODE_TAIL;
 }
 
@@ -561,11 +568,20 @@ nfsd4_decode_lock(struct nfsd4_compoundargs *argp, struct nfsd4_lock *lock)
 		READ32(lock->lk_new_owner.len);
 		READ_BUF(lock->lk_new_owner.len);
 		READMEM(lock->lk_new_owner.data, lock->lk_new_owner.len);
+
+		if ((argp->minorversion == 1) &&
+		    (lock->lk_new_open_seqid !=0 ||
+		     lock->lk_new_lock_seqid != 0 ||
+		     !zero_clientid(&lock->lk_new_clientid)))
+			return nfserr_inval;
 	} else {
 		READ_BUF(20);
 		READ32(lock->lk_old_lock_stateid.si_generation);
 		COPYMEM(&lock->lk_old_lock_stateid.si_opaque, sizeof(stateid_opaque_t));
 		READ32(lock->lk_old_lock_seqid);
+
+		if (argp->minorversion == 1 && lock->lk_old_lock_seqid !=0)
+			return nfserr_inval;
 	}
 
 	DECODE_TAIL;
@@ -587,6 +603,8 @@ nfsd4_decode_lockt(struct nfsd4_compoundargs *argp, struct nfsd4_lockt *lockt)
 	READ_BUF(lockt->lt_owner.len);
 	READMEM(lockt->lt_owner.data, lockt->lt_owner.len);
 
+	if (argp->minorversion == 1 && !zero_clientid(&lockt->lt_clientid))
+		return nfserr_inval;
 	DECODE_TAIL;
 }
 
@@ -605,6 +623,9 @@ nfsd4_decode_locku(struct nfsd4_compoundargs *argp, struct nfsd4_locku *locku)
 	COPYMEM(&locku->lu_stateid.si_opaque, sizeof(stateid_opaque_t));
 	READ64(locku->lu_offset);
 	READ64(locku->lu_length);
+
+	if (argp->minorversion == 1 && locku->lu_seqid != 0)
+		return nfserr_inval;
 
 	DECODE_TAIL;
 }
@@ -640,6 +661,10 @@ nfsd4_decode_open(struct nfsd4_compoundargs *argp, struct nfsd4_open *open)
 	READ32(open->op_share_deny);
 	COPYMEM(&open->op_clientid, sizeof(clientid_t));
 	READ32(open->op_owner.len);
+
+	if ((argp->minorversion == 1) &&
+	    (open->op_seqid != 0 || !zero_clientid(&open->op_clientid)))
+		return nfserr_inval;
 
 	/* owner, open_flag */
 	READ_BUF(open->op_owner.len + 4);
@@ -729,6 +754,9 @@ nfsd4_decode_open_downgrade(struct nfsd4_compoundargs *argp, struct nfsd4_open_d
 	READ32(open_down->od_share_access);
 	READ32(open_down->od_share_deny);
 						        
+	if (argp->minorversion == 1 && open_down->od_seqid != 0)
+		return nfserr_inval;
+
 	DECODE_TAIL;
 }
 
@@ -1181,6 +1209,8 @@ nfsd4_decode_release_lockowner(struct nfsd4_compoundargs *argp, struct nfsd4_rel
 	READ32(rlockowner->rl_owner.len);
 	READ_BUF(rlockowner->rl_owner.len);
 	READMEM(rlockowner->rl_owner.data, rlockowner->rl_owner.len);
+
+	if (argp->minorversion == 1 && !zero_clientid(&rlockowner->rl_clientid))		return nfserr_inval;
 
 	DECODE_TAIL;
 }
