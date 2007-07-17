@@ -1870,6 +1870,9 @@ nfsd4_process_open1(struct nfsd4_open *open)
 		open->op_stateowner = NULL;
 		goto renew;
 	}
+	/* Skip seqid processing for NFSv4.1 */
+	if (open->op_minorversion == 1)
+		goto renew;
 	if (open->op_seqid == sop->so_seqid - 1) {
 		if (sop->so_replay.rp_buflen)
 			return nfserr_replay_me;
@@ -2194,6 +2197,8 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 			release_stateid(stp, OPEN_STATE);
 			goto out;
 		}
+		if (open->op_minorversion == 1)
+			update_stateid(&stp->st_stateid);
 	}
 	memcpy(&open->op_stateid, &stp->st_stateid, sizeof(stateid_t));
 
@@ -2204,6 +2209,8 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 	nfs4_open_delegation(current_fh, open, stp);
 
 	status = nfs_ok;
+	if (open->op_minorversion == 1)
+		open->op_stateowner->so_confirmed = 1;
 
 	dprintk("nfs4_process_open2: stateid=(%08x/%08x/%08x/%08x)\n",
 	            stp->st_stateid.si_boot, stp->st_stateid.si_stateownerid,
@@ -2217,7 +2224,7 @@ out:
 	* To finish the open response, we just need to set the rflags.
 	*/
 	open->op_rflags = NFS4_OPEN_RESULT_LOCKTYPE_POSIX;
-	if (!open->op_stateowner->so_confirmed)
+	if (!open->op_stateowner->so_confirmed && !open->op_minorversion)
 		open->op_rflags |= NFS4_OPEN_RESULT_CONFIRM;
 
 	return status;
