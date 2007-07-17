@@ -1623,10 +1623,20 @@ find_file(struct inode *ino)
 	return NULL;
 }
 
+#if defined(CONFIG_NFSD_V4_1)
+static int access_valid(u32 x)
+{
+	return (!(x & NFS4_SHARE_INVALID_MASK ||
+		((x & NFS4_SHARE_DENY_MASK) > NFS4_SHARE_ACCESS_BOTH) ||
+		((x & NFS4_SHARE_WANT_MASK) > NFS4_SHARE_WANT_CANCEL) ||
+		((x & NFS4_SHARE_WHEN_MASK) > NFS4_SHARE_PUSH_DELEG_WHEN_UNCONTENDED)));
+}
+#else
 static int access_valid(u32 x)
 {
 	return (x > 0 && x < 4);
 }
+#endif /* CONFIG_NFSD_V4_1 */
 
 static int deny_valid(u32 x)
 {
