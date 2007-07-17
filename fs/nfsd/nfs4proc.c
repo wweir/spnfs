@@ -929,6 +929,18 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			goto encode_op;
 		}
 
+#if defined(CONFIG_NFSD_V4_1)
+                if ((args->minorversion == 1) &&
+                    ((op->opnum == OP_SETCLIENTID) ||
+                    (op->opnum == OP_SETCLIENTID_CONFIRM) ||
+                    (op->opnum == OP_OPEN_CONFIRM) ||
+                    (op->opnum == OP_RELEASE_LOCKOWNER) ||
+                    (op->opnum == OP_RENEW))) {
+                        op->status = nfserr_notsupp;
+                        goto encode_op;
+                }
+#endif /* CONFIG_NFSD_V4_1 */
+
 		if (opdesc->op_func)
 			op->status = opdesc->op_func(rqstp, cstate, &op->u);
 		else
