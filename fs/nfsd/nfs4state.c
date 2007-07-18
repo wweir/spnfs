@@ -4413,8 +4413,9 @@ int nfs4_pnfs_return_layout(struct super_block *sb, struct svc_fh *current_fh,
 		destroy_layout(lp);
 		status = 0;
 	}
-	put_nfs4_file(fp);
 out:
+        if (fp)
+                put_nfs4_file(fp);
 	dprintk("pNFS %s: exit status %d \n", __FUNCTION__, status);
 	return status;
 }
