@@ -1135,7 +1135,7 @@ nfsd4_layoutreturn(struct svc_rqst *rqstp,
 	lrp->lr_seg.clientid = *(u64 *)&current_ses->cs_sid.clientid;
 	status = nfs4_pnfs_return_layout(sb, current_fh, lrp);
 out:
-	dprintk("pNFS %s: status %d layout_type %d\n",
+	dprintk("pNFS %s: status %d layout_type 0x%x\n",
 		__FUNCTION__, status, lrp->lr_seg.layout_type);
 	return status;
 }
