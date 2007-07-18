@@ -997,7 +997,7 @@ nfsd4_decode_create_session(struct nfsd4_compoundargs *argp, struct nfsd4_create
 {
 	DECODE_HEAD;
 
-	u32 dummy;
+	u32 dummy, len;
 	char *machine_name;
 	int i;
 	int nr_secflavs;
@@ -1009,14 +1009,20 @@ nfsd4_decode_create_session(struct nfsd4_compoundargs *argp, struct nfsd4_create
 	READ32(sess->header_padding);
 
 	/* conn_binding4args */
-	READ_BUF(4);
+	READ_BUF(4); /* cba_enforce */
 	READ32(dummy);
 	if (dummy) {
-		/* skip sec_oid4 */
-		dprintk("cba_enforce = 1 not supported!\n");
+		/* skip sec_oid4s */
+		dprintk("cba_enforce = 1 not supported! Skip OID\n");
 		READ_BUF(4);
-		READ32(dummy);
-		READ_BUF(dummy);
+		READ32(dummy); /* number of sec_oid4 */
+		for (i = 0; i < dummy; i++) {
+			READ_BUF(4);
+			READ32(len); /* number of sec_oid4 */
+			dprintk("%s skip oid of len %d\n",__FUNCTION__,len);
+			READ_BUF(len);
+			p += XDR_QUADLEN(len);
+		}
 	}
 
 	/* Fore channel attrs */
