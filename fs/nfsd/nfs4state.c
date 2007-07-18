@@ -1313,23 +1313,28 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 	unconf = find_unconfirmed_client(&session->clientid);
 	conf = find_confirmed_client(&session->clientid);
 
+	if (!conf && !unconf) {
+		status = nfserr_stale_clientid;
+		goto out;
+	}
 	if (conf) {
 		status = nfs_ok;
-		if (conf->cl_seqid != session->seqid + 1) {
+		if (conf->cl_seqid == session->seqid) {
+			dprintk("Got a create_session replay!\n");
+			goto out_replay;
+		} else if (conf->cl_seqid != session->seqid + 1) {
 			status = nfserr_seq_misordered;
 			goto out;
 		}
 
-		/* replay... check if principal changed */
+		/* XXX why do this check here?
+		 *
+		 * replay... check if principal changed
 		if (!same_creds(&conf->cl_cred, &rqstp->rq_cred) || (ip_addr != conf->cl_addr)) {
 			status = nfserr_clid_inuse;
 			goto out;
-		}
+		} */
 
-		if (conf->cl_seqid == session->seqid) {
-			dprintk("Got a create_session replay!\n");
-			goto out_replay;
-		}
 
 	} else if (unconf) {
 		if (!same_creds(&unconf->cl_cred, &rqstp->rq_cred) || (ip_addr != unconf->cl_addr)) {
