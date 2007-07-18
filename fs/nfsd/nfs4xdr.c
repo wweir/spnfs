@@ -1321,12 +1321,17 @@ nfsd4_decode_layoutcommit(struct nfsd4_compoundargs *argp,
 	DECODE_HEAD;
 	u32 timechange;
 
-	READ_BUF(36);
+	READ_BUF(24);
 	READ64(lcp->lc_seg.offset);
 	READ64(lcp->lc_seg.length);
 	READ32(lcp->lc_reclaim);
 	READ32(lcp->lc_newoffset);
-	READ64(lcp->lc_last_wr);
+	if (lcp->lc_newoffset) {
+		READ_BUF(8);
+		READ64(lcp->lc_last_wr);
+	} else
+		lcp->lc_last_wr = 0;
+	READ_BUF(4);
 	READ32(timechange);
 	if (timechange) {
 		READ_BUF(12);
