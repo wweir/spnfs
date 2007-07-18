@@ -2703,7 +2703,7 @@ nfs4_preprocess_seqid_op(struct svc_fh *current_fh, u32 seqid, stateid_t *statei
 		if (lock->lk_is_new) {
 			if (!sop->so_is_open_owner)
 				return nfserr_bad_stateid;
-			if (!same_clid(&clp->cl_clientid, lockclid))
+			if (sop->so_minorversion == 0 && !same_clid(&clp->cl_clientid, lockclid))
 			       return nfserr_bad_stateid;
 			/* stp is the open stateid */
 			status = nfs4_check_openmode(stp->st_access_bmap, lkflg);
@@ -2730,7 +2730,7 @@ nfs4_preprocess_seqid_op(struct svc_fh *current_fh, u32 seqid, stateid_t *statei
 	*  For the moment, we ignore the possibility of 
 	*  generation number wraparound.
 	*/
-	if (sop->so_minorversion != 1 && seqid != sop->so_seqid)
+	if (sop->so_minorversion == 0 && seqid != sop->so_seqid)
 		goto check_replay;
 
 	if (sop->so_confirmed && flags & CONFIRM) {
@@ -3152,6 +3152,7 @@ alloc_init_lock_stateowner(unsigned int strhashval, struct nfs4_client *clp, str
 	 * case of new lockowners; so increment the lock seqid manually: */
 	sop->so_seqid = lock->lk_new_lock_seqid + 1;
 	sop->so_confirmed = 1;
+	sop->so_minorversion = open_stp->st_stateowner->so_minorversion;
 	rp = &sop->so_replay;
 	rp->rp_status = nfserr_serverfault;
 	rp->rp_buflen = 0;
@@ -3215,6 +3216,7 @@ nfsd4_lock(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	unsigned int strhashval;
 	unsigned int cmd;
 	int err;
+        struct current_session *cses = cstate->current_ses;
 
 	dprintk("NFSD: nfsd4_lock: start=%Ld length=%Ld\n",
 		(long long) lock->lk_offset,
@@ -3241,7 +3243,7 @@ nfsd4_lock(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 		struct nfs4_file *fp;
 		
 		status = nfserr_stale_clientid;
-		if (STALE_CLIENTID(&lock->lk_new_clientid))
+		if (!cses && STALE_CLIENTID(&lock->lk_new_clientid))
 			goto out;
 
 		/* validate and update open stateid and open seqid */
@@ -3369,6 +3371,7 @@ nfsd4_lockt(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	struct file_lock file_lock;
 	int error;
 	__be32 status;
+        struct current_session *cses = cstate->current_ses;
 
 	if (nfs4_in_grace())
 		return nfserr_grace;
@@ -3380,7 +3383,7 @@ nfsd4_lockt(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	nfs4_lock_state();
 
 	status = nfserr_stale_clientid;
-	if (STALE_CLIENTID(&lockt->lt_clientid))
+	if (!cses && STALE_CLIENTID(&lockt->lt_clientid))
 		goto out;
 
 	if ((status = fh_verify(rqstp, &cstate->current_fh, S_IFREG, 0))) {
