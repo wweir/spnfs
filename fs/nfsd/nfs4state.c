@@ -1125,13 +1125,33 @@ void nfsd4_setup_callback_channel(void)
 void
 nfsd4_set_ex_flags(struct nfs4_client *new, struct nfsd4_exchange_id *clid)
 {
+#if defined(CONFIG_PNFSD)
+	int mds_ds = 0;
 	/* if sessions only, ignore the wire_flags from client */
+#endif /* CONFIG_PNFSD */
 
 	/* Referrals are supported, Migration is not. */
 	new->cl_exchange_flags |= EXCHGID4_FLAG_SUPP_MOVED_REFER;
 
-	/* pNFS is not supported */
-	new->cl_exchange_flags |=  EXCHGID4_FLAG_USE_NON_PNFS;
+	/* Non pNFS v4.1 is supported */
+/* FIXME: bakeathon patch (02-server-nfs4state.patch)
+remove EXCHGID4_FLAG_USE_NON_PNFS in cl_exchange flags, even though it is
+true that a pnfs server can use NON_PNFS
+*/
+//???	new->cl_exchange_flags |=  EXCHGID4_FLAG_USE_NON_PNFS;
+
+#if defined(CONFIG_PNFSD)
+	/* Save the client's MDS or DS flags, or set them both.
+	 * XXX We currently do not have a method of determining
+	 * what a server supports prior to receiving a filehandle
+	 * e.g. at exchange id time. */
+
+	mds_ds = clid->flags & EXCHGID4_MFS_DS_FLAG_MASK;
+	if (mds_ds)
+		new->cl_exchange_flags |= mds_ds;
+	else
+		new->cl_exchange_flags |= EXCHGID4_MFS_DS_FLAG_MASK;
+#endif /* CONFIG_PNFSD */
 
 	/* set the wire flags to return to client. */
 	clid->flags = new->cl_exchange_flags;
