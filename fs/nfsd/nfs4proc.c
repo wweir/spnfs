@@ -51,6 +51,60 @@
 
 #define NFSDDBG_FACILITY		NFSDDBG_PROC
 
+#ifdef OP
+#error OP is defined
+#endif
+#define OP(op) [OP_ ## op] = #op
+char *nfsd4_op_names[] = {
+        OP(ACCESS),
+        OP(CLOSE),
+        OP(COMMIT),
+        OP(CREATE),
+        OP(DELEGPURGE),
+        OP(DELEGRETURN),
+        OP(GETATTR),
+        OP(GETFH),
+        OP(LINK),
+        OP(LOCK),
+        OP(LOCKT),
+        OP(LOCKU),
+        OP(LOOKUP),
+        OP(LOOKUPP),
+        OP(NVERIFY),
+        OP(OPEN),
+        OP(OPENATTR),
+        OP(OPEN_CONFIRM),
+        OP(OPEN_DOWNGRADE),
+        OP(PUTFH),
+        OP(PUTPUBFH),
+        OP(PUTROOTFH),
+        OP(READ),
+        OP(READDIR),
+        OP(READLINK),
+        OP(REMOVE),
+        OP(RENAME),
+        OP(RENEW),
+        OP(RESTOREFH),
+        OP(SAVEFH),
+        OP(SECINFO),
+        OP(SETATTR),
+        OP(SETCLIENTID),
+        OP(SETCLIENTID_CONFIRM),
+        OP(VERIFY),
+        OP(WRITE),
+        OP(RELEASE_LOCKOWNER),
+        OP(EXCHANGE_ID),
+        OP(CREATE_SESSION),
+        OP(DESTROY_SESSION),
+        OP(GETDEVICEINFO),
+        OP(GETDEVICELIST),
+        OP(LAYOUTCOMMIT),
+        OP(LAYOUTGET),
+        OP(LAYOUTRETURN),
+        OP(SEQUENCE),
+};
+#undef OP
+
 static inline void
 fh_dup2(struct svc_fh *dst, struct svc_fh *src)
 {
@@ -963,6 +1017,9 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
                         goto encode_op;
                 }
 #endif /* CONFIG_NFSD_V4_1 */
+                dprintk("xxx server proc %2d %s\n", op->opnum,
+                        op->opnum < ARRAY_SIZE(nfsd4_op_names) &&
+                        nfsd4_op_names[op->opnum] ? nfsd4_op_names[op->opnum] : "");
 
 		if (opdesc->op_func)
 			op->status = opdesc->op_func(rqstp, cstate, &op->u);
