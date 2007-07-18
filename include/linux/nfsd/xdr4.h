@@ -103,6 +103,7 @@ struct nfsd4_create {
 
 struct nfsd4_delegreturn {
 	stateid_t	dr_stateid;
+	u32		dr_minorversion;
 };
 
 struct nfsd4_getattr {
@@ -254,6 +255,7 @@ struct nfsd4_read {
 	
 	struct svc_rqst *rd_rqstp;          /* response */
 	struct svc_fh * rd_fhp;             /* response */
+	u32		rd_minorversion;    /* processing */
 };
 
 struct nfsd4_readdir {
@@ -303,6 +305,7 @@ struct nfsd4_secinfo {
 
 struct nfsd4_setattr {
 	stateid_t	sa_stateid;         /* request */
+	u32		sa_minorversion;    /* processing */
 	u32		sa_bmval[2];        /* request */
 	struct iattr	sa_iattr;           /* request */
 	struct nfs4_acl *sa_acl;
@@ -344,6 +347,7 @@ struct nfsd4_write {
 	u32		wr_bytes_written;   /* response */
 	u32		wr_how_written;     /* response */
 	nfs4_verifier	wr_verifier;        /* response */
+	u32		wr_minorversion;    /* processing */
 };
 
 struct nfstime4 {

@@ -780,6 +780,7 @@ nfsd4_decode_read(struct nfsd4_compoundargs *argp, struct nfsd4_read *read)
 {
 	DECODE_HEAD;
 
+	read->rd_minorversion = argp->minorversion;
 	READ_BUF(sizeof(stateid_t) + 12);
 	READ32(read->rd_stateid.si_generation);
 	COPYMEM(&read->rd_stateid.si_opaque, sizeof(stateid_opaque_t));
@@ -899,6 +900,7 @@ nfsd4_decode_setattr(struct nfsd4_compoundargs *argp, struct nfsd4_setattr *seta
 {
 	DECODE_HEAD;
 
+	setattr->sa_minorversion = argp->minorversion;
 	READ_BUF(sizeof(stateid_t));
 	READ32(setattr->sa_stateid.si_generation);
 	COPYMEM(&setattr->sa_stateid.si_opaque, sizeof(stateid_opaque_t));
@@ -1155,6 +1157,7 @@ nfsd4_decode_write(struct nfsd4_compoundargs *argp, struct nfsd4_write *write)
 	int len;
 	DECODE_HEAD;
 
+	write->wr_minorversion = argp->minorversion;
 	READ_BUF(sizeof(stateid_opaque_t) + 20);
 	READ32(write->wr_stateid.si_generation);
 	COPYMEM(&write->wr_stateid.si_opaque, sizeof(stateid_opaque_t));

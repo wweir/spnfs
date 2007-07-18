@@ -1482,6 +1482,7 @@ alloc_init_open_stateowner(unsigned int strhashval, struct nfs4_client *clp, str
 	sop->so_client = clp;
 	sop->so_seqid = open->op_seqid;
 	sop->so_confirmed = 0;
+	sop->so_minorversion = open->op_minorversion;
 	rp = &sop->so_replay;
 	rp->rp_status = nfserr_serverfault;
 	rp->rp_buflen = 0;
@@ -2583,12 +2584,14 @@ nfs4_preprocess_stateid_op(struct svc_fh *current_fh, stateid_t *stateid, int fl
 			goto out;
 		stidp = &stp->st_stateid;
 	}
-	if (stateid->si_generation > stidp->si_generation)
+	if (flags & NFS_4_1 && stateid->si_generation !=0 )
+		goto out;
+	if (!(flags & NFS_4_1) && stateid->si_generation > stidp->si_generation)
 		goto out;
 
 	/* OLD STATEID */
 	status = nfserr_old_stateid;
-	if (stateid->si_generation < stidp->si_generation)
+	if (!(flags & NFS_4_1) && stateid->si_generation < stidp->si_generation)
 		goto out;
 	if (stp) {
 		if ((status = nfs4_check_openmode(stp->st_access_bmap,flags)))
@@ -2698,7 +2701,7 @@ nfs4_preprocess_seqid_op(struct svc_fh *current_fh, u32 seqid, stateid_t *statei
 	*  For the moment, we ignore the possibility of 
 	*  generation number wraparound.
 	*/
-	if (seqid != sop->so_seqid)
+	if (sop->so_minorversion != 1 && seqid != sop->so_seqid)
 		goto check_replay;
 
 	if (sop->so_confirmed && flags & CONFIRM) {
@@ -2711,6 +2714,14 @@ nfs4_preprocess_seqid_op(struct svc_fh *current_fh, u32 seqid, stateid_t *statei
 				" confirmed yet!\n");
 		return nfserr_bad_stateid;
 	}
+
+	if (sop->so_minorversion == 1) {
+		if (stateid->si_generation != 0)
+			return nfserr_bad_stateid;
+		else
+			goto renew; /* skip v4.0 generation number checks */
+	}
+
 	if (stateid->si_generation > stp->st_stateid.si_generation) {
 		dprintk("NFSD: preprocess_seqid_op: future stateid?!\n");
 		return nfserr_bad_stateid;
@@ -2720,6 +2731,7 @@ nfs4_preprocess_seqid_op(struct svc_fh *current_fh, u32 seqid, stateid_t *statei
 		dprintk("NFSD: preprocess_seqid_op: old stateid!\n");
 		return nfserr_old_stateid;
 	}
+renew:
 	renew_client(sop->so_client);
 	return nfs_ok;
 
@@ -2909,13 +2921,16 @@ nfsd4_delegreturn(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 		  struct nfsd4_delegreturn *dr)
 {
 	__be32 status;
+	int flags = 0;
 
 	if ((status = fh_verify(rqstp, &cstate->current_fh, S_IFREG, 0)))
 		goto out;
 
 	nfs4_lock_state();
-	status = nfs4_preprocess_stateid_op(&cstate->current_fh,
-					    &dr->dr_stateid, DELEG_RET, NULL);
+        flags |= DELEG_RET;
+        if (dr->dr_minorversion == 1)
+                flags |= NFS_4_1;
+        status = nfs4_preprocess_stateid_op(&cstate->current_fh, &dr->dr_stateid, flags, NULL);
 	nfs4_unlock_state();
 out:
 	return status;

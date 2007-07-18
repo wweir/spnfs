@@ -300,6 +300,7 @@ struct nfs4_stateowner {
 	u32                     so_seqid;
 	struct xdr_netobj       so_owner;     /* open owner name */
 	int                     so_confirmed; /* successful OPEN_CONFIRM? */
+	u32			so_minorversion;
 	struct nfs4_replay	so_replay;
 };
 
@@ -359,6 +360,7 @@ struct nfs4_stateid {
 #define WR_STATE	        0x00000020
 #define CLOSE_STATE             0x00000040
 #define DELEG_RET               0x00000080
+#define NFS_4_1			0x00000100
 
 #define seqid_mutating_err(err)                       \
 	(((err) != nfserr_stale_clientid) &&    \

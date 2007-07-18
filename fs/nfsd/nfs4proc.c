@@ -521,6 +521,7 @@ nfsd4_read(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	   struct nfsd4_read *read)
 {
 	__be32 status;
+        int flags = 0;
 
 	/* no need to check permission - this will be done in nfsd_read() */
 
@@ -528,11 +529,14 @@ nfsd4_read(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	if (read->rd_offset >= OFFSET_MAX)
 		return nfserr_inval;
 
+        flags = CHECK_FH | RD_STATE;
+        if (read->rd_minorversion == 1)
+                flags |= NFS_4_1;
 	nfs4_lock_state();
 	/* check stateid */
 	if ((status = nfs4_preprocess_stateid_op(&cstate->current_fh,
 				&read->rd_stateid,
-				CHECK_FH | RD_STATE, &read->rd_filp))) {
+				flags, &read->rd_filp))) {
 		dprintk("NFSD: nfsd4_read: couldn't process stateid!\n");
 		goto out;
 	}
@@ -659,9 +663,12 @@ static __be32
 nfsd4_setattr(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	      struct nfsd4_setattr *setattr)
 {
-	__be32 status = nfs_ok;
+	__be32 status = nfs_ok, flags = 0;
 
 	if (setattr->sa_iattr.ia_valid & ATTR_SIZE) {
+                flags = CHECK_FH | WR_STATE;
+                if (setattr->sa_minorversion == 1)
+                        flags |= NFS_4_1;
 		nfs4_lock_state();
 		status = nfs4_preprocess_stateid_op(&cstate->current_fh,
 			&setattr->sa_stateid, CHECK_FH | WR_STATE, NULL);
@@ -689,16 +696,19 @@ nfsd4_write(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	stateid_t *stateid = &write->wr_stateid;
 	struct file *filp = NULL;
 	u32 *p;
-	__be32 status = nfs_ok;
+	__be32 status = nfs_ok, flags = 0;
 
 	/* no need to check permission - this will be done in nfsd_write() */
 
 	if (write->wr_offset >= OFFSET_MAX)
 		return nfserr_inval;
 
+        flags = CHECK_FH | WR_STATE;
+        if (write->wr_minorversion == 1)
+                flags |= NFS_4_1;
 	nfs4_lock_state();
 	status = nfs4_preprocess_stateid_op(&cstate->current_fh, stateid,
-					CHECK_FH | WR_STATE, &filp);
+					flags, &filp);
 	if (filp)
 		get_file(filp);
 	nfs4_unlock_state();
