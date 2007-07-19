@@ -1097,7 +1097,7 @@ __be32 nfsd4_exchange_id(struct svc_rqst *rqstp,
                         goto out;
                 }
 
-                if (same_verf(&verf, &conf->cl_verifier)) {
+                if (!same_verf(&verf, &conf->cl_verifier)) {
                         /* Client reboot: destroy old state */
                         expire_client(conf);
 			goto out_new;
