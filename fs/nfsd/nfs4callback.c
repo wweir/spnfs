@@ -140,9 +140,13 @@ xdr_error:                                      \
 } while (0)
 
 struct nfs4_cb_compound_hdr {
-	int		status;
-	u32		ident;
+	/* args */
+	u32		minorversion;
+	u32		ident;		/* minorversion 0 only */
 	u32		nops;
+
+	/* res */
+	int		status;
 	u32		taglen;
 	char *		tag;
 };
@@ -211,8 +215,10 @@ encode_cb_compound_hdr(struct xdr_stream *xdr, struct nfs4_cb_compound_hdr *hdr)
 
 	RESERVE_SPACE(16);
 	WRITE32(0);            /* tag length is always 0 */
-	WRITE32(NFS4_MINOR_VERSION);
-	WRITE32(hdr->ident);
+	WRITE32(hdr->minorversion);
+	if (hdr->minorversion == 0) {
+		WRITE32(hdr->ident);
+	}
 	WRITE32(hdr->nops);
 	return 0;
 }
@@ -247,6 +253,7 @@ nfs4_xdr_enc_cb_recall(struct rpc_rqst *req, __be32 *p, struct nfs4_cb_recall *a
 {
 	struct xdr_stream xdr;
 	struct nfs4_cb_compound_hdr hdr = {
+		.minorversion = args->cbr_minorversion,
 		.ident = args->cbr_ident,
 		.nops   = 1,
 	};
@@ -461,6 +468,7 @@ nfsd4_cb_recall(struct nfs4_delegation *dp)
 	if ((!atomic_read(&clp->cl_callback.cb_set)) || !clnt)
 		return;
 
+	cbr->cbr_minorversion = clp->cl_callback.cb_minorversion;
 	cbr->cbr_trunc = 0; /* XXX need to implement truncate optimization */
 	cbr->cbr_dp = dp;
 

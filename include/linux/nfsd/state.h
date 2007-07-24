@@ -70,6 +70,7 @@ typedef struct {
 
 
 struct nfs4_cb_recall {
+	u32			cbr_minorversion;
 	u32			cbr_ident;
 	int			cbr_trunc;
 	stateid_t		cbr_stateid;
@@ -102,7 +103,8 @@ struct nfs4_callback {
 	u32                     cb_addr;
 	unsigned short          cb_port;
 	u32                     cb_prog;
-	u32                     cb_ident;
+	u32			cb_minorversion;
+	u32                     cb_ident;   /* minorversion 0 only */
 	/* RPC client info */
 	atomic_t		cb_set;     /* successful CB_NULL call */
 	struct rpc_program      cb_program;

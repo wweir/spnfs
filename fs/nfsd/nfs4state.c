@@ -848,6 +848,8 @@ gen_callback(struct nfs4_client *clp, struct nfsd4_setclientid *se)
 	if ( !(parse_ipv4(se->se_callback_addr_len, se->se_callback_addr_val,
 	                 &cb->cb_addr, &cb->cb_port)))
 		goto out_err;
+
+	cb->cb_minorversion = 0;
 	cb->cb_prog = se->se_callback_prog;
 	cb->cb_ident = se->se_callback_ident;
 	return;
@@ -1352,6 +1354,10 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 		nfsd4_probe_callback(unconf);
 		conf = unconf;
 	}
+
+	conf->cl_callback.cb_minorversion = 1;
+	conf->cl_callback.cb_prog = session->callback_prog;
+
 	status = alloc_init_session(conf, session);
 
 out_replay:
