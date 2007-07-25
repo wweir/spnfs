@@ -188,8 +188,8 @@ extern int nfs4_server_capabilities(struct nfs_server *server, struct nfs_fh *fh
 extern int nfs4_proc_fs_locations(struct inode *dir, const struct qstr *name,
 		struct nfs4_fs_locations *fs_locations, struct page *page);
 
-extern struct nfs4_state_recovery_ops nfs4_reboot_recovery_ops;
-extern struct nfs4_state_recovery_ops nfs4_network_partition_recovery_ops;
+extern struct nfs4_state_recovery_ops *nfs4_reboot_recovery_ops[];
+extern struct nfs4_state_recovery_ops *nfs4_network_partition_recovery_ops[];
 
 extern const u32 nfs4_fattr_bitmap[2];
 extern const u32 nfs4_statfs_bitmap[2];

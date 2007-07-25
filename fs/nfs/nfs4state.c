@@ -910,7 +910,7 @@ static int reclaimer(void *ptr)
 	if (list_empty(&clp->cl_superblocks))
 		goto out;
 restart_loop:
-	ops = &nfs4_network_partition_recovery_ops;
+	ops = nfs4_network_partition_recovery_ops[clp->cl_minorversion];
 	/* Are there any open files on this volume? */
 	cred = nfs4_get_renew_cred(clp);
 	if (cred != NULL) {
@@ -923,7 +923,7 @@ restart_loop:
 				goto out;
 			case -NFS4ERR_STALE_CLIENTID:
 			case -NFS4ERR_LEASE_MOVED:
-				ops = &nfs4_reboot_recovery_ops;
+				ops = nfs4_reboot_recovery_ops[clp->cl_minorversion];
 		}
 	} else {
 		/* "reboot" to ensure we clear all state on the server */
@@ -947,7 +947,7 @@ restart_loop:
 		status = nfs4_reclaim_open_state(ops, sp);
 		if (status < 0) {
 			if (status == -NFS4ERR_NO_GRACE) {
-				ops = &nfs4_network_partition_recovery_ops;
+				ops = nfs4_network_partition_recovery_ops[clp->cl_minorversion];
 				status = nfs4_reclaim_open_state(ops, sp);
 			}
 			if (status == -NFS4ERR_STALE_CLIENTID)
