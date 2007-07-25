@@ -60,7 +60,7 @@ const nfs4_stateid zero_stateid;
 
 static LIST_HEAD(nfs4_clientid_list);
 
-static int nfs4_init_clientid(struct nfs_client *clp, struct rpc_cred *cred)
+int nfs4_init_clientid(struct nfs_client *clp, struct rpc_cred *cred)
 {
 	int status = nfs4_proc_setclientid(clp, NFS4_CALLBACK,
 			nfs_callback_tcpport, cred);
@@ -915,7 +915,7 @@ restart_loop:
 	cred = nfs4_get_renew_cred(clp);
 	if (cred != NULL) {
 		/* Yes there are: try to renew the old lease */
-		status = nfs4_proc_renew(clp, cred);
+		status = ops->renew_lease(clp, cred);
 		switch (status) {
 			case 0:
 			case -NFS4ERR_CB_PATH_DOWN:
@@ -934,7 +934,7 @@ restart_loop:
 	nfs4_state_mark_reclaim(clp);
 	status = -ENOENT;
 	if (cred != NULL) {
-		status = nfs4_init_clientid(clp, cred);
+		status = ops->establish_clid(clp, cred);
 		put_rpccred(cred);
 	}
 	if (status)

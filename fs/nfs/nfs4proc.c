@@ -3693,11 +3693,15 @@ int nfs4_proc_fs_locations(struct inode *dir, const struct qstr *name,
 struct nfs4_state_recovery_ops nfs4_reboot_recovery_ops = {
 	.recover_open	= nfs4_open_reclaim,
 	.recover_lock	= nfs4_lock_reclaim,
+	.renew_lease	= nfs4_proc_renew,
+	.establish_clid = nfs4_init_clientid,
 };
 
 struct nfs4_state_recovery_ops nfs4_network_partition_recovery_ops = {
 	.recover_open	= nfs4_open_expired,
 	.recover_lock	= nfs4_lock_expired,
+	.renew_lease	= nfs4_proc_renew,
+	.establish_clid = nfs4_init_clientid,
 };
 
 static const struct inode_operations nfs4_file_inode_operations = {
