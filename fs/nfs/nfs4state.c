@@ -60,7 +60,7 @@ const nfs4_stateid zero_stateid;
 
 static LIST_HEAD(nfs4_clientid_list);
 
-static int nfs4_init_client(struct nfs_client *clp, struct rpc_cred *cred)
+static int nfs4_init_clientid(struct nfs_client *clp, struct rpc_cred *cred)
 {
 	int status = nfs4_proc_setclientid(clp, NFS4_CALLBACK,
 			nfs_callback_tcpport, cred);
@@ -934,7 +934,7 @@ restart_loop:
 	nfs4_state_mark_reclaim(clp);
 	status = -ENOENT;
 	if (cred != NULL) {
-		status = nfs4_init_client(clp, cred);
+		status = nfs4_init_clientid(clp, cred);
 		put_rpccred(cred);
 	}
 	if (status)
