@@ -137,6 +137,7 @@ static struct nfs_client *nfs_alloc_client(const char *hostname,
 	rpc_init_wait_queue(&clp->cl_rpcwaitq, "NFS client");
 	clp->cl_boot_time = CURRENT_TIME;
 	clp->cl_state = 1 << NFS4CLNT_LEASE_EXPIRED;
+	clp->cl_minorversion = NFS4_MAX_MINOR_VERSION;
 #endif
 
 	return clp;
