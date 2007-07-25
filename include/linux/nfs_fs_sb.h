@@ -4,6 +4,10 @@
 #include <linux/list.h>
 #include <linux/backing-dev.h>
 
+#ifdef CONFIG_NFS_V4_1
+#include <linux/nfs4_session.h>
+#endif
+
 struct nfs_iostats;
 
 /*
@@ -66,6 +70,13 @@ struct nfs_client {
 	unsigned char		cl_id_uniquifier;
 	u32			cl_minorversion;
 #endif
+
+#ifdef CONFIG_NFS_V4_1
+	/* The sequence id returned by EXCHANGE_ID */
+	u32			cl_seqid;
+	/* The flags used for obtaining the clientid during EXCHANGE_ID */
+	u32			cl_exchange_flags;
+#endif
 };
 
 /*
@@ -110,6 +121,11 @@ struct nfs_server {
 						   that are supported on this
 						   filesystem */
 #endif
+
+#ifdef CONFIG_NFS_V4_1
+	struct nfs4_session *	session;	/* NFSv4.1 session */
+#endif
+
 	void (*destroy)(struct nfs_server *);
 };
 

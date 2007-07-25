@@ -183,6 +183,11 @@ enum nfs_opnum4 {
 	OP_EXCHANGE_ID = 42,
 	OP_CREATE_SESSION = 43,
 	OP_DESTROY_SESSION = 44,
+	OP_GETDEVICEINFO = 47,
+	OP_GETDEVICELIST = 48,
+	OP_LAYOUTCOMMIT = 49,
+	OP_LAYOUTGET = 50,
+	OP_LAYOUTRETURN = 51,
 	OP_SEQUENCE = 53,
 	OP_ILLEGAL = 10044,
 };
@@ -456,7 +461,9 @@ enum {
 	NFSPROC4_CLNT_GET_LEASE_TIME,
 };
 
+#ifdef CONFIG_NFS_V4_1
 typedef unsigned char nfs41_sessionid[16];
+#endif
 
 /* Create Session Flags */
 #define SESSION4_PERSIST	 0x001

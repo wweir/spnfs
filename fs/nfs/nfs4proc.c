@@ -2936,6 +2936,55 @@ int nfs4_proc_setclientid(struct nfs_client *clp, u32 program, unsigned short po
 	return status;
 }
 
+#ifdef CONFIG_NFS_V4_1
+int nfs4_proc_exchange_id(struct nfs_client *clp)
+{
+	nfs4_verifier verifier;
+	struct nfs41_exchange_id_args args = {
+		.flags = clp->cl_exchange_flags,
+	};
+	struct nfs41_exchange_id_res res = {
+		.client = clp,
+	};
+	int status;
+	int loop = 0;
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_EXCHANGE_ID],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+	};
+	u32 *p;
+
+	p = (u32*)verifier.data;
+	*p++ = htonl((u32)clp->cl_boot_time.tv_sec);
+	*p = htonl((u32)clp->cl_boot_time.tv_nsec);
+	args.verifier = &verifier;
+
+	while (1) {
+		args.id_len = scnprintf(args.id, sizeof(args.id),
+				"%s/%u.%u.%u.%u %s %u",
+				clp->cl_ipaddr, NIPQUAD(
+					clp->cl_addr.sin_addr.s_addr),
+			         "AUTH_SYS", clp->cl_id_uniquifier);
+
+		status = rpc_call_sync(clp->cl_rpcclient, &msg, 0);
+		if (status != NFS4ERR_CLID_INUSE)
+			break;
+
+		if (signalled())
+			break;
+
+		if (loop++ & 1)
+			ssleep(clp->cl_lease_time + 1);
+		else if (++clp->cl_id_uniquifier == 0)
+			break;
+	}
+
+	dprintk("%s returns %d\n", __FUNCTION__, status);
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 static int _nfs4_proc_setclientid_confirm(struct nfs_client *clp, struct rpc_cred *cred)
 {
 	struct nfs_fsinfo fsinfo;

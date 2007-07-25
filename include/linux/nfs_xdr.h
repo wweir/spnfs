@@ -755,87 +755,6 @@ struct nfs4_setclientid {
 	u32				sc_cb_ident;      /* request */
 };
 
-struct nfstime4 {
-	u64	seconds;
-	u32	nseconds;
-};
-
-struct nfs_impl_id4 {
-	u32		domain_len;
-	char 		domain[NFS4_OPAQUE_LIMIT];
-	u32		name_len;
-	char 		name[NFS4_OPAQUE_LIMIT];
-	struct nfstime4	date;
-};
-
-struct nfs41_exchange_id_args {
-	nfs4_verifier *			verifier;
-	unsigned int 			id_len;
-	char 				id[48];
-	u32				flags;
-	struct nfs_impl_id4		impl_id;
-	clientid4			clientid;
-	u32				seqid;
-};
-
-struct server_owner {
-	uint64_t			minor_id;
-	uint32_t			major_id_sz;
-	char				major_id[NFS4_OPAQUE_LIMIT];
-};
-
-struct server_scope {
-	uint32_t			server_scope_sz;
-	char 				server_scope[NFS4_OPAQUE_LIMIT];
-};
-
-struct nfs41_exchange_id_res {
-	struct nfs4_client *		client;
-	u32				flags;
-	struct server_owner		server_owner;
-	struct server_scope		server_scope;
-};
-
-struct nfs41_create_session_args {
-	struct nfs4_client *		client;
-	struct nfs4_session *		session;
-	uint32_t			flags;
-	uint32_t			header_padding;
-	uint32_t			cb_program;
-};
-
-struct nfs41_create_session_res {
-	struct nfs4_client *		client;
-	struct nfs4_session *		session;
-};
-
-struct nfs41_sequence_args {
-	char				sessionid[NFS4_MAX_SESSIONID_LEN];
-	u32				seqid;
-	u32				slotid;
-	u32				maxslots;
-	struct nfs4_client *		client;
-};
-
-struct nfs41_sequence_res {
-	char				sessionid[NFS4_MAX_SESSIONID_LEN];
-	u32				seqid;
-	u32				slotid;
-	u32				maxslots;
-	u32				target_maxslots;
-	u32				status_flags;
-	struct nfs4_state_owner		*sp;
-};
-
-struct nfs4_get_lease_time_args {
-	void                            *minorversion_info;
-};
-
-struct nfs4_get_lease_time_res {
-	struct nfs_fsinfo               *fsinfo;
-	void                            *minorversion_info;
-};
-
 struct nfs4_statfs_arg {
 	const struct nfs_fh *		fh;
 	const u32 *			bitmask;
@@ -902,6 +821,47 @@ struct nfs4_fs_locations_res {
 };
 
 #endif /* CONFIG_NFS_V4 */
+
+#ifdef CONFIG_NFS_V4_1
+struct nfstime4 {
+	u64	seconds;
+	u32	nseconds;
+};
+
+struct nfs_impl_id4 {
+	u32		domain_len;
+	char *		domain;
+	u32		name_len;
+	char * 		name;
+	struct nfstime4	date;
+};
+
+struct nfs41_exchange_id_args {
+	nfs4_verifier *			verifier;
+	unsigned int 			id_len;
+	char 				id[48];
+	u32				flags;
+};
+
+struct server_owner {
+	uint64_t			minor_id;
+	uint32_t			major_id_sz;
+	char				major_id[NFS4_OPAQUE_LIMIT];
+};
+
+struct server_scope {
+	uint32_t			server_scope_sz;
+	char 				server_scope[NFS4_OPAQUE_LIMIT];
+};
+
+struct nfs41_exchange_id_res {
+	struct nfs_client *		client;
+	u32				flags;
+	struct server_owner		server_owner;
+	struct server_scope		server_scope;
+	struct nfs_impl_id4		impl_id;
+};
+#endif /* CONFIG_NFS_V4_1 */
 
 struct nfs_page;
 

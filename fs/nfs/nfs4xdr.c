@@ -238,6 +238,20 @@ static int nfs4_stat_to_errno(int);
 				(encode_getattr_maxsz)
 #define decode_fs_locations_maxsz \
 				(0)
+#ifdef CONFIG_NFS_V4_1
+#define encode_exchange_id_maxsz (op_encode_hdr_maxsz + \
+				4 /*server->ip_addr*/ + \
+				1 /*netid*/ + \
+				3 /*cred name*/ + \
+				1 /*id_uniquifier*/ + \
+				(NFS4_VERIFIER_SIZE >> 2) + \
+				1 /*flags*/ + \
+				1 /*zero implemetation id array*/)
+#define decode_exchange_id_maxsz (op_decode_hdr_maxsz + 2 + 1 + 1 + 2 + 1 + \
+				(NFS4_OPAQUE_LIMIT >> 2) + 1 + \
+				(NFS4_OPAQUE_LIMIT >> 2) + 1)
+#endif /* CONFIG_NFS_V4_1 */
+
 #define NFS40_enc_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS40_dec_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS40_enc_read_sz	(compound_encode_hdr_maxsz + \
@@ -519,6 +533,14 @@ static int nfs4_stat_to_errno(int);
 				 decode_putfh_maxsz + \
 				 decode_lookup_maxsz + \
 				 decode_fs_locations_maxsz)
+#ifdef CONFIG_NFS_V4_1
+#define NFS41_enc_exchange_id_sz \
+				(compound_encode_hdr_maxsz + \
+				 encode_exchange_id_maxsz)
+#define NFS41_dec_exchange_id_sz \
+				(compound_decode_hdr_maxsz + \
+				 decode_exchange_id_maxsz)
+#endif /* CONFIG_NFS_V4_1 */
 
 static struct {
 	unsigned int	mode;
@@ -1324,6 +1346,26 @@ static int encode_setclientid(struct xdr_stream *xdr, const struct nfs4_setclien
 
 	return 0;
 }
+
+#ifdef CONFIG_NFS_V4_1
+static int encode_exchange_id(struct xdr_stream *xdr, struct nfs41_exchange_id_args *args)
+{
+
+	uint32_t *p;
+
+	RESERVE_SPACE(4 + sizeof(args->verifier->data));
+	WRITE32(OP_EXCHANGE_ID);
+	WRITEMEM(args->verifier->data, sizeof(args->verifier->data));
+
+	encode_string(xdr, args->id_len, args->id);
+
+	RESERVE_SPACE(8);
+	WRITE32(args->flags);
+	WRITE32(0);     /* zero length implementation id array */
+
+	return 0;
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 static int encode_setclientid_confirm(struct xdr_stream *xdr, const struct nfs_client *client_state)
 {
@@ -2273,6 +2315,26 @@ static int nfs40_xdr_enc_setclientid(struct rpc_rqst *req, __be32 *p, struct nfs
 	encode_compound_hdr(&xdr, &hdr, 0);
 	return encode_setclientid(&xdr, sc);
 }
+
+#ifdef CONFIG_NFS_V4_1
+/*
+ * EXCHANGE_ID request
+ */
+static int nfs41_xdr_enc_exchange_id(struct rpc_rqst *req, uint32_t *p, void *args)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr = {
+	        .nops   = 1,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	encode_exchange_id(&xdr, args);
+
+	return 0;
+}
+#endif
 
 /*
  * a SETCLIENTID_CONFIRM request
@@ -3931,6 +3993,55 @@ static int decode_setclientid(struct xdr_stream *xdr, struct nfs_client *clp)
 	return 0;
 }
 
+#ifdef CONFIG_NFS_V4_1
+static int decode_exchange_id(struct xdr_stream *xdr, struct nfs41_exchange_id_res *res)
+{
+	uint32_t *p;
+	int status, implen;
+	struct nfs_client *clp = res->client;
+
+	status = decode_op_hdr(xdr, OP_EXCHANGE_ID);
+	if (status)
+		return status;
+
+	READ_BUF(8);
+	READ64(clp->cl_clientid);
+	READ_BUF(8);
+	READ32(clp->cl_seqid);
+	READ32(clp->cl_exchange_flags);
+
+	/* Draft 12 includes state_protect switch here */
+
+	/*
+	 * We currently only suppot SP4_NONE.
+	 * No support available for SP4_MACH_CRED or SP4_SSV.
+	 */
+
+	/* minor_id */
+	READ_BUF(8);
+	READ64(res->server_owner.minor_id);
+
+	/* Major id */
+	READ_BUF(4);
+	READ32(res->server_owner.major_id_sz);
+	READ_BUF(res->server_owner.major_id_sz);
+	COPYMEM(res->server_owner.major_id, res->server_owner.major_id_sz);
+
+	/* server_scope */
+	READ_BUF(4);
+	READ32(res->server_scope.server_scope_sz);
+	READ_BUF(res->server_scope.server_scope_sz);
+	COPYMEM(res->server_scope.server_scope,
+		res->server_scope.server_scope_sz);
+	/* Throw away Implementation id array */
+	READ_BUF(4);
+	READ32(implen);
+	p += XDR_QUADLEN(implen);
+
+	return 0;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 static int decode_setclientid_confirm(struct xdr_stream *xdr)
 {
 	return decode_op_hdr(xdr, OP_SETCLIENTID_CONFIRM);
@@ -4966,6 +5077,28 @@ static int nfs40_xdr_dec_setclientid(struct rpc_rqst *req, __be32 *p,
 	return status;
 }
 
+#ifdef CONFIG_NFS_V4_1
+/*
+ * EXCHANGE_ID request
+ */
+static int nfs41_xdr_dec_exchange_id(struct rpc_rqst *rqstp, uint32_t *p, void *res)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr;
+        int status;
+
+        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+        status = decode_compound_hdr(&xdr, &hdr);
+
+	if (hdr.status)
+		return hdr.status;
+
+	status = decode_exchange_id(&xdr, res);
+
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * a SETCLIENTID_CONFIRM request
  */
@@ -5222,6 +5355,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(GETACL,		enc_getacl,	dec_getacl, 0),
   PROC(SETACL,		enc_setacl,	dec_setacl, 0),
   PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations, 0),
+  PROC(EXCHANGE_ID,	enc_exchange_id,	dec_exchange_id, 1),
 };
 
 struct rpc_version		nfs_version4 = {
