@@ -115,6 +115,44 @@ struct nfs4_change_info {
 };
 
 struct nfs_seqid;
+
+#if defined(CONFIG_NFS_V4_1)
+
+#define SESSIONID_SIZE	128
+
+typedef char	sessionid4[SESSIONID_SIZE];
+typedef u32	sequenceid4;
+typedef u32	slotid4;
+
+struct nfs41_sequence_args {
+	sessionid4		sa_sessionid;
+	sequenceid4		sa_seqid;
+	slotid4			sa_slotid;
+	slotid4			sa_max_slotid;
+	u32			sa_cache_this;
+};
+
+#define SEQ4_STATUS_CB_PATH_DOWN		0x00000001
+#define SEQ4_STATUS_CB_GSS_CONTEXTS_EXPIRING	0x00000002
+#define SEQ4_STATUS_CB_GSS_CONTEXTS_EXPIRED	0x00000004
+#define SEQ4_STATUS_EXPIRED_ALL_STATE_REVOKED	0x00000008
+#define SEQ4_STATUS_EXPIRED_SOME_STATE_REVOKED	0x00000010
+#define SEQ4_STATUS_ADMIN_STATE_REVOKED		0x00000020
+#define SEQ4_STATUS_RECALLABLE_STATE_REVOKED	0x00000040
+#define SEQ4_STATUS_LEASE_MOVED                 0x00000080
+#define SEQ4_STATUS_RESTART_RECLAIM_NEEDED	0x00000100
+
+struct nfs41_sequence_res {
+	sessionid4		sr_sessionid;
+	sequenceid4		sr_seqid;
+	slotid4			sr_slotid;
+	slotid4			sr_max_slotid;
+	slotid4			sr_target_max_slotid;
+	u32			sr_flags;
+};
+
+#endif	/* CONFIG_NFS_V4_1 */
+
 /*
  * Arguments to the open call.
  */
