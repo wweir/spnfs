@@ -98,6 +98,8 @@ static void nfs4_set_recdir(char *recdir);
  */
 static struct kmem_cache *pnfs_layout_slab;
 static struct kmem_cache *pnfs_layoutrecall_slab;
+
+static int expire_layout(struct nfs4_layout *lp);
 static void destroy_layout(struct nfs4_layout *lp);
 static void layoutrecall_done(struct nfs4_layoutrecall *clr);
 static void release_pnfs_ds_dev_list(struct nfs4_stateid *stp);
@@ -622,6 +624,7 @@ expire_client(struct nfs4_client *clp)
 		dprintk("NFSD: expire client. lp %p, fp %p\n", lp,
 				lp->lo_file);
 		BUG_ON(lp->lo_client != clp);
+		expire_layout(lp);
 		destroy_layout(lp);
 	}
 	while (!list_empty(&clp->cl_layoutrecalls)) {
@@ -4090,6 +4093,34 @@ destroy_layout(struct nfs4_layout *lp)
 	put_nfs4_file(fp);
 }
 
+static int
+expire_layout(struct nfs4_layout *lp)
+{
+	struct nfs4_client *clp;
+	struct nfs4_file *fp;
+	struct nfsd4_pnfs_layoutreturn lr;
+
+	clp = lp->lo_client;
+	fp = lp->lo_file;
+	dprintk("pNFS %s: lp %p clp %p fp %p ino %p\n", __FUNCTION__,
+		lp, clp, fp, fp->fi_inode);
+
+	/* call exported filesystem layout_return */
+	if (!fp->fi_inode->i_sb->s_export_op->layout_return)
+		return 0;
+
+	lr.lr_return_type = RETURN_FILE;
+	lr.lr_reclaim = 0;
+	lr.lr_flags = LR_FLAG_EXPIRE;
+	lr.lr_seg.clientid = lp->lo_seg.clientid;
+	lr.lr_seg.layout_type = lp->lo_seg.layout_type;
+	lr.lr_seg.iomode = IOMODE_ANY;
+	lr.lr_seg.offset = 0;
+	lr.lr_seg.length = NFS4_LENGTH_EOF;
+	return fp->fi_inode->i_sb->s_export_op->layout_return(
+		fp->fi_inode, &lr);
+}
+
 /*
  * Create a layoutrecall structure
  * An optional layoutrecall can be cloned (except for the layoutrecall lists)
@@ -4679,6 +4710,9 @@ int nfsd_layout_recall_cb(struct inode *inode, struct nfsd4_pnfs_cb_layout *cbl)
 	       cbl->cbl_recall_type != RECALL_FSID &&
 	       cbl->cbl_recall_type != RECALL_ALL);
 	BUG_ON(cbl->cbl_recall_type != RECALL_ALL && !inode);
+
+	if (nfsd_serv == NULL)
+		return -ENOENT;
 
 	clr = alloc_init_layoutrecall(NULL);
 	if (!clr)
