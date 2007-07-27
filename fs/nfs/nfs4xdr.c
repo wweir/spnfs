@@ -641,6 +641,10 @@ static int nr_sequence_quads;
 					 encode_sequence_maxsz)
 #define NFS41_dec_read_sz		(NFS40_dec_read_sz + \
 					 decode_sequence_maxsz)
+#define NFS41_enc_setattr_sz		(NFS40_enc_setattr_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_setattr_sz		(NFS40_dec_setattr_sz + \
+					 decode_sequence_maxsz)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -2593,6 +2597,23 @@ static int nfs40_xdr_enc_setattr(struct rpc_rqst *req, __be32 *p, struct nfs_set
 
 	return nfs4_xdr_enc_setattr(&xdr, args);
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_setattr(struct rpc_rqst *req, __be32 *p,
+				 struct nfs_setattrargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 4,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_setattr(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Encode a GETACL request
@@ -5608,6 +5629,27 @@ out:
         return status;
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_setattr(struct rpc_rqst *rqstp, __be32 *p,
+				 struct nfs_setattrres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		return status;
+	status = nfs4_xdr_dec_setattr(&xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Decode LOCK response
  */
@@ -6469,7 +6511,7 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(OPEN_NOATTR,	enc_open_noattr,	dec_open_noattr, 1),
   PROC(OPEN_DOWNGRADE,	enc_open_downgrade,	dec_open_downgrade, 1),
   PROC(CLOSE,		enc_close,	dec_close, 1),
-  PROC(SETATTR,		enc_setattr,	dec_setattr, 0),
+  PROC(SETATTR,		enc_setattr,	dec_setattr, 1),
   PROC(FSINFO,		enc_fsinfo,	dec_fsinfo, 0),
   PROC(RENEW,		enc_renew,	dec_renew, 0),
   PROC(SETCLIENTID,	enc_setclientid,	dec_setclientid, 0),

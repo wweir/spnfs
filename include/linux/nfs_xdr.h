@@ -436,8 +436,8 @@ struct nfs_setattrargs {
 	struct iattr *                  iap;
 	const struct nfs_server *	server; /* Needed for name mapping */
 	const u32 *			bitmask;
-#ifdef CONFIG_NFS_V4
-	void *				minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_args 	seq_args;
 #endif
 };
 
@@ -466,8 +466,8 @@ struct nfs_getaclres {
 struct nfs_setattrres {
 	struct nfs_fattr *              fattr;
 	const struct nfs_server *	server;
-#ifdef CONFIG_NFS_V4
-	void *                          minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_res	seq_res;
 #endif
 };
 
