@@ -345,8 +345,8 @@ struct nfs_writeargs {
 	unsigned int		pgbase;
 	struct page **		pages;
 	const u32 *		bitmask;
-#ifdef CONFIG_NFS_V4
-	void *                  minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_args	seq_args;
 #endif
 };
 
@@ -360,8 +360,8 @@ struct nfs_writeres {
 	struct nfs_writeverf *	verf;
 	__u32			count;
 	const struct nfs_server *server;
-#ifdef CONFIG_NFS_V4
-	void *                  minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_res	seq_res;
 #endif
 };
 

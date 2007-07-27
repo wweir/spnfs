@@ -645,6 +645,14 @@ static int nr_sequence_quads;
 					 encode_sequence_maxsz)
 #define NFS41_dec_setattr_sz		(NFS40_dec_setattr_sz + \
 					 decode_sequence_maxsz)
+#define NFS41_enc_write_sz		(NFS40_enc_write_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_write_sz		(NFS40_dec_write_sz + \
+					 decode_sequence_maxsz)
+#define NFS41_enc_commit_sz		(NFS40_enc_commit_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_commit_sz		(NFS40_dec_commit_sz + \
+					 decode_sequence_maxsz)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -2683,6 +2691,23 @@ static int nfs40_xdr_enc_write(struct rpc_rqst *req, __be32 *p, struct nfs_write
 	return nfs4_xdr_enc_write(&xdr, args);
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_write(struct rpc_rqst *req, __be32 *p,
+			       struct nfs_writeargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_write(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  *  a COMMIT request
  */
@@ -2713,6 +2738,23 @@ static int nfs40_xdr_enc_commit(struct rpc_rqst *req, __be32 *p, struct nfs_writ
 
 	return nfs4_xdr_enc_commit(&xdr, args);
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_commit(struct rpc_rqst *req, __be32 *p,
+				struct nfs_writeargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_commit(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * FSINFO request
@@ -6000,6 +6042,27 @@ out:
 	return status;
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_write(struct rpc_rqst *rqstp, __be32 *p,
+			       struct nfs_writeres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = nfs4_xdr_dec_write(&xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Decode COMMIT response
  */
@@ -6033,6 +6096,27 @@ static int nfs40_xdr_dec_commit(struct rpc_rqst *rqstp, __be32 *p, struct nfs_wr
 out:
 	return status;
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_commit(struct rpc_rqst *rqstp, __be32 *p,
+				struct nfs_writeres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = nfs4_xdr_dec_commit(&xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * FSINFO request
@@ -6504,8 +6588,8 @@ struct rpc_procinfo	nfs4_procedures[] = {
 #if defined(CONFIG_NFS_V4_1)
 struct rpc_procinfo	nfs41_procedures[] = {
   PROC(READ,		enc_read,	dec_read, 1),
-  PROC(WRITE,		enc_write,	dec_write, 0),
-  PROC(COMMIT,		enc_commit,	dec_commit, 0),
+  PROC(WRITE,		enc_write,	dec_write, 1),
+  PROC(COMMIT,		enc_commit,	dec_commit, 1),
   PROC(OPEN,		enc_open,	dec_open, 1),
   PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm, 0),
   PROC(OPEN_NOATTR,	enc_open_noattr,	dec_open_noattr, 1),
