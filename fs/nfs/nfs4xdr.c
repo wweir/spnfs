@@ -629,6 +629,14 @@ static int nr_sequence_quads;
 					 encode_sequence_maxsz)
 #define NFS41_dec_lockt_sz		(NFS40_dec_lockt_sz + \
 					 decode_sequence_maxsz)
+#define NFS41_enc_readlink_sz		(NFS40_enc_readlink_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_readlink_sz		(NFS40_dec_readlink_sz + \
+					 decode_sequence_maxsz)
+#define NFS41_enc_readdir_sz		(NFS40_enc_readdir_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_readdir_sz		(NFS40_dec_readdir_sz + \
+					 decode_sequence_maxsz)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -2412,6 +2420,23 @@ static int nfs40_xdr_enc_readlink(struct rpc_rqst *req, __be32 *p, const struct 
 	return nfs4_xdr_enc_readlink(req, &xdr, args, NFS40_dec_readlink_sz);
 }
 
+# if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_readlink(struct rpc_rqst *req, __be32 *p,
+				  const struct nfs4_readlink *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_readlink(req, &xdr, args, NFS41_dec_readlink_sz);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Encode a READDIR request
  */
@@ -2455,6 +2480,23 @@ static int nfs40_xdr_enc_readdir(struct rpc_rqst *req, __be32 *p, const struct n
 
 	return nfs4_xdr_enc_readdir(req, &xdr, args, NFS40_dec_readdir_sz);
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_readdir(struct rpc_rqst *req, __be32 *p,
+				 const struct nfs4_readdir_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_readdir(req, &xdr, args, NFS41_dec_readdir_sz);
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Encode a READ request
@@ -5732,6 +5774,27 @@ out:
 	return status;
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_readlink(struct rpc_rqst *rqstp, __be32 *p,
+				  struct nfs4_readlink_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = nfs4_xdr_dec_readlink(rqstp, &xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Decode READDIR response
  */
@@ -5762,6 +5825,27 @@ static int nfs40_xdr_dec_readdir(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_
 out:
 	return status;
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_readdir(struct rpc_rqst *rqstp, __be32 *p,
+				 struct nfs4_readdir_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = nfs4_xdr_dec_readdir(rqstp, &xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Decode Read response
@@ -6363,8 +6447,8 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(CREATE,		enc_create,	dec_create, 1),
   PROC(PATHCONF,	enc_pathconf,	dec_pathconf, 0),
   PROC(STATFS,		enc_statfs,	dec_statfs, 0),
-  PROC(READLINK,	enc_readlink,	dec_readlink, 0),
-  PROC(READDIR,		enc_readdir,	dec_readdir, 0),
+  PROC(READLINK,	enc_readlink,	dec_readlink, 1),
+  PROC(READDIR,		enc_readdir,	dec_readdir, 1),
   PROC(SERVER_CAPS,	enc_server_caps, dec_server_caps, 0),
   PROC(DELEGRETURN,	enc_delegreturn, dec_delegreturn, 0),
   PROC(GETACL,		enc_getacl,	dec_getacl, 0),
