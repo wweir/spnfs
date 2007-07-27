@@ -569,6 +569,14 @@ static int nr_sequence_quads;
 				 encode_sequence_maxsz)
 #define NFS41_dec_access_sz	(NFS40_dec_access_sz + \
 				 decode_sequence_maxsz)
+#define NFS41_enc_lookup_sz	(NFS40_enc_lookup_sz + \
+				 encode_sequence_maxsz)
+#define NFS41_dec_lookup_sz	(NFS40_dec_lookup_sz + \
+				 decode_sequence_maxsz)
+#define NFS41_enc_lookup_root_sz	(NFS40_enc_lookup_root_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_lookup_root_sz	(NFS40_dec_lookup_root_sz + \
+					 decode_sequence_maxsz)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -1616,6 +1624,23 @@ static int nfs40_xdr_enc_lookup(struct rpc_rqst *req, __be32 *p, const struct nf
 	return nfs4_xdr_enc_lookup(&xdr, args);
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_lookup(struct rpc_rqst *req, __be32 *p,
+				const struct nfs4_lookup_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 5,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_lookup(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Encode LOOKUP_ROOT request
  */
@@ -1643,6 +1668,23 @@ static int nfs40_xdr_enc_lookup_root(struct rpc_rqst *req, __be32 *p, const stru
 
 	return nfs4_xdr_enc_lookup_root(&xdr, args);
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_lookup_root(struct rpc_rqst *req, __be32 *p,
+				     const struct nfs4_lookup_root_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_lookup_root(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Encode REMOVE request
@@ -4492,6 +4534,28 @@ out:
 	return status;
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_lookup(struct rpc_rqst *rqstp, __be32 *p,
+				struct nfs4_lookup_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+
+	status = nfs4_xdr_dec_lookup(&xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Decode LOOKUP_ROOT response
  */
@@ -4521,6 +4585,28 @@ static int nfs40_xdr_dec_lookup_root(struct rpc_rqst *rqstp, __be32 *p, struct n
 out:
 	return status;
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_lookup_root(struct rpc_rqst *rqstp, __be32 *p,
+				     struct nfs4_lookup_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+
+	status = nfs4_xdr_dec_lookup_root(&xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Decode REMOVE response
@@ -5742,8 +5828,8 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(LOCKU,		enc_locku,	dec_locku, 0),
   PROC(ACCESS,		enc_access,	dec_access, 1),
   PROC(GETATTR,		enc_getattr,	dec_getattr, 0),
-  PROC(LOOKUP,		enc_lookup,	dec_lookup, 0),
-  PROC(LOOKUP_ROOT,	enc_lookup_root,	dec_lookup_root, 0),
+  PROC(LOOKUP,		enc_lookup,	dec_lookup, 1),
+  PROC(LOOKUP_ROOT,	enc_lookup_root,	dec_lookup_root, 1),
   PROC(REMOVE,		enc_remove,	dec_remove, 0),
   PROC(RENAME,		enc_rename,	dec_rename, 0),
   PROC(LINK,		enc_link,	dec_link, 0),
