@@ -597,6 +597,10 @@ static int nr_sequence_quads;
 					 encode_sequence_maxsz)
 #define NFS41_dec_symlink_sz		(NFS40_dec_symlink_sz + \
 					 decode_sequence_maxsz)
+#define NFS41_enc_getattr_sz		(NFS40_enc_getattr_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_getattr_sz		(NFS40_dec_getattr_sz + \
+					 decode_sequence_maxsz)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -1954,6 +1958,23 @@ static int nfs40_xdr_enc_getattr(struct rpc_rqst *req, __be32 *p, const struct n
 
 	return nfs4_xdr_enc_getattr(&xdr, args);
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_getattr(struct rpc_rqst *req, __be32 *p,
+				 const struct nfs4_getattr_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_getattr(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Encode a CLOSE request
@@ -4989,6 +5010,28 @@ out:
 
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_getattr(struct rpc_rqst *rqstp, __be32 *p,
+				 struct nfs4_getattr_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = nfs4_xdr_dec_getattr(&xdr, res);
+out:
+	return status;
+
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Encode an SETACL request
  */
@@ -6015,7 +6058,7 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(LOCKT,		enc_lockt,	dec_lockt, 0),
   PROC(LOCKU,		enc_locku,	dec_locku, 0),
   PROC(ACCESS,		enc_access,	dec_access, 1),
-  PROC(GETATTR,		enc_getattr,	dec_getattr, 0),
+  PROC(GETATTR,		enc_getattr,	dec_getattr, 1),
   PROC(LOOKUP,		enc_lookup,	dec_lookup, 1),
   PROC(LOOKUP_ROOT,	enc_lookup_root,	dec_lookup_root, 1),
   PROC(REMOVE,		enc_remove,	dec_remove, 1),
