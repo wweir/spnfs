@@ -319,8 +319,8 @@ struct nfs_readargs {
 	__u32			count;
 	unsigned int		pgbase;
 	struct page **		pages;
-#ifdef CONFIG_NFS_V4
-	void *                  minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_args	seq_args;
 #endif
 };
 
@@ -328,8 +328,8 @@ struct nfs_readres {
 	struct nfs_fattr *	fattr;
 	__u32			count;
 	int                     eof;
-#ifdef CONFIG_NFS_V4
-	void *                  minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_res	seq_res;
 #endif
 };
 
