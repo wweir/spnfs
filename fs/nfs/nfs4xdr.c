@@ -2024,7 +2024,9 @@ static int nfs40_xdr_enc_locku(struct rpc_rqst *req, __be32 *p, struct nfs_locku
 /*
  * Encode a READLINK request
  */
-static int nfs4_xdr_enc_readlink(struct rpc_rqst *req, struct xdr_stream *xdr, const struct nfs4_readlink *args)
+static int nfs4_xdr_enc_readlink(struct rpc_rqst *req, struct xdr_stream *xdr,
+					const struct nfs4_readlink *args,
+					const size_t dec_readlink_sz)
 {
 	unsigned int replen;
 	int status;
@@ -2039,7 +2041,7 @@ static int nfs4_xdr_enc_readlink(struct rpc_rqst *req, struct xdr_stream *xdr, c
 	 *    toplevel_status + taglen + rescount + OP_PUTFH + status
 	 *      + OP_READLINK + status + string length = 8
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS40_dec_readlink_sz) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + dec_readlink_sz) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen, args->pages,
 			args->pgbase, args->pglen);
 
@@ -2057,13 +2059,15 @@ static int nfs40_xdr_enc_readlink(struct rpc_rqst *req, __be32 *p, const struct 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
 	encode_compound_hdr(&xdr, &hdr, 0);
 	
-	return nfs4_xdr_enc_readlink(req, &xdr, args);
+	return nfs4_xdr_enc_readlink(req, &xdr, args, NFS40_dec_readlink_sz);
 }
 
 /*
  * Encode a READDIR request
  */
-static int nfs4_xdr_enc_readdir(struct rpc_rqst *req, struct xdr_stream *xdr, const struct nfs4_readdir_arg *args)
+static int nfs4_xdr_enc_readdir(struct rpc_rqst *req, struct xdr_stream *xdr,
+					const struct nfs4_readdir_arg *args,
+					const size_t dec_readdir_sz)
 {
 	struct rpc_auth *auth = req->rq_task->tk_msg.rpc_cred->cr_auth;
 	int replen;
@@ -2078,7 +2082,7 @@ static int nfs4_xdr_enc_readdir(struct rpc_rqst *req, struct xdr_stream *xdr, co
 	 *    toplevel_status + taglen + rescount + OP_PUTFH + status
 	 *      + OP_READDIR + status + verifer(2)  = 9
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS40_dec_readdir_sz) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + dec_readdir_sz) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen, args->pages,
 			 args->pgbase, args->count);
 	dprintk("%s: inlined page args = (%u, %p, %u, %u)\n",
@@ -2099,13 +2103,15 @@ static int nfs40_xdr_enc_readdir(struct rpc_rqst *req, __be32 *p, const struct n
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
 	encode_compound_hdr(&xdr, &hdr, 0);
 
-	return nfs4_xdr_enc_readdir(req, &xdr, args);
+	return nfs4_xdr_enc_readdir(req, &xdr, args, NFS40_dec_readdir_sz);
 }
 
 /*
  * Encode a READ request
  */
-static int nfs4_xdr_enc_read(struct rpc_rqst *req, struct xdr_stream *xdr, struct nfs_readargs *args)
+static int nfs4_xdr_enc_read(struct rpc_rqst *req, struct xdr_stream *xdr,
+						struct nfs_readargs *args,
+						const size_t dec_read_sz)
 {
 	struct rpc_auth *auth = req->rq_task->tk_msg.rpc_cred->cr_auth;
 	int replen, status;
@@ -2121,7 +2127,7 @@ static int nfs4_xdr_enc_read(struct rpc_rqst *req, struct xdr_stream *xdr, struc
 	 *    toplevel status + taglen=0 + rescount + OP_PUTFH + status
 	 *       + OP_READ + status + eof + datalen = 9
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS40_dec_read_sz) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + dec_read_sz) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen,
 			 args->pages, args->pgbase, args->count);
 	req->rq_rcv_buf.flags |= XDRBUF_READ;
@@ -2139,7 +2145,7 @@ static int nfs40_xdr_enc_read(struct rpc_rqst *req, __be32 *p, struct nfs_readar
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
 	encode_compound_hdr(&xdr, &hdr, 0);
 
-	return nfs4_xdr_enc_read(req, &xdr, args);
+	return nfs4_xdr_enc_read(req, &xdr, args, NFS40_dec_read_sz);
 }
 
 /*
@@ -2180,7 +2186,7 @@ static int nfs40_xdr_enc_setattr(struct rpc_rqst *req, __be32 *p, struct nfs_set
  */
 static int
 nfs4_xdr_enc_getacl(struct rpc_rqst *req, struct xdr_stream *xdr,
-		struct nfs_getaclargs *args)
+		struct nfs_getaclargs *args, const size_t dec_getacl_sz)
 {
 	struct rpc_auth *auth = req->rq_task->tk_msg.rpc_cred->cr_auth;
 	int replen, status;
@@ -2190,7 +2196,7 @@ nfs4_xdr_enc_getacl(struct rpc_rqst *req, struct xdr_stream *xdr,
 		goto out;
 	status = encode_getattr_two(xdr, FATTR4_WORD0_ACL, 0);
 	/* set up reply buffer: */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS40_dec_getacl_sz) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + dec_getacl_sz) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen,
 		args->acl_pages, args->acl_pgbase, args->acl_len);
 out:
@@ -2209,7 +2215,7 @@ nfs40_xdr_enc_getacl(struct rpc_rqst *req, __be32 *p,
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
 	encode_compound_hdr(&xdr, &hdr, 0);
 
-	return nfs4_xdr_enc_getacl(req, &xdr, args);
+	return nfs4_xdr_enc_getacl(req, &xdr, args, NFS40_dec_getacl_sz);
 }
 
 /*
