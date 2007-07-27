@@ -1432,7 +1432,7 @@ static int encode_delegreturn(struct xdr_stream *xdr, const nfs4_stateid *statei
 
 }
 
-#ifdef CONFIG_NFS_V4_1
+#if defined(CONFIG_NFS_V4_1)
 /* NFSv4.1 operations */
 static int encode_create_session(struct xdr_stream *xdr,
 				struct nfs41_create_session_args *args)
@@ -1491,6 +1491,27 @@ static int encode_create_session(struct xdr_stream *xdr,
 	WRITE32(0);                             /* UID */
 	WRITE32(0);                             /* GID */
 	WRITE32(0);                             /* No more gids */
+
+	return 0;
+}
+
+static int encode_sequence(struct xdr_stream *xdr,
+			   const struct nfs41_sequence_args *args)
+{
+	__be32 *p;
+
+	RESERVE_SPACE(4);
+	WRITE32(OP_SEQUENCE);
+
+	/*
+	 * Sessionid + seqid + slotid + max slotid + cache_this
+	 */
+	RESERVE_SPACE(SESSIONID_SIZE + 16);
+	WRITEMEM(args->sa_sessionid, SESSIONID_SIZE);
+	WRITE32(args->sa_seqid);
+	WRITE32(args->sa_slotid);
+	WRITE32(args->sa_max_slotid);
+	WRITE32(args->sa_cache_this);
 
 	return 0;
 }
