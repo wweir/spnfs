@@ -617,6 +617,18 @@ static int nr_sequence_quads;
 					 encode_sequence_maxsz)
 #define NFS41_dec_open_downgrade_sz	(NFS40_dec_open_downgrade_sz + \
 					 decode_sequence_maxsz)
+#define NFS41_enc_lock_sz		(NFS40_enc_lock_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_lock_sz		(NFS40_dec_lock_sz + \
+					 decode_sequence_maxsz)
+#define NFS41_enc_locku_sz		(NFS40_enc_locku_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_locku_sz		(NFS40_dec_locku_sz + \
+					 decode_sequence_maxsz)
+#define NFS41_enc_lockt_sz		(NFS40_enc_lockt_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_lockt_sz		(NFS40_dec_lockt_sz + \
+					 decode_sequence_maxsz)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -2252,6 +2264,23 @@ static int nfs40_xdr_enc_lock(struct rpc_rqst *req, __be32 *p, struct nfs_lock_a
 	return nfs4_xdr_enc_lock(&xdr, args);
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_lock(struct rpc_rqst *req, __be32 *p,
+			      struct nfs_lock_args *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_lock(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Encode a LOCKT request
  */
@@ -2280,6 +2309,23 @@ static int nfs40_xdr_enc_lockt(struct rpc_rqst *req, __be32 *p, struct nfs_lockt
 	return nfs4_xdr_enc_lockt(&xdr, args);
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_lockt(struct rpc_rqst *req, __be32 *p,
+			       struct nfs_lockt_args *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_lockt(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Encode a LOCKU request
  */
@@ -2307,6 +2353,23 @@ static int nfs40_xdr_enc_locku(struct rpc_rqst *req, __be32 *p, struct nfs_locku
 
 	return nfs4_xdr_enc_locku(&xdr, args);
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_locku(struct rpc_rqst *req, __be32 *p,
+			       struct nfs_locku_args *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_locku(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Encode a READLINK request
@@ -5513,6 +5576,27 @@ out:
 	return status;
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_lock(struct rpc_rqst *rqstp, __be32 *p,
+			      struct nfs_lock_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = nfs4_xdr_dec_lock(&xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Decode LOCKT response
  */
@@ -5544,6 +5628,27 @@ out:
 	return status;
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_lockt(struct rpc_rqst *rqstp, __be32 *p,
+			       struct nfs_lockt_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = nfs4_xdr_dec_lockt(&xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Decode LOCKU response
  */
@@ -5574,6 +5679,27 @@ static int nfs40_xdr_dec_locku(struct rpc_rqst *rqstp, __be32 *p, struct nfs_loc
 out:
 	return status;
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_locku(struct rpc_rqst *rqstp, __be32 *p,
+			       struct nfs_locku_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = nfs4_xdr_dec_locku(&xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Decode READLINK response
@@ -6223,9 +6349,9 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(SETCLIENTID,	enc_setclientid,	dec_setclientid, 0),
   PROC(SETCLIENTID_CONFIRM,
 			enc_setclientid_confirm, dec_setclientid_confirm, 0),
-  PROC(LOCK,		enc_lock,	dec_lock, 0),
-  PROC(LOCKT,		enc_lockt,	dec_lockt, 0),
-  PROC(LOCKU,		enc_locku,	dec_locku, 0),
+  PROC(LOCK,		enc_lock,	dec_lock, 1),
+  PROC(LOCKT,		enc_lockt,	dec_lockt, 1),
+  PROC(LOCKU,		enc_locku,	dec_locku, 1),
   PROC(ACCESS,		enc_access,	dec_access, 1),
   PROC(GETATTR,		enc_getattr,	dec_getattr, 1),
   PROC(LOOKUP,		enc_lookup,	dec_lookup, 1),
