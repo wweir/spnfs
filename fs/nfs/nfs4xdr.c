@@ -589,6 +589,10 @@ static int nr_sequence_quads;
 					 encode_sequence_maxsz)
 #define NFS41_dec_link_sz		(NFS40_dec_link_sz + \
 					 decode_sequence_maxsz)
+#define NFS41_enc_create_sz		(NFS40_enc_create_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_create_sz		(NFS40_dec_create_sz + \
+					 decode_sequence_maxsz)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -1888,6 +1892,23 @@ static int nfs40_xdr_enc_create(struct rpc_rqst *req, __be32 *p, const struct nf
 	
 	return nfs4_xdr_enc_create(&xdr, args);
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_create(struct rpc_rqst *req, __be32 *p,
+				const struct nfs4_create_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 8,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_create(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Encode SYMLINK request
@@ -4886,6 +4907,27 @@ out:
 	return status;
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_create(struct rpc_rqst *rqstp, __be32 *p,
+				struct nfs4_create_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = nfs4_xdr_dec_create(&xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Decode SYMLINK response
  */
@@ -5960,7 +6002,7 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(RENAME,		enc_rename,	dec_rename, 1),
   PROC(LINK,		enc_link,	dec_link, 1),
   PROC(SYMLINK,		enc_symlink,	dec_symlink, 0),
-  PROC(CREATE,		enc_create,	dec_create, 0),
+  PROC(CREATE,		enc_create,	dec_create, 1),
   PROC(PATHCONF,	enc_pathconf,	dec_pathconf, 0),
   PROC(STATFS,		enc_statfs,	dec_statfs, 0),
   PROC(READLINK,	enc_readlink,	dec_readlink, 0),
