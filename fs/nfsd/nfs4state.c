@@ -2403,6 +2403,7 @@ set_curr_ses:
 	 * nfs41_put_session called only if cs_slot is set
 	 */
 	memcpy(&c_ses->cs_sid, &seq->sessionid, sizeof(c_ses->cs_sid));
+	BUG_ON(sizeof(c_ses->cs_sid) != sizeof(seq->sessionid));
 	c_ses->cs_slot = slot;
 	nfs41_get_session(slot->sl_session);
 
