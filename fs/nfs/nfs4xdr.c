@@ -609,6 +609,14 @@ static int nr_sequence_quads;
 					 encode_sequence_maxsz)
 #define NFS41_dec_open_sz		(NFS40_dec_open_sz + \
 					 decode_sequence_maxsz)
+#define NFS41_enc_open_noattr_sz	(NFS40_enc_open_noattr_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_open_noattr_sz	(NFS40_dec_open_noattr_sz + \
+					 decode_sequence_maxsz)
+#define NFS41_enc_open_downgrade_sz	(NFS40_enc_open_downgrade_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_open_downgrade_sz	(NFS40_dec_open_downgrade_sz + \
+					 decode_sequence_maxsz)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -2151,6 +2159,23 @@ static int nfs40_xdr_enc_open_noattr(struct rpc_rqst *req, __be32 *p, struct nfs
 	return nfs4_xdr_enc_open_noattr(&xdr, args);
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_open_noattr(struct rpc_rqst *req, __be32 *p,
+				     struct nfs_openargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 4,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_open_noattr(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Encode an OPEN_DOWNGRADE request
  */
@@ -2181,6 +2206,23 @@ static int nfs40_xdr_enc_open_downgrade(struct rpc_rqst *req, __be32 *p, struct 
 
 	return nfs4_xdr_enc_open_downgrade(&xdr, args);
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_open_downgrade(struct rpc_rqst *req, __be32 *p,
+					struct nfs_closeargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops	= 4,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_open_downgrade(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Encode a LOCK request
@@ -4601,6 +4643,28 @@ out:
 	return status;
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_open_downgrade(struct rpc_rqst *rqstp, __be32 *p,
+					struct nfs_closeres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = nfs4_xdr_dec_open_downgrade(&xdr, res);
+out:
+	return status;
+
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * END OF "GENERIC" DECODE ROUTINES.
  */
@@ -5360,6 +5424,27 @@ static int nfs40_xdr_dec_open_noattr(struct rpc_rqst *rqstp, __be32 *p, struct n
 out:
         return status;
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_open_noattr(struct rpc_rqst *rqstp, __be32 *p,
+				     struct nfs_openres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = nfs4_xdr_dec_open_noattr(&xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Decode SETATTR response
@@ -6129,8 +6214,8 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(COMMIT,		enc_commit,	dec_commit, 0),
   PROC(OPEN,		enc_open,	dec_open, 1),
   PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm, 0),
-  PROC(OPEN_NOATTR,	enc_open_noattr,	dec_open_noattr, 0),
-  PROC(OPEN_DOWNGRADE,	enc_open_downgrade,	dec_open_downgrade, 0),
+  PROC(OPEN_NOATTR,	enc_open_noattr,	dec_open_noattr, 1),
+  PROC(OPEN_DOWNGRADE,	enc_open_downgrade,	dec_open_downgrade, 1),
   PROC(CLOSE,		enc_close,	dec_close, 1),
   PROC(SETATTR,		enc_setattr,	dec_setattr, 0),
   PROC(FSINFO,		enc_fsinfo,	dec_fsinfo, 0),
