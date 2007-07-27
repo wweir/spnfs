@@ -352,12 +352,18 @@ struct nfs_removeargs {
 	const struct nfs_fh	*fh;
 	struct qstr		name;
 	const u32 *		bitmask;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_args	seq_args;
+#endif
 };
 
 struct nfs_removeres {
-	const struct nfs_server *server;
+	struct nfs_server *server;
 	struct nfs4_change_info	cinfo;
 	struct nfs_fattr	dir_attr;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_res 	seq_res;
+#endif
 };
 
 /*
