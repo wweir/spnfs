@@ -215,14 +215,18 @@ struct nfs_closeargs {
 	struct nfs_seqid *	seqid;
 	int			open_flags;
 	const u32 *		bitmask;
-	void *                  minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_args	seq_args;
+#endif
 };
 
 struct nfs_closeres {
 	nfs4_stateid            stateid;
 	struct nfs_fattr *	fattr;
 	const struct nfs_server *server;
-	void *                  minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_res	seq_res;
+#endif
 };
 /*
  *  * Arguments to the lock,lockt, and locku call.
