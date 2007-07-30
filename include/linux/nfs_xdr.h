@@ -871,12 +871,16 @@ struct nfs4_setclientid {
 struct nfs4_statfs_arg {
 	const struct nfs_fh *		fh;
 	const u32 *			bitmask;
-	void *                          minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_args	seq_args;
+#endif
 };
 
 struct nfs4_statfs_res {
-	void *                  minorversion_info;
-	struct nfs_fsstat *	fsstat;
+	struct nfs_fsstat	       *fsstat;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_res	seq_res;
+#endif
 };
 
 struct nfs4_server_caps_args {

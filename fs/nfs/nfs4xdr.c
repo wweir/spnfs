@@ -665,6 +665,10 @@ static int nr_sequence_quads;
 					 encode_sequence_maxsz)
 #define NFS41_dec_pathconf_sz		(NFS40_dec_pathconf_sz + \
 					 decode_sequence_maxsz)
+#define NFS41_enc_statfs_sz		(NFS40_enc_statfs_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_statfs_sz		(NFS40_dec_statfs_sz + \
+					 decode_sequence_maxsz)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -2882,6 +2886,23 @@ static int nfs40_xdr_enc_statfs(struct rpc_rqst *req, __be32 *p, const struct nf
 
 	return nfs4_xdr_enc_statfs(&xdr, args);
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_statfs(struct rpc_rqst *req, __be32 *p,
+				const struct nfs4_statfs_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_statfs(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * GETATTR_BITMAP request
@@ -6288,7 +6309,8 @@ static int nfs4_xdr_dec_statfs(struct xdr_stream *xdr, struct nfs_fsstat *fsstat
 	return status;
 }
 
-static int nfs40_xdr_dec_statfs(struct rpc_rqst *req, __be32 *p, struct nfs_fsstat *fsstat)
+static int nfs40_xdr_dec_statfs(struct rpc_rqst *req, __be32 *p,
+				struct nfs4_statfs_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -6297,9 +6319,27 @@ static int nfs40_xdr_dec_statfs(struct rpc_rqst *req, __be32 *p, struct nfs_fsst
 	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
 	if (!status)
-		status = nfs4_xdr_dec_statfs(&xdr, fsstat);
+		status = nfs4_xdr_dec_statfs(&xdr, res->fsstat);
 	return status;
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_statfs(struct rpc_rqst *req, __be32 *p,
+				struct nfs4_statfs_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (!status)
+		status = decode_sequence(&xdr, &res->seq_res);
+	if (!status)
+		status = nfs4_xdr_dec_statfs(&xdr, res->fsstat);
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * GETATTR_BITMAP request
@@ -6738,7 +6778,7 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(SYMLINK,		enc_symlink,	dec_symlink, 1),
   PROC(CREATE,		enc_create,	dec_create, 1),
   PROC(PATHCONF,	enc_pathconf,	dec_pathconf, 1),
-  PROC(STATFS,		enc_statfs,	dec_statfs, 0),
+  PROC(STATFS,		enc_statfs,	dec_statfs, 1),
   PROC(READLINK,	enc_readlink,	dec_readlink, 1),
   PROC(READDIR,		enc_readdir,	dec_readdir, 1),
   PROC(SERVER_CAPS,	enc_server_caps, dec_server_caps, 0),
