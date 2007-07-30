@@ -2674,17 +2674,20 @@ out:
 static ssize_t __nfs4_get_acl_uncached(struct inode *inode, void *buf, size_t buflen)
 {
 	struct page *pages[NFS4ACL_MAXPAGES];
+	size_t resp_len = buflen;
 	struct nfs_getaclargs args = {
 		.fh = NFS_FH(inode),
 		.acl_pages = pages,
 		.acl_len = buflen,
 	};
-	size_t resp_len = buflen;
+	struct nfs_getaclres res = {
+		.acl_len = &resp_len,
+	};
 	void *resp_buf;
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_GETACL],
 		.rpc_argp = &args,
-		.rpc_resp = &resp_len,
+		.rpc_resp = &res,
 	};
 	struct page *localpage = NULL;
 	int ret;

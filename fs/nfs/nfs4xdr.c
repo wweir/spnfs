@@ -673,6 +673,10 @@ static int nr_sequence_quads;
 					 encode_sequence_maxsz)
 #define NFS41_dec_server_caps_sz	(NFS40_dec_server_caps_sz + \
 					 decode_sequence_maxsz)
+#define NFS41_enc_getacl_sz		(NFS40_enc_getacl_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_getacl_sz		(NFS40_dec_getacl_sz + \
+					 decode_sequence_maxsz)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -2679,6 +2683,24 @@ nfs40_xdr_enc_getacl(struct rpc_rqst *req, __be32 *p,
 
 	return nfs4_xdr_enc_getacl(req, &xdr, args, NFS40_dec_getacl_sz);
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int
+nfs41_xdr_enc_getacl(struct rpc_rqst *req, __be32 *p,
+		     struct nfs_getaclargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_getacl(req, &xdr, args, NFS41_dec_getacl_sz);
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Encode a WRITE request
@@ -5514,7 +5536,8 @@ out:
 }
 
 static int
-nfs40_xdr_dec_getacl(struct rpc_rqst *rqstp, __be32 *p, size_t *acl_len)
+nfs40_xdr_dec_getacl(struct rpc_rqst *rqstp, __be32 *p,
+		     struct nfs_getaclres *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -5525,10 +5548,32 @@ nfs40_xdr_dec_getacl(struct rpc_rqst *rqstp, __be32 *p, size_t *acl_len)
 	if (status)
 		goto out;
 
-	status = nfs4_xdr_dec_getacl(rqstp, &xdr, acl_len);
+	status = nfs4_xdr_dec_getacl(rqstp, &xdr, res->acl_len);
 out:
 	return status;
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int
+nfs41_xdr_dec_getacl(struct rpc_rqst *rqstp, __be32 *p,
+		     struct nfs_getaclres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = nfs4_xdr_dec_getacl(rqstp, &xdr, res->acl_len);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Decode CLOSE response
@@ -6826,7 +6871,7 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(READDIR,		enc_readdir,	dec_readdir, 1),
   PROC(SERVER_CAPS,	enc_server_caps, dec_server_caps, 1),
   PROC(DELEGRETURN,	enc_delegreturn, dec_delegreturn, 1),
-  PROC(GETACL,		enc_getacl,	dec_getacl, 0),
+  PROC(GETACL,		enc_getacl,	dec_getacl, 1),
   PROC(SETACL,		enc_setacl,	dec_setacl, 0),
   PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations, 0),
 };
