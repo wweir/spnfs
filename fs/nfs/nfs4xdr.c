@@ -681,6 +681,10 @@ static int nr_sequence_quads;
 					 encode_sequence_maxsz)
 #define NFS41_dec_setacl_sz		(NFS40_dec_setacl_sz + \
 					 decode_sequence_maxsz)
+#define NFS41_enc_fs_locations_sz	(NFS40_enc_fs_locations_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_fs_locations_sz	(NFS40_dec_fs_locations_sz + \
+					 decode_sequence_maxsz)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -3180,6 +3184,23 @@ static int nfs40_xdr_enc_fs_locations(struct rpc_rqst *req, __be32 *p, struct nf
 
 	return nfs4_xdr_enc_fs_locations(req, &xdr, args);
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_fs_locations(struct rpc_rqst *req, __be32 *p,
+				      struct nfs4_fs_locations_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_fs_locations(req, &xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * START OF "GENERIC" DECODE ROUTINES.
@@ -6691,7 +6712,8 @@ out:
 	return status;
 }
 
-static int nfs40_xdr_dec_fs_locations(struct rpc_rqst *req, __be32 *p, struct nfs4_fs_locations *res)
+static int nfs40_xdr_dec_fs_locations(struct rpc_rqst *req, __be32 *p,
+				      struct nfs4_fs_locations_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -6702,10 +6724,31 @@ static int nfs40_xdr_dec_fs_locations(struct rpc_rqst *req, __be32 *p, struct nf
 	if (status != 0)
 		goto out;
 
-	status = nfs4_xdr_dec_fs_locations(&xdr, res);
+	status = nfs4_xdr_dec_fs_locations(&xdr, res->fs_locations);
 out:
 	return status;
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_fs_locations(struct rpc_rqst *req, __be32 *p,
+				      struct nfs4_fs_locations_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = nfs4_xdr_dec_fs_locations(&xdr, res->fs_locations);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 __be32 *nfs4_decode_dirent(__be32 *p, struct nfs_entry *entry, int plus)
 {
@@ -6917,7 +6960,7 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(DELEGRETURN,	enc_delegreturn, dec_delegreturn, 1),
   PROC(GETACL,		enc_getacl,	dec_getacl, 1),
   PROC(SETACL,		enc_setacl,	dec_setacl, 1),
-  PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations, 0),
+  PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations, 1),
 };
 #endif /* CONFIG_NFS_V4_1 */
 

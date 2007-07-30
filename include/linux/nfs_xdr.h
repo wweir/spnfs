@@ -940,12 +940,16 @@ struct nfs4_fs_locations_arg {
 	const struct qstr *name;
 	struct page *page;
 	const u32 *bitmask;
-	void *                          minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_args	seq_args;
+#endif
 };
 
 struct nfs4_fs_locations_res {
-	void *                  	minorversion_info;
-	struct nfs4_fs_locations *	fs_locations;
+	struct nfs4_fs_locations       *fs_locations;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_res	seq_res;
+#endif
 };
 
 #endif /* CONFIG_NFS_V4 */
