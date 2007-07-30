@@ -685,6 +685,8 @@ static int nr_sequence_quads;
 					 encode_sequence_maxsz)
 #define NFS41_dec_fs_locations_sz	(NFS40_dec_fs_locations_sz + \
 					 decode_sequence_maxsz)
+#define NFS41_enc_error_sz		(0)
+#define NFS41_dec_error_sz		(0)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -1654,6 +1656,13 @@ static int encode_destroy_session(struct xdr_stream *xdr,
 /*
  * END OF "GENERIC" ENCODE ROUTINES.
  */
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_error(struct rpc_rqst *req, __be32 *p, void *args)
+{
+	BUG();
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Encode an ACCESS request
@@ -5011,6 +5020,13 @@ out:
  * END OF "GENERIC" DECODE ROUTINES.
  */
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_error(struct rpc_rqst *req, __be32 *p, void *res)
+{
+	BUG();
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Decode ACCESS response
  */
@@ -6930,16 +6946,15 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(WRITE,		enc_write,	dec_write, 1),
   PROC(COMMIT,		enc_commit,	dec_commit, 1),
   PROC(OPEN,		enc_open,	dec_open, 1),
-  PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm, 0),
+  PROC(OPEN_CONFIRM,	enc_error,	dec_error, 1),
   PROC(OPEN_NOATTR,	enc_open_noattr,	dec_open_noattr, 1),
   PROC(OPEN_DOWNGRADE,	enc_open_downgrade,	dec_open_downgrade, 1),
   PROC(CLOSE,		enc_close,	dec_close, 1),
   PROC(SETATTR,		enc_setattr,	dec_setattr, 1),
   PROC(FSINFO,		enc_fsinfo,	dec_fsinfo, 1),
-  PROC(RENEW,		enc_renew,	dec_renew, 0),
-  PROC(SETCLIENTID,	enc_setclientid,	dec_setclientid, 0),
-  PROC(SETCLIENTID_CONFIRM,
-			enc_setclientid_confirm, dec_setclientid_confirm, 0),
+  PROC(RENEW,		enc_error,	dec_error, 1),
+  PROC(SETCLIENTID,	enc_error,	dec_error, 1),
+  PROC(SETCLIENTID_CONFIRM, enc_error,	dec_error, 1),
   PROC(LOCK,		enc_lock,	dec_lock, 1),
   PROC(LOCKT,		enc_lockt,	dec_lockt, 1),
   PROC(LOCKU,		enc_locku,	dec_locku, 1),
