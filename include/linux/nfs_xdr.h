@@ -883,9 +883,11 @@ struct nfs4_statfs_res {
 #endif
 };
 
-struct nfs4_server_caps_args {
-	void *                  minorversion_info;
-	struct nfs_fh *		fhandle;
+struct nfs4_server_caps_arg {
+	struct nfs_fh		       *fhandle;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_args	seq_args;
+#endif
 };
 
 struct nfs4_server_caps_res {
@@ -893,7 +895,9 @@ struct nfs4_server_caps_res {
 	u32				acl_bitmask;
 	u32				has_links;
 	u32				has_symlinks;
-	void *                  	minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_res	seq_res;
+#endif
 };
 
 struct nfs4_string {
