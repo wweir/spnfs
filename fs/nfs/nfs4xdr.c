@@ -653,6 +653,14 @@ static int nr_sequence_quads;
 					 encode_sequence_maxsz)
 #define NFS41_dec_commit_sz		(NFS40_dec_commit_sz + \
 					 decode_sequence_maxsz)
+#define NFS41_enc_delegreturn_sz	(NFS40_enc_delegreturn_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_delegreturn_sz	(NFS40_dec_delegreturn_sz + \
+					 decode_sequence_maxsz)
+#define NFS41_enc_fsinfo_sz		(NFS40_enc_fsinfo_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_fsinfo_sz		(NFS40_dec_fsinfo_sz + \
+					 decode_sequence_maxsz)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -2782,6 +2790,23 @@ static int nfs40_xdr_enc_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs4_fsi
 	return nfs4_xdr_enc_fsinfo(&xdr, args);
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_fsinfo(struct rpc_rqst *req, __be32 *p,
+				struct nfs4_fsinfo_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops	= 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_fsinfo(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * a PATHCONF request
  */
@@ -3009,6 +3034,23 @@ static int nfs40_xdr_enc_delegreturn(struct rpc_rqst *req, __be32 *p, const stru
 
 	return nfs4_xdr_enc_delegreturn(&xdr, args);
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_delegreturn(struct rpc_rqst *req, __be32 *p,
+				     const struct nfs4_delegreturnargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_delegreturn(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Encode FS_LOCATIONS request
@@ -6131,7 +6173,8 @@ static int nfs4_xdr_dec_fsinfo(struct xdr_stream *xdr, struct nfs_fsinfo *fsinfo
 	return status;
 }
 
-static int nfs40_xdr_dec_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs_fsinfo *fsinfo)
+static int nfs40_xdr_dec_fsinfo(struct rpc_rqst *req, __be32 *p,
+				struct nfs4_fsinfo_res *res)
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr;
@@ -6140,11 +6183,31 @@ static int nfs40_xdr_dec_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs_fsin
 	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
 	if (!status)
-		status = nfs4_xdr_dec_fsinfo(&xdr, fsinfo);
+		status = nfs4_xdr_dec_fsinfo(&xdr, res->fsinfo);
 	if (!status)
 		status = -nfs4_stat_to_errno(hdr.status);
 	return status;
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_fsinfo(struct rpc_rqst *req, __be32 *p,
+				struct nfs4_fsinfo_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (!status)
+		status = decode_sequence(&xdr, &res->seq_res);
+	if (!status)
+		status = nfs4_xdr_dec_fsinfo(&xdr, res->fsinfo);
+	if (!status)
+		status = -nfs4_stat_to_errno(hdr.status);
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * PATHCONF request
@@ -6378,6 +6441,27 @@ out:
 	return status;
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_delegreturn(struct rpc_rqst *rqstp, __be32 *p,
+				     struct nfs4_delegreturnres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = nfs4_xdr_dec_delegreturn(&xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * FS_LOCATIONS request
  */
@@ -6596,7 +6680,7 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(OPEN_DOWNGRADE,	enc_open_downgrade,	dec_open_downgrade, 1),
   PROC(CLOSE,		enc_close,	dec_close, 1),
   PROC(SETATTR,		enc_setattr,	dec_setattr, 1),
-  PROC(FSINFO,		enc_fsinfo,	dec_fsinfo, 0),
+  PROC(FSINFO,		enc_fsinfo,	dec_fsinfo, 1),
   PROC(RENEW,		enc_renew,	dec_renew, 0),
   PROC(SETCLIENTID,	enc_setclientid,	dec_setclientid, 0),
   PROC(SETCLIENTID_CONFIRM,
@@ -6618,7 +6702,7 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(READLINK,	enc_readlink,	dec_readlink, 1),
   PROC(READDIR,		enc_readdir,	dec_readdir, 1),
   PROC(SERVER_CAPS,	enc_server_caps, dec_server_caps, 0),
-  PROC(DELEGRETURN,	enc_delegreturn, dec_delegreturn, 0),
+  PROC(DELEGRETURN,	enc_delegreturn, dec_delegreturn, 1),
   PROC(GETACL,		enc_getacl,	dec_getacl, 0),
   PROC(SETACL,		enc_setacl,	dec_setacl, 0),
   PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations, 0),

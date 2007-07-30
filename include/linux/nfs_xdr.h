@@ -300,13 +300,17 @@ struct nfs4_delegreturnargs {
 	const struct nfs_fh *fhandle;
 	const nfs4_stateid *stateid;
 	const u32 * bitmask;
-	void *                  minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_args	seq_args;
+#endif
 };
 
 struct nfs4_delegreturnres {
 	struct nfs_fattr * fattr;
 	const struct nfs_server *server;
-	void *                  minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_res	seq_res;
+#endif
 };
 
 /*
@@ -704,12 +708,16 @@ struct nfs4_create_res {
 struct nfs4_fsinfo_arg {
 	const struct nfs_fh *		fh;
 	const u32 *			bitmask;
-	void *                          minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_args	seq_args;
+#endif
 };
 
 struct nfs4_fsinfo_res {
-	void *                  	minorversion_info;
-	struct nfs_fsinfo *		fsinfo;
+	struct nfs_fsinfo	       *fsinfo;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_res	seq_res;
+#endif
 };
 
 struct nfs4_getattr_arg {
