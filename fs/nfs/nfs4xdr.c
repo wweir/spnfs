@@ -677,6 +677,10 @@ static int nr_sequence_quads;
 					 encode_sequence_maxsz)
 #define NFS41_dec_getacl_sz		(NFS40_dec_getacl_sz + \
 					 decode_sequence_maxsz)
+#define NFS41_enc_setacl_sz		(NFS40_enc_setacl_sz + \
+					 encode_sequence_maxsz)
+#define NFS41_dec_setacl_sz		(NFS40_dec_setacl_sz + \
+					 decode_sequence_maxsz)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -5485,6 +5489,24 @@ nfs40_xdr_enc_setacl(struct rpc_rqst *req, __be32 *p, struct nfs_setaclargs *arg
 	return nfs4_xdr_enc_setacl(&xdr, args);
 }
 
+#if defined(CONFIG_NFS_V4_1)
+static int
+nfs41_xdr_enc_setacl(struct rpc_rqst *req, __be32 *p,
+		     struct nfs_setaclargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 3,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+
+	return nfs4_xdr_enc_setacl(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Decode SETACL response
  */
@@ -5517,6 +5539,28 @@ nfs40_xdr_dec_setacl(struct rpc_rqst *rqstp, __be32 *p, void *res)
 out:
 	return status;
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int
+nfs41_xdr_dec_setacl(struct rpc_rqst *rqstp, __be32 *p,
+		     struct nfs_setaclres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	return nfs4_xdr_dec_setacl(&xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Decode GETACL response
@@ -6872,7 +6916,7 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(SERVER_CAPS,	enc_server_caps, dec_server_caps, 1),
   PROC(DELEGRETURN,	enc_delegreturn, dec_delegreturn, 1),
   PROC(GETACL,		enc_getacl,	dec_getacl, 1),
-  PROC(SETACL,		enc_setacl,	dec_setacl, 0),
+  PROC(SETACL,		enc_setacl,	dec_setacl, 1),
   PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations, 0),
 };
 #endif /* CONFIG_NFS_V4_1 */

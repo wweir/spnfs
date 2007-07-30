@@ -450,9 +450,16 @@ struct nfs_setaclargs {
 	size_t				acl_len;
 	unsigned int			acl_pgbase;
 	struct page **			acl_pages;
-	void *				minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_args	seq_args;
+#endif
 };
 
+struct nfs_setaclres {
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_res	seq_res;
+#endif
+};
 
 struct nfs_getaclargs {
 	struct nfs_fh *			fh;
@@ -479,10 +486,6 @@ struct nfs_setattrres {
 #endif
 };
 
-struct nfs_setaclres {
-	struct nfs_setattrres *		opres;
-	void *				minorversion_info;
-};
 
 struct nfs_linkargs {
 	struct nfs_fh *		fromfh;
