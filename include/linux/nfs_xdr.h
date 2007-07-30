@@ -785,12 +785,16 @@ struct nfs4_lookup_root_arg {
 struct nfs4_pathconf_arg {
 	const struct nfs_fh *		fh;
 	const u32 *			bitmask;
-	void *                          minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_args	seq_args;
+#endif
 };
 
 struct nfs4_pathconf_res {
-	void *                  minorversion_info;
-	struct nfs_pathconf *	pathconf;
+	struct nfs_pathconf	       *pathconf;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_res	seq_res;
+#endif
 };
 
 struct nfs4_readdir_arg {
