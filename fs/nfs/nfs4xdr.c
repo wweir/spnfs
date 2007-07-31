@@ -1494,7 +1494,7 @@ static int encode_setclientid(struct xdr_stream *xdr, const struct nfs4_setclien
 	return 0;
 }
 
-#ifdef CONFIG_NFS_V4_1
+#if defined(CONFIG_NFS_V4_1)
 static int encode_exchange_id(struct xdr_stream *xdr, struct nfs41_exchange_id_args *args)
 {
 
@@ -3024,7 +3024,7 @@ static int nfs40_xdr_enc_setclientid(struct rpc_rqst *req, __be32 *p, struct nfs
 	return encode_setclientid(&xdr, sc);
 }
 
-#ifdef CONFIG_NFS_V4_1
+#if defined(CONFIG_NFS_V4_1)
 /*
  * EXCHANGE_ID request
  */
@@ -3066,7 +3066,7 @@ static int nfs40_xdr_enc_setclientid_confirm(struct rpc_rqst *req, __be32 *p, st
 	return status;
 }
 
-#ifdef CONFIG_NFS_V4_1
+#if defined(CONFIG_NFS_V4_1)
 /*
  * a CREATE_SESSION request
  */
@@ -4776,7 +4776,7 @@ static int decode_setclientid(struct xdr_stream *xdr, struct nfs_client *clp)
 	return 0;
 }
 
-#ifdef CONFIG_NFS_V4_1
+#if defined(CONFIG_NFS_V4_1)
 static int decode_exchange_id(struct xdr_stream *xdr, struct nfs41_exchange_id_res *res)
 {
 	uint32_t *p;
@@ -6574,7 +6574,7 @@ static int nfs40_xdr_dec_setclientid(struct rpc_rqst *req, __be32 *p,
 	return status;
 }
 
-#ifdef CONFIG_NFS_V4_1
+#if defined(CONFIG_NFS_V4_1)
 /*
  * EXCHANGE_ID request
  */
@@ -6935,9 +6935,6 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(GETACL,		enc_getacl,	dec_getacl, 0),
   PROC(SETACL,		enc_setacl,	dec_setacl, 0),
   PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations, 0),
-  PROC(EXCHANGE_ID,	enc_exchange_id,	dec_exchange_id, 1),
-  PROC(CREATE_SESSION,	enc_create_session,	dec_create_session, 1),
-  PROC(DESTROY_SESSION,	enc_destroy_session,	dec_destroy_session, 1),
 };
 
 #if defined(CONFIG_NFS_V4_1)
@@ -6976,6 +6973,9 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(GETACL,		enc_getacl,	dec_getacl, 1),
   PROC(SETACL,		enc_setacl,	dec_setacl, 1),
   PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations, 1),
+  PROC(EXCHANGE_ID,	enc_exchange_id,	dec_exchange_id, 1),
+  PROC(CREATE_SESSION,	enc_create_session,	dec_create_session, 1),
+  PROC(DESTROY_SESSION,	enc_destroy_session,	dec_destroy_session, 1),
 };
 #endif /* CONFIG_NFS_V4_1 */
 
