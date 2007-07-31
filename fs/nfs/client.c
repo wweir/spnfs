@@ -935,6 +935,13 @@ static int nfs4_init_server(struct nfs_server *server,
 
 	dprintk("--> nfs4_init_server()\n");
 
+	/*
+	 * XXX For development default to minor version 1.  Will want to
+	 * change to 0 for deployment once there's a way to specify the
+	 * minor version from the command line.
+	 */
+	server->minor_version = 1;
+
 	/* Initialise the client representation from the mount data */
 	server->flags = data->flags & NFS_MOUNT_FLAGMASK;
 	server->caps |= NFS_CAP_ATOMIC_OPEN;
