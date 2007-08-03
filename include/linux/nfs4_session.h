@@ -2,6 +2,8 @@
 #define _NFS4_SESSIONS_H
 
 #include <linux/nfs4.h>
+#include <linux/smp_lock.h>
+#include <linux/sunrpc/sched.h>
 
 /* The flags for the nfs4_slot struct */
 #define NFS4_SLOT_BUSY		0X0	/* Slot in use */
@@ -45,6 +47,7 @@ struct nfs4_channel {
 struct nfs4_session {
 	nfs41_sessionid			sess_id;
 	u32				flags;
+	unsigned long			session_state;
 	u32				header_padding;
 	u32				hash_alg;
 	u32				ssv_len;
@@ -57,6 +60,7 @@ struct nfs4_session {
 	struct list_head		session_hashtbl;
 	spinlock_t 			session_lock;
 	atomic_t			ref_count;
+	struct rpc_wait_queue		recovery_waitq;
 };
 
 
