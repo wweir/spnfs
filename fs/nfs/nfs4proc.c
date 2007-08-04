@@ -206,6 +206,193 @@ static void renew_lease(const struct nfs_server *server, unsigned long timestamp
 	spin_unlock(&clp->cl_lock);
 }
 
+static int nfs4_recover_expired_lease(struct nfs_server *server)
+{
+	struct nfs_client *clp = server->nfs_client;
+	int ret;
+
+	for (;;) {
+		ret = nfs4_wait_clnt_recover(server->client, clp);
+		if (ret != 0)
+			return ret;
+		if (!test_and_clear_bit(NFS4CLNT_LEASE_EXPIRED, &clp->cl_state))
+			break;
+		nfs4_schedule_state_recovery(clp);
+	}
+	return 0;
+}
+
+int nfs4_wait_bit_interruptible(void *word)
+{
+	if (signal_pending(current))
+		return -ERESTARTSYS;
+	schedule();
+	return 0;
+}
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_proc_sequence_done(struct nfs_server *server,
+	struct nfs41_sequence_res *res, int status)
+{
+	unsigned long timestamp;
+	struct nfs_client *clp;
+
+	clp = server->nfs_client;
+	BUG_ON(clp == NULL);
+
+	if (status == 0) {
+		/*
+		 * The sequence call was successful,
+		 * Update our lease renewal timers
+		 */
+		timestamp = res->sr_renewal_time;
+
+		spin_lock(&clp->cl_lock);
+		if (time_before(clp->cl_last_renewal, timestamp))
+			clp->cl_last_renewal = timestamp;
+		spin_unlock(&clp->cl_lock);
+	} else {
+		res->sr_slot->seq_nr--;
+		dprintk("%s: status %d ERROR - Decremented slot %d:%d\n",
+			__FUNCTION__, status, res->sr_slot->slot_nr,
+			res->sr_slot->seq_nr);
+	}
+
+	/* Clear the 'busy' bit on the slot that was used */
+	smp_mb__before_clear_bit();
+	clear_bit(NFS4_SLOT_BUSY, &res->sr_slot->flags);
+	smp_mb__after_clear_bit();
+
+	dprintk("waking up waiters on slot %d\n", res->sr_slot->slot_nr);
+
+	/* Wake up the threads waiting on this slot */
+	wake_up_bit(&res->sr_slot->flags, NFS4_SLOT_BUSY);
+
+	return status;
+}
+
+/* Find the lowest numbered slot or sleep on the least loaded slot */
+struct nfs4_slot *nfs4_find_slot(struct nfs4_channel *channel)
+{
+	struct nfs4_slot_table *tbl;
+	struct nfs4_slot *slot;
+	struct nfs4_slot *target_slot;
+	u32 max_slots;
+	u32 min_waiters;
+	int i;
+	int need_to_sleep;
+
+	might_sleep();
+
+	tbl = &channel->slot_table;
+	min_waiters = tbl->slots[0].nr_waiters;
+	target_slot = &tbl->slots[0];
+
+	/* Make a local copy of max slots.
+	 * XXX Will need to revalidate this if slots are reclaimed
+	 */
+	max_slots = atomic_read(&tbl->max_slots);
+
+	do {
+		need_to_sleep = 1;
+		for (i = 0; i <  max_slots; ++i) {
+			slot = &tbl->slots[i];
+			if (!test_and_set_bit(NFS4_SLOT_BUSY, &slot->flags)) {
+				/* We found an empty slot */
+				target_slot = slot;
+				need_to_sleep = 0;
+				break;
+			}
+
+			spin_lock(&slot->slot_lock);
+			if (min_waiters > slot->nr_waiters) {
+				min_waiters = slot->nr_waiters;
+				target_slot = slot;
+			}
+			spin_unlock(&slot->slot_lock);
+			dprintk("slot %d has busy bit %s and "
+				"nr_waiters is %u\n",
+				slot->slot_nr,
+				(need_to_sleep) ? "set" : "unset",
+				slot->nr_waiters);
+		}
+
+		/* Check whether we need to sleep. If so, sleep on the BUSY bit
+		 * Increment the nr_waiters before sleeping and decrement it
+		 * when woken up
+		 */
+		if (need_to_sleep) {
+			dprintk("sleeping on slot %d; seq_nr: %d\n",
+					target_slot->slot_nr,
+					target_slot->seq_nr);
+			spin_lock(&target_slot->slot_lock);
+			++target_slot->nr_waiters;
+			spin_unlock(&target_slot->slot_lock);
+
+			/* XXX: We need to check the return value of
+			 * eait_on_bit so that we can check if it's
+			 * interrupted.
+			 */
+			wait_on_bit(&target_slot->flags, NFS4_SLOT_BUSY,
+					nfs4_wait_bit_interruptible,
+					TASK_INTERRUPTIBLE);
+
+			spin_lock(&target_slot->slot_lock);
+			--target_slot->nr_waiters;
+			spin_unlock(&target_slot->slot_lock);
+		} else
+			break;
+	} while (test_and_set_bit(NFS4_SLOT_BUSY, &target_slot->flags));
+
+	dprintk("slot id: %u\nseqid: %u\n max_slots: %u\n",
+		target_slot->slot_nr, target_slot->seq_nr,
+		max_slots);
+
+	return target_slot;
+}
+
+static int _nfs41_proc_setup_sequence(struct nfs4_session *session,
+	struct nfs41_sequence_args *args, struct nfs41_sequence_res *res)
+{
+	u32 *ptr;
+	struct nfs4_slot *slot;
+
+	ptr = (u32 *)session->sess_id;
+	dprintk("%s: %u:%u:%u:%u\n", __FUNCTION__,
+		ptr[0], ptr[1], ptr[2], ptr[3]);
+
+	memcpy(args->sa_sessionid, (unsigned char *)session->sess_id,
+		NFS4_MAX_SESSIONID_LEN);
+
+	slot = nfs4_find_slot(&session->fore_channel);
+
+	/* bump slot->seq_nr upon success */
+	args->sa_seqid = slot->seq_nr++;
+	dprintk("%s:Incremented slot %d:%d args->seqid %d\n",
+		__FUNCTION__, slot->slot_nr, slot->seq_nr, args->sa_seqid);
+	args->sa_slotid = slot->slot_nr;
+	args->sa_max_slotid = atomic_read(
+		&session->fore_channel.slot_table.max_slots);
+	res->sr_slot = slot;
+	res->sr_renewal_time = jiffies;
+	return 0;
+}
+
+static int nfs41_proc_setup_sequence_call(struct nfs_server *server,
+	struct nfs41_sequence_args *args,
+	struct nfs41_sequence_res *res)
+{
+	int status;
+
+	status = _nfs41_proc_setup_sequence(server->session, args, res);
+
+	if (status == 0)
+		status = nfs4_recover_expired_lease(server);
+
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 static void update_changeattr(struct inode *dir, struct nfs4_change_info *cinfo)
 {
 	struct nfs_inode *nfsi = NFS_I(dir);
@@ -947,22 +1134,6 @@ static int _nfs4_proc_open(struct nfs4_opendata *data)
 	}
 	if (!(o_res->f_attr->valid & NFS_ATTR_FATTR))
 		_nfs4_proc_getattr(server, &o_res->fh, o_res->f_attr);
-	return 0;
-}
-
-static int nfs4_recover_expired_lease(struct nfs_server *server)
-{
-	struct nfs_client *clp = server->nfs_client;
-	int ret;
-
-	for (;;) {
-		ret = nfs4_wait_clnt_recover(server->client, clp);
-		if (ret != 0)
-			return ret;
-		if (!test_and_clear_bit(NFS4CLNT_LEASE_EXPIRED, &clp->cl_state))
-			break;
-		nfs4_schedule_state_recovery(clp);
-	}
 	return 0;
 }
 
@@ -2142,6 +2313,7 @@ static int _nfs4_proc_mkdir(struct inode *dir, struct dentry *dentry,
 	struct nfs_server *server = NFS_SERVER(dir);
 	struct nfs_fh fhandle;
 	struct nfs_fattr fattr, dir_fattr;
+
 	struct nfs4_create_arg arg = {
 		.dir_fh = NFS_FH(dir),
 		.server = server,
@@ -2166,12 +2338,25 @@ static int _nfs4_proc_mkdir(struct inode *dir, struct dentry *dentry,
 	nfs_fattr_init(&fattr);
 	nfs_fattr_init(&dir_fattr);
 	
+#ifdef CONFIG_NFS_V4_1
+	if (server->minor_version == 1)
+		status = nfs41_proc_setup_sequence_call(
+				server, &arg.seq_args, &res.seq_res);
+	arg.seq_args.sa_cache_this = 1;
+#endif
+
 	status = rpc_call_sync(NFS_CLIENT(dir), &msg, 0);
 	if (!status) {
 		update_changeattr(dir, &res.dir_cinfo);
 		nfs_post_op_update_inode(dir, res.dir_fattr);
 		status = nfs_instantiate(dentry, &fhandle, &fattr);
 	}
+
+#ifdef CONFIG_NFS_V4_1
+	if (server->minor_version == 1)
+		status = nfs41_proc_sequence_done(server, &res.seq_res, status);
+#endif
+
 	return status;
 }
 
@@ -2826,14 +3011,6 @@ nfs4_async_handle_error(struct rpc_task *task, const struct nfs_server *server)
 	return 0;
 }
 
-static int nfs4_wait_bit_interruptible(void *word)
-{
-	if (signal_pending(current))
-		return -ERESTARTSYS;
-	schedule();
-	return 0;
-}
-
 static int nfs4_wait_clnt_recover(struct rpc_clnt *clnt, struct nfs_client *clp)
 {
 	sigset_t oldset;
@@ -3048,6 +3225,88 @@ int nfs4_proc_setclientid_confirm(struct nfs_client *clp, struct rpc_cred *cred)
 }
 
 #ifdef CONFIG_NFS_V4_1
+int nfs4_proc_get_lease_time(struct nfs_server *sp, struct nfs_fsinfo *fsinfo)
+{
+	struct nfs4_get_lease_time_args args;
+	struct nfs4_get_lease_time_res res = {
+		.lr_fsinfo = fsinfo,
+	};
+
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_GET_LEASE_TIME],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+	};
+	int status;
+
+	status = _nfs41_proc_setup_sequence(sp->session,
+				&args.la_seq_args,
+				&res.lr_seq_res);
+	if (status)
+		return status;
+
+	args.la_seq_args.sa_cache_this = 0;
+
+	dprintk("%s: Sequence call parameters: "
+		"slotid=%d\nsequenceid=%d,max_slotid=%d\n,cache_this=%d\n",
+		__FUNCTION__, args.la_seq_args.sa_slotid,
+		args.la_seq_args.sa_seqid, args.la_seq_args.sa_max_slotid,
+		args.la_seq_args.sa_cache_this);
+
+	status = rpc_call_sync(sp->nfs_client->cl_rpcclient, &msg, 0);
+	nfs41_proc_sequence_done(sp, &res.lr_seq_res, status);
+
+	return status;
+}
+
+/* Initialize a slot table */
+int nfs4_init_slot_table(struct nfs4_channel *channel)
+{
+	int i;
+	struct nfs4_slot_table *tbl;
+	struct nfs4_slot *slot;
+
+	tbl = &channel->slot_table;
+	atomic_set(&tbl->max_slots, channel->chan_attrs.max_reqs);
+
+	tbl->slots = kzalloc(channel->chan_attrs.max_reqs *
+				sizeof(struct nfs4_slot), GFP_ATOMIC);
+	if (!tbl->slots)
+		return -ENOMEM;
+	for (i = 0; i < channel->chan_attrs.max_reqs; ++i) {
+		slot = &tbl->slots[i];
+		slot->slot_nr = i;
+		slot->seq_nr = 1;
+		slot->flags = 0;
+		slot->nr_waiters = 0;
+		spin_lock_init(&slot->slot_lock);
+	}
+	return 0;
+}
+
+/* Destroy the slot table */
+void nfs4_destroy_slot_table(struct nfs4_channel *channel)
+{
+	int i;
+	struct nfs4_slot *slot;
+	struct nfs4_slot_table *tbl;
+	u32 max_slots;
+
+	tbl = &channel->slot_table;
+	max_slots = atomic_read(&tbl->max_slots);
+
+	for (i = 0; i < max_slots; ++i) {
+		slot = &tbl->slots[i];
+
+		BUG_ON(slot->nr_waiters);
+	}
+
+	kfree(channel->slot_table.slots);
+	channel->slot_table.slots = NULL;
+
+	return;
+}
+
 struct nfs4_session *nfs4_alloc_session(void)
 {
 	struct nfs4_session *session;
@@ -3081,10 +3340,8 @@ void nfs4_put_session(struct nfs4_session **session)
 {
 	dprintk("--> nfs4_put_session()\n");
 	if (atomic_dec_and_test(&((*session)->ref_count))) {
-/*
 		nfs4_destroy_slot_table(&((*session)->fore_channel));
-		nfs4_destroy_slot_table(&((*session)->back_channel));
-*/
+/* FIXME		nfs4_destroy_slot_table(&((*session)->back_channel)); */
 		nfs4_free_session(*session);
 		*session = NULL;
 	}
@@ -3193,24 +3450,24 @@ int nfs4_proc_create_session(struct nfs_server *sp)
 	struct nfs4_session *session;
 	struct nfs_client *clp = sp->nfs_client;
 	u32 *ptr;
+	struct nfs_fsinfo fsinfo;
 
+	dprintk("--> %s()\n", __FUNCTION__);
 	BUG_ON(sp->session == NULL);
 	BUG_ON(!sp->session->expired);
 
 	status = _nfs4_proc_create_session(clp, sp->session, clp->cl_rpcclient);
 	if (status)
-		return status;
+		goto out;
 
 	session = sp->session;
 
 	/* Init the fore channel */
-/*
 	status = nfs4_init_slot_table(&session->fore_channel);
 	dprintk("fore channel initialization returned %d\n", status);
 	if (status)
-		return status;
+		goto out;
 
-*/
 	/* Init the back channel */
 /*
 	status = nfs4_init_slot_table(&session->back_channel);
@@ -3224,8 +3481,25 @@ int nfs4_proc_create_session(struct nfs_server *sp)
 	dprintk("%s client>seqid %d\n", __FUNCTION__, clp->cl_seqid);
 	ptr = (int *)session->sess_id;
 	dprintk("sessionid is: %d:%d:%d:%d\n", ptr[0], ptr[1], ptr[2], ptr[3]);
-	if (status == 0)
+
+	/* Get the lease time */
+	status = nfs4_proc_get_lease_time(sp, &fsinfo);
+	if (status == 0) {
+		/* Update lease time and schedule renewal */
+		spin_lock(&clp->cl_lock);
+		clp->cl_lease_time = fsinfo.lease_time * HZ;
+		clp->cl_last_renewal = jiffies;
+		clear_bit(NFS4CLNT_LEASE_EXPIRED, &clp->cl_state);
+		spin_unlock(&clp->cl_lock);
+
+		nfs4_schedule_state_renewal(clp);
 		session->expired = 0;	/* Activate session */
+	} else {
+		nfs4_put_session(&sp->session);
+	}
+
+out:
+	dprintk("<-- %s()\n", __FUNCTION__);
 	return status;
 }
 

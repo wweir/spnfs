@@ -1,5 +1,5 @@
-#ifndef __NFS4_1_SESSIONS_H__
-#define __NFS4_1_SESSIONS_H__
+#ifndef _NFS4_SESSIONS_H
+#define _NFS4_SESSIONS_H
 
 #include <linux/nfs4.h>
 

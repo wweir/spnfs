@@ -1767,6 +1767,7 @@ static void nfs4_kill_super(struct super_block *sb)
 {
 	struct nfs_server *server = NFS_SB(sb);
 
+	dprintk("--> %s\n", __FUNCTION__);
 	nfs_return_all_delegations(sb);
 	kill_anon_super(sb);
 
@@ -1779,6 +1780,7 @@ static void nfs4_kill_super(struct super_block *sb)
 #endif /* CONFIG_NFS_V4_1 */
 	nfs4_renewd_prepare_shutdown(server);
 	nfs_free_server(server);
+	dprintk("<-- %s\n", __FUNCTION__);
 }
 
 /*

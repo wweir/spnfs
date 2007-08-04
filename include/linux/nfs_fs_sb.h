@@ -79,6 +79,10 @@ struct nfs_client {
 #endif
 };
 
+#ifdef CONFIG_NFS_V4_1
+	struct nfs4_session;	/* NFSv4.1 session */
+#endif
+
 /*
  * NFS client parameters stored in the superblock.
  */

@@ -149,6 +149,17 @@ struct nfs41_sequence_res {
 	slotid4			sr_max_slotid;
 	slotid4			sr_target_max_slotid;
 	u32			sr_flags;
+	struct nfs4_slot	*sr_slot;	/* Used to send request */
+	unsigned long		sr_renewal_time;
+};
+
+struct nfs4_get_lease_time_args {
+	struct nfs41_sequence_args	la_seq_args;
+};
+
+struct nfs4_get_lease_time_res {
+	struct nfs_fsinfo	       *lr_fsinfo;
+	struct nfs41_sequence_res	lr_seq_res;
 };
 
 #endif	/* CONFIG_NFS_V4_1 */
