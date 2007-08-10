@@ -92,6 +92,7 @@ static void nfs4_set_recdir(char *recdir);
  * 	unconfstr_hashtbl[], uncofid_hashtbl[].
  */
 static DEFINE_MUTEX(client_mutex);
+static struct thread_info *client_mutex_owner;
 
 static struct kmem_cache *stateowner_slab = NULL;
 static struct kmem_cache *file_slab = NULL;
@@ -104,11 +105,13 @@ void
 nfs4_lock_state(void)
 {
 	mutex_lock(&client_mutex);
+	client_mutex_owner = current_thread_info();
 }
 
 void
 nfs4_unlock_state(void)
 {
+	client_mutex_owner = NULL;
 	mutex_unlock(&client_mutex);
 }
 
@@ -508,6 +511,9 @@ alloc_client(struct xdr_netobj name)
 		if ((clp->cl_name.data = kmalloc(name.len, GFP_KERNEL)) != NULL) {
 			memcpy(clp->cl_name.data, name.data, name.len);
 			clp->cl_name.len = name.len;
+#if defined(CONFIG_NFSD_V4_1)
+			mutex_init(&clp->cl_cb_mutex);
+#endif
 		}
 		else {
 			kfree(clp);
@@ -522,6 +528,7 @@ shutdown_callback_client(struct nfs4_client *clp)
 {
 	struct rpc_clnt *clnt = clp->cl_callback.cb_client;
 
+	dprintk("NFSD: %s: clp %p cb_client %p\n", __FUNCTION__, clp, clnt);
 	/* shutdown rpc client, ending any outstanding recall rpcs */
 	if (clnt) {
 		clp->cl_callback.cb_client = NULL;
@@ -540,6 +547,9 @@ free_client(struct nfs4_client *clp)
 	shutdown_callback_client(clp);
 	if (clp->cl_cred.cr_group_info)
 		put_group_info(clp->cl_cred.cr_group_info);
+#if defined(CONFIG_NFSD_V4_1)
+	mutex_destroy(&clp->cl_cb_mutex);
+#endif
 	kfree(clp->cl_name.data);
 	kfree(clp);
 }
@@ -1351,7 +1361,21 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 
 		unconf->cl_seqid++;
 		move_to_confirmed(unconf);
-		nfsd4_probe_callback(unconf);
+
+		/*
+		 * We do not support RDMA or persistent sessions
+		 */
+		session->flags &= ~SESSION4_PERSIST;
+		session->flags &= ~SESSION4_RDMA;
+
+		if (!(unconf->cl_exchange_flags & EXCHGID4_FLAG_USE_PNFS_MDS) &&
+			unconf->cl_exchange_flags & EXCHGID4_FLAG_USE_PNFS_DS)
+			session->flags &= ~SESSION4_BACK_CHAN;
+
+		if (session->flags & SESSION4_BACK_CHAN) {
+			unconf->svsk = rqstp->rq_sock;
+			nfsd41_probe_callback(unconf);
+		}
 		conf = unconf;
 	}
 
@@ -1752,11 +1776,24 @@ static
 void nfsd_break_deleg_cb(struct file_lock *fl)
 {
 	struct nfs4_delegation *dp=  (struct nfs4_delegation *)fl->fl_owner;
+	struct rpc_clnt *clnt;
 	struct task_struct *t;
 
 	dprintk("NFSD nfsd_break_deleg_cb: dp %p fl %p\n",dp,fl);
 	if (!dp)
 		return;
+
+	nfs4_lock_state();
+	clnt = dp->dl_client->cl_callback.cb_client;
+	if (!atomic_read(&dp->dl_client->cl_callback.cb_set) || !clnt) {
+		nfs4_unlock_state();
+		return;
+	}
+	/*
+	 * FIXME: should use kref now
+	 */
+	//atomic_inc(&clnt->cl_users);
+	nfs4_unlock_state();
 
 	/* We're assuming the state code never drops its reference
 	 * without first removing the lease.  Since we're in this lease
@@ -1788,7 +1825,10 @@ void nfsd_break_deleg_cb(struct file_lock *fl)
 			"for client (clientid %08x/%08x)\n",
 			clp->cl_clientid.cl_boot, clp->cl_clientid.cl_id);
 		put_nfs4_client(dp->dl_client);
+		rpc_release_client(clnt);
+		nfs4_lock_state();
 		nfs4_put_delegation(dp);
+		nfs4_unlock_state();
 	}
 }
 

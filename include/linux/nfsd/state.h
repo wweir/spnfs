@@ -70,7 +70,6 @@ typedef struct {
 
 
 struct nfs4_cb_recall {
-	u32			cbr_minorversion;
 	u32			cbr_ident;
 	int			cbr_trunc;
 	stateid_t		cbr_stateid;
@@ -183,6 +182,16 @@ struct current_session {
 	nfsd_sessionid_t	cs_sid;
 	struct nfs41_slot	*cs_slot;
 };
+
+struct nfs41_cb_sequence {
+	/* args/res */
+	char			cbs_sessionid[NFS4_MAX_SESSIONID_LEN];
+	u32			cbs_seqid;
+	u32			cbs_slotid;
+	u32			cbs_highest_slotid;
+	u32			cbsa_cachethis;			/* args only */
+	u32			cbsr_target_highest_slotid;	/* res only */
+};
 #endif /* CONFIG_NFSD_V4_1 */
 
 #define HEXDIR_LEN     33 /* hex version of 16 byte md5 of cl_name plus '\0' */
@@ -225,6 +234,9 @@ struct nfs4_client {
          * For the v4.1 callback path setup
          */
         struct svc_sock *       svsk;
+	/* FIXME: support multiple callback slots */
+	struct mutex            cl_cb_mutex;
+	u32                     cl_cb_seq_nr;
 #endif
 };
 

@@ -33,6 +33,7 @@ EXPORT_SYMBOL(rpc_wake_up_status);
 /* RPC client functions */
 EXPORT_SYMBOL(rpc_clone_client);
 EXPORT_SYMBOL(rpc_bind_new_program);
+EXPORT_SYMBOL(rpc_release_client);
 EXPORT_SYMBOL(rpc_shutdown_client);
 EXPORT_SYMBOL(rpc_killall_tasks);
 EXPORT_SYMBOL(rpc_call_sync);
