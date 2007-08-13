@@ -61,6 +61,7 @@ struct nfs4_session {
 	spinlock_t 			session_lock;
 	atomic_t			ref_count;
 	struct rpc_wait_queue		recovery_waitq;
+	struct rpc_clnt		       *clnt;
 };
 
 

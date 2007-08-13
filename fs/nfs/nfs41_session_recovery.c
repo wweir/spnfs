@@ -44,11 +44,13 @@ int nfs41_set_session_expired(struct nfs4_session *session)
  */
 int nfs41_set_session_valid(struct nfs4_session *session)
 {
+	int ret;
 	smp_mb__before_clear_bit();
-	clear_bit(NFS41_SESSION_EXPIRED, &session->session_state);
+	ret = test_and_clear_bit(NFS41_SESSION_EXPIRED,
+				&session->session_state);
 	smp_mb__after_clear_bit();
 
-	return 0;
+	return ret;
 }
 
 static int nfs41_start_session_recovery(struct nfs4_session *session)
@@ -207,5 +209,23 @@ int nfs41_recover_session_async(struct rpc_task *task,
 	return ret;
 }
 
+int nfs41_recover_expired_session(struct rpc_clnt *clnt,
+				  struct nfs_server *server)
+{
+	int ret;
+
+	while (1) {
+		ret = nfs41_wait_session_recover_sync(clnt, server);
+		if (ret)
+			return ret;
+
+		if (!nfs41_set_session_valid(server->session))
+			break;
+
+		ret = nfs41_recover_session_sync(clnt, server);
+	}
+
+	return ret;
+}
 
 #endif /* CONFIG_NFS_V4_1 */

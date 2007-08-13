@@ -54,6 +54,7 @@
 #include "iostat.h"
 #ifdef CONFIG_NFS_V4_1
 #include "callback.h"
+#include <linux/nfs41_session_recovery.h>
 #endif /* CONFIG_NFS_V4_1 */
 
 #define NFSDBG_FACILITY		NFSDBG_PROC
@@ -378,16 +379,33 @@ static int _nfs41_proc_setup_sequence(struct nfs4_session *session,
 	return 0;
 }
 
+/*
+ * This function sets up the arguments to the sequence call. It can possibly
+ * sleep. In its current form, it must *never* be called in rpciod context. The
+ * session recovery code is synchronous. While there is async session recovery
+ * code, it hasn't been called here.
+ */
 static int nfs41_proc_setup_sequence_call(struct nfs_server *server,
 	struct nfs41_sequence_args *args,
 	struct nfs41_sequence_res *res)
 {
 	int status;
 
-	status = _nfs41_proc_setup_sequence(server->session, args, res);
+	/*
+	 * Ensure we have a valid lease
+	 */
+	status = nfs4_recover_expired_lease(server);
+	if (status)
+		return status;
 
-	if (status == 0)
-		status = nfs4_recover_expired_lease(server);
+	/*
+	 * Ensure we have a valid session
+	 */
+	status = nfs41_recover_expired_session(server->session->clnt, server);
+	if (status)
+		return status;
+
+	status = _nfs41_proc_setup_sequence(server->session, args, res);
 
 	return status;
 }
@@ -2983,6 +3001,7 @@ static int
 nfs4_async_handle_error(struct rpc_task *task, const struct nfs_server *server)
 {
 	struct nfs_client *clp = server->nfs_client;
+	int ret;
 
 	if (!clp || task->tk_status >= 0)
 		return 0;
@@ -2990,12 +3009,34 @@ nfs4_async_handle_error(struct rpc_task *task, const struct nfs_server *server)
 		case -NFS4ERR_STALE_CLIENTID:
 		case -NFS4ERR_STALE_STATEID:
 		case -NFS4ERR_EXPIRED:
+#if defined(CONFIG_NFS_V4_1)
+		case -NFS4ERR_BADSESSION:
+#endif
 			rpc_sleep_on(&clp->cl_rpcwaitq, task, NULL, NULL);
 			nfs4_schedule_state_recovery(clp);
 			if (test_bit(NFS4CLNT_STATE_RECOVER, &clp->cl_state) == 0)
 				rpc_wake_up_task(task);
 			task->tk_status = 0;
+			if (!server->nfs_client->cl_minorversion)
+				return -EAGAIN;
+#if defined(CONFIG_NFS_V4_1)
+		case -NFS4ERR_BADSLOT:
+		case -NFS4ERR_CONN_NOT_BOUND_TO_SESSION:
+		case -NFS4ERR_BACK_CHAN_BUSY:
+		case -NFS4ERR_SEQ_MISORDERED:
+		case -NFS4ERR_SEQUENCE_POS:
+		case -NFS4ERR_REQ_TOO_BIG:
+		case -NFS4ERR_REP_TOO_BIG:
+		case -NFS4ERR_REP_TOO_BIG_TO_CACHE:
+		case -NFS4ERR_RETRY_UNCACHED_REP:
+		case -NFS4ERR_TOO_MANY_OPS:
+		case -NFS4ERR_OP_NOT_IN_SESSION:
+			ret = nfs41_recover_session_async(task, server);
+			if (ret)
+				return ret;
+			task->tk_status = 0;
 			return -EAGAIN;
+#endif /* CONFIG_NFS_V4_1 */
 		case -NFS4ERR_DELAY:
 			nfs_inc_server_stats((struct nfs_server *) server,
 						NFSIOS_DELAY);
@@ -3068,11 +3109,38 @@ static int nfs4_handle_exception(const struct nfs_server *server, int errorcode,
 		case -NFS4ERR_STALE_CLIENTID:
 		case -NFS4ERR_STALE_STATEID:
 		case -NFS4ERR_EXPIRED:
+#if defined(CONFIG_NFS_V4_1)
+		case -NFS4ERR_BADSESSION:
+#endif
 			nfs4_schedule_state_recovery(clp);
 			ret = nfs4_wait_clnt_recover(server->client, clp);
 			if (ret == 0)
 				exception->retry = 1;
+#if !defined(CONFIG_NFS_V4_1)
 			break;
+#else /* !defined(CONFIG_NFS_V4_1) */
+			if (!server->nfs_client->cl_minorversion)
+				break;
+			/* FALLTHROUGH */
+		case -NFS4ERR_BADSLOT:
+		case -NFS4ERR_CONN_NOT_BOUND_TO_SESSION:
+		case -NFS4ERR_BACK_CHAN_BUSY:
+		case -NFS4ERR_SEQ_MISORDERED:
+		case -NFS4ERR_SEQUENCE_POS:
+		case -NFS4ERR_REQ_TOO_BIG:
+		case -NFS4ERR_REP_TOO_BIG:
+		case -NFS4ERR_REP_TOO_BIG_TO_CACHE:
+		case -NFS4ERR_RETRY_UNCACHED_REP:
+		case -NFS4ERR_TOO_MANY_OPS:
+		case -NFS4ERR_OP_NOT_IN_SESSION:
+			ret = nfs41_recover_session_sync(server->session->clnt,
+							 server);
+			if (!ret) {
+				exception->retry = 1;
+				break;
+			}
+			/* FALLTHROUGH */
+#endif /* !defined(CONFIG_NFS_V4_1) */
 		case -NFS4ERR_FILE_OPEN:
 		case -NFS4ERR_GRACE:
 		case -NFS4ERR_DELAY:
