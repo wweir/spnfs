@@ -165,6 +165,10 @@ struct nfs4_state_recovery_ops {
 	int (*establish_clid)(struct nfs_client *, struct rpc_cred *);
 };
 
+struct nfs4_state_maintenance_ops {
+	int (*sched_state_renewal)(struct nfs_client *, struct rpc_cred *);
+};
+
 extern struct dentry_operations nfs4_dentry_operations;
 extern const struct inode_operations nfs4_dir_inode_operations;
 

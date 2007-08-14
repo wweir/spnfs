@@ -4464,8 +4464,18 @@ struct nfs4_state_recovery_ops nfs41_network_partition_recovery_ops = {
 };
 #endif /* CONFIG_NFS_V4_1 */
 
+struct nfs4_state_maintenance_ops nfs40_state_renewal_ops = {
+	.sched_state_renewal = nfs4_proc_async_renew,
+};
+
+#if defined(CONFIG_NFS_V4_1)
+struct nfs4_state_maintenance_ops nfs41_state_renewal_ops = {
+	.sched_state_renewal = nfs41_proc_async_sequence,
+};
+#endif
+
 /*
- * Per minor version reboot and network partition revocery ops
+ * Per minor version reboot and network partition recovery ops
  */
 
 struct nfs4_state_recovery_ops *nfs4_reboot_recovery_ops[] = {
@@ -4476,6 +4486,12 @@ struct nfs4_state_recovery_ops *nfs4_network_partition_recovery_ops[] = {
 	&nfs40_network_partition_recovery_ops,
 };
 
+struct nfs4_state_maintenance_ops *nfs4_state_renewal_ops[] = {
+	&nfs40_state_renewal_ops,
+#if defined(CONFIG_NFS_V4_1)
+	&nfs41_state_renewal_ops,
+#endif
+};
 
 static const struct inode_operations nfs4_file_inode_operations = {
 	.permission	= nfs_permission,
