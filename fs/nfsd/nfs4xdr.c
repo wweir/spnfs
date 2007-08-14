@@ -2845,6 +2845,7 @@ nfsd4_encode_exchange_id(struct nfsd4_compoundres *resp, int nfserr, struct nfsd
 }
 #endif /* CONFIG_NFSD_V4_1 */
 
+#if defined(CONFIG_NFSD_V4_1)
 static void
 nfsd4_encode_create_session(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_create_session *sess)
 {
@@ -2896,7 +2897,9 @@ nfsd4_encode_create_session(struct nfsd4_compoundres *resp, int nfserr, struct n
 		}
 	}
 }
+#endif /* CONFIG_NFSD_V4_1 */
 
+#if defined(CONFIG_NFSD_V4_1)
 static void nfsd4_encode_sequence(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_sequence *seq)
 {
 	ENCODE_HEAD;
@@ -2914,13 +2917,16 @@ static void nfsd4_encode_sequence(struct nfsd4_compoundres *resp, int nfserr, st
 		ADJUST_ARGS();
 	}
 }
+#endif /* CONFIG_NFSD_V4_1 */
 
+#if defined(CONFIG_NFSD_V4_1)
 static void nfsd4_encode_destroy_session(struct nfsd4_compoundres *resp,
 					int nfserr, struct nfsd4_destroy_session
 					*destroy_session)
 {
 	return;
 }
+#endif /* CONFIG_NFSD_V4_1 */
 
 static void
 nfsd4_encode_write(struct nfsd4_compoundres *resp, __be32 nfserr, struct nfsd4_write *write)

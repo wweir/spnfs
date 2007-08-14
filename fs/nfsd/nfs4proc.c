@@ -216,18 +216,22 @@ do_open_fhandle(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_
 	return status;
 }
 
+#if defined(CONFIG_NFSD_V4_1)
 static void
 nfsd41_set_clientid(clientid_t *clid, struct current_session *cses)
 {
 	clid->cl_boot = cses->cs_sid.clientid.cl_boot;
 	clid->cl_id = cses->cs_sid.clientid.cl_id;
 }
+#endif /* CONFIG_NFSD_V4_1 */
 
 static __be32
 nfsd4_open(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	   struct nfsd4_open *open, struct nfs4_stateowner **replay_owner)
 {
+#if defined(CONFIG_NFSD_V4_1)
 	struct current_session *current_ses = cstate->current_ses;
+#endif
 	__be32 status;
 	dprintk("NFSD: nfsd4_open filename %.*s op_stateowner %p\n",
 		(int)open->op_fname.len, open->op_fname.data,
@@ -237,11 +241,15 @@ nfsd4_open(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	if (open->op_create && open->op_claim_type != NFS4_OPEN_CLAIM_NULL)
 		return nfserr_inval;
 
+#if defined(CONFIG_NFSD_V4_1)
 	/* Set the NFSv4.1 client id */
 	if (current_ses) {
 		nfsd41_set_clientid(&open->op_clientid, current_ses);
 		open->op_minorversion = 1;
 	}
+#else /* CONFIG_NFSD_V4_1 */
+	open->op_minorversion = 0; /* DMXXX */
+#endif /* CONFIG_NFSD_V4_1 */
 		
 	nfs4_lock_state();
 

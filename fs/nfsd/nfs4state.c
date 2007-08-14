@@ -3659,7 +3659,6 @@ alloc_reclaim(void)
 	return kmalloc(sizeof(struct nfs4_client_reclaim), GFP_KERNEL);
 }
 
-#if defined(CONFIG_NFSD_V4_1)
 int
 nfs4_has_reclaimed_state(const char *name)
 {
@@ -3708,7 +3707,6 @@ nfs4_release_reclaim(void)
 	}
 	BUG_ON(reclaim_str_hashtbl_size);
 }
-#endif /* CONFIG_NFSD_V4_1 */
 
 /*
  * called from OPEN, CLAIM_PREVIOUS with a new clientid. */
