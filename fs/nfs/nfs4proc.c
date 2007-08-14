@@ -4480,10 +4480,16 @@ struct nfs4_state_maintenance_ops nfs41_state_renewal_ops = {
 
 struct nfs4_state_recovery_ops *nfs4_reboot_recovery_ops[] = {
 	&nfs40_reboot_recovery_ops,
+#if defined(CONFIG_NFS_V4_1)
+	&nfs41_reboot_recovery_ops,
+#endif
 };
 
 struct nfs4_state_recovery_ops *nfs4_network_partition_recovery_ops[] = {
 	&nfs40_network_partition_recovery_ops,
+#if defined(CONFIG_NFS_V4_1)
+	&nfs41_network_partition_recovery_ops,
+#endif
 };
 
 struct nfs4_state_maintenance_ops *nfs4_state_renewal_ops[] = {
