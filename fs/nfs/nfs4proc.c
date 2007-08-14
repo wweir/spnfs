@@ -2781,6 +2781,54 @@ int nfs4_proc_renew(struct nfs_client *clp, struct rpc_cred *cred)
 	return 0;
 }
 
+#if defined(CONFIG_NFS_V4_1)
+int nfs4_proc_sequence(struct nfs_client *clp, struct rpc_cred *cred)
+{
+	struct nfs41_sequence_args args;
+	struct nfs41_sequence_res res;
+	struct nfs_server *server;
+
+	struct rpc_message msg = {
+		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_SEQUENCE],
+		.rpc_argp	= &args,
+		.rpc_resp	= &res,
+		.rpc_cred	= cred,
+	};
+	unsigned long now = jiffies;
+	int status;
+
+	/*
+	 * We need to renew the lease on the server. For this, we use any
+	 * session we have on the server to send the SEQUENCE op
+	 */
+	 BUG_ON(list_empty(&clp->cl_superblocks));
+
+	 server = list_entry(clp->cl_superblocks.next, struct nfs_server,
+				client_link);
+
+	status = _nfs41_proc_setup_sequence(server->session, &args, &res);
+	if (status)
+		return status;
+
+	/*
+	 * Why do we need this??
+	 */
+	args.sa_cache_this = 0;
+
+	status = rpc_call_sync(clp->cl_rpcclient, &msg, 0);
+	if (status < 0)
+		goto out;
+	spin_lock(&clp->cl_lock);
+	if (time_before(clp->cl_last_renewal, now))
+		clp->cl_last_renewal = now;
+	spin_unlock(&clp->cl_lock);
+
+out:
+	nfs41_proc_sequence_done(server, &res, status);
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 static inline int nfs4_server_supports_acls(struct nfs_server *server)
 {
 	return (server->caps & NFS_CAP_ACLS)
@@ -3202,7 +3250,7 @@ int nfs4_proc_setclientid(struct nfs_client *clp, u32 program, unsigned short po
 }
 
 #ifdef CONFIG_NFS_V4_1
-int nfs4_proc_exchange_id(struct nfs_client *clp)
+int nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
 {
 	nfs4_verifier verifier;
 	struct nfs41_exchange_id_args args = {
@@ -3217,6 +3265,7 @@ int nfs4_proc_exchange_id(struct nfs_client *clp)
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_EXCHANGE_ID],
 		.rpc_argp = &args,
 		.rpc_resp = &res,
+		.rpc_cred = cred,
 	};
 	u32 *p;
 
@@ -4328,12 +4377,30 @@ struct nfs4_state_recovery_ops nfs40_reboot_recovery_ops = {
 	.establish_clid = nfs4_init_clientid,
 };
 
+#if defined(CONFIG_NFS_V4_1)
+struct nfs4_state_recovery_ops nfs41_reboot_recovery_ops = {
+	.recover_open	= nfs4_open_reclaim,
+	.recover_lock	= nfs4_lock_reclaim,
+	.renew_lease	= nfs4_proc_sequence,
+	.establish_clid = nfs4_proc_exchange_id,
+};
+#endif /* CONFIG_NFS_V4_1 */
+
 struct nfs4_state_recovery_ops nfs40_network_partition_recovery_ops = {
 	.recover_open	= nfs4_open_expired,
 	.recover_lock	= nfs4_lock_expired,
 	.renew_lease	= nfs4_proc_renew,
 	.establish_clid = nfs4_init_clientid,
 };
+
+#if defined(CONFIG_NFS_V4_1)
+struct nfs4_state_recovery_ops nfs41_network_partition_recovery_ops = {
+	.recover_open	= nfs4_open_expired,
+	.recover_lock	= nfs4_lock_expired,
+	.renew_lease	= nfs4_proc_sequence,
+	.establish_clid = nfs4_proc_exchange_id,
+};
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Per minor version reboot and network partition revocery ops
