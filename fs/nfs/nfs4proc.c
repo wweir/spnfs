@@ -2794,7 +2794,6 @@ int nfs4_proc_sequence(struct nfs_client *clp, struct rpc_cred *cred)
 		.rpc_resp	= &res,
 		.rpc_cred	= cred,
 	};
-	unsigned long now = jiffies;
 	int status;
 
 	/*
@@ -2815,18 +2814,81 @@ int nfs4_proc_sequence(struct nfs_client *clp, struct rpc_cred *cred)
 	 */
 	args.sa_cache_this = 0;
 
-	status = rpc_call_sync(clp->cl_rpcclient, &msg, 0);
-	if (status < 0)
-		goto out;
-	spin_lock(&clp->cl_lock);
-	if (time_before(clp->cl_last_renewal, now))
-		clp->cl_last_renewal = now;
-	spin_unlock(&clp->cl_lock);
-
-out:
+	status = rpc_call_sync(server->session->clnt, &msg, 0);
 	nfs41_proc_sequence_done(server, &res, status);
 	return status;
 }
+
+void nfs41_sequence_done(struct rpc_task *task, void *data)
+{
+	struct nfs_server *server = (struct nfs_server *)data;
+	struct nfs_client *clp = server->nfs_client;
+
+	if (task->tk_status < 0) {
+		switch (task->tk_status) {
+		case -NFS4ERR_STALE_CLIENTID:
+		case -NFS4ERR_EXPIRED:
+		case -NFS4ERR_CB_PATH_DOWN:
+		case -NFS4ERR_BADSESSION:
+			nfs4_schedule_state_recovery(clp);
+		case -NFS4ERR_BADSLOT:
+		case -NFS4ERR_CONN_NOT_BOUND_TO_SESSION:
+		case -NFS4ERR_BACK_CHAN_BUSY:
+		case -NFS4ERR_SEQ_MISORDERED:
+		case -NFS4ERR_SEQUENCE_POS:
+		case -NFS4ERR_REQ_TOO_BIG:
+		case -NFS4ERR_REP_TOO_BIG:
+		case -NFS4ERR_REP_TOO_BIG_TO_CACHE:
+		case -NFS4ERR_RETRY_UNCACHED_REP:
+		case -NFS4ERR_TOO_MANY_OPS:
+		case -NFS4ERR_OP_NOT_IN_SESSION:
+			nfs41_recover_session(server);
+		}
+	}
+	nfs41_proc_sequence_done(server, task->tk_msg.rpc_resp,
+							task->tk_status);
+}
+
+static const struct rpc_call_ops nfs41_sequence_ops = {
+	.rpc_call_done = nfs41_sequence_done,
+};
+
+int nfs41_proc_async_sequence(struct nfs_client *clp, struct rpc_cred *cred)
+{
+	struct nfs41_sequence_args args;
+	struct nfs41_sequence_res res;
+	struct nfs_server *server;
+
+	struct rpc_message msg = {
+		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_SEQUENCE],
+		.rpc_argp	= &args,
+		.rpc_resp	= &res,
+		.rpc_cred	= cred,
+	};
+	int status;
+
+	/*
+	 * We need to renew the lease on the server. For this, we use any
+	 * session we have on the server to send the SEQUENCE op
+	 */
+	 BUG_ON(list_empty(&clp->cl_superblocks));
+
+	 server = list_entry(clp->cl_superblocks.next, struct nfs_server,
+					 client_link);
+
+	status = _nfs41_proc_setup_sequence(server->session, &args, &res);
+	if (status)
+		return status;
+
+	/*
+	 * Why do we need this??
+	 */
+	args.sa_cache_this = 0;
+
+	return rpc_call_async(server->session->clnt, &msg, RPC_TASK_SOFT,
+				&nfs41_sequence_ops, (void *)server);
+}
+
 #endif /* CONFIG_NFS_V4_1 */
 
 static inline int nfs4_server_supports_acls(struct nfs_server *server)

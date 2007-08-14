@@ -160,7 +160,7 @@ static int nfs41_schedule_session_recovery(struct nfs_server *server)
  * Session recovery
  * Called when an op receives a session related error
  */
-static int nfs41_recover_session(struct nfs_server *server)
+int nfs41_recover_session(struct nfs_server *server)
 {
 	int ret;
 

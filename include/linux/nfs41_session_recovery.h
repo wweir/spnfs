@@ -13,6 +13,7 @@
 
 int nfs41_set_session_expired(struct nfs4_session *session);
 int nfs41_set_session_valid(struct nfs4_session *session);
+int nfs41_recover_session(struct nfs_server *server);
 int nfs41_recover_session_sync(struct rpc_clnt *, struct nfs_server *server);
 int nfs41_recover_session_async(struct rpc_task *, struct nfs_server *server);
 int nfs41_recover_expired_session(struct rpc_clnt *clnt, struct nfs_server
