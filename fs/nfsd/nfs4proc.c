@@ -246,9 +246,8 @@ nfsd4_open(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	if (current_ses) {
 		nfsd41_set_clientid(&open->op_clientid, current_ses);
 		open->op_minorversion = 1;
-	}
-#else /* CONFIG_NFSD_V4_1 */
-	open->op_minorversion = 0; /* DMXXX */
+	} else
+		open->op_minorversion = 0;
 #endif /* CONFIG_NFSD_V4_1 */
 		
 	nfs4_lock_state();
@@ -950,9 +949,12 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 		goto out;
 
 #if defined(CONFIG_NFSD_V4_1)
-	current_ses = kzalloc(sizeof(*current_ses), GFP_KERNEL);
-	if (current_ses == NULL)
-		goto out;
+	if (args->minorversion == 1) {
+		current_ses = kzalloc(sizeof(*current_ses), GFP_KERNEL);
+		if (current_ses == NULL)
+			goto out;
+	}
+	/* DM: current_ses must be NULL for minorversion 0 */
 	cstate->current_ses = current_ses;
 #endif
 
