@@ -605,7 +605,7 @@ nfsd41_probe_callback(struct nfs4_client *clp)
 		.version	= nfs_cb_version[1]->number,
 		.authflavor	= RPC_AUTH_UNIX,	/* XXX: need AUTH_GSS... */
 		.flags		= (RPC_CLNT_CREATE_NOPING),
-		.svsk		= clp->svsk,  /* FIXME: this is ugly */
+		.svsk		= clp->svsk,
 	};
 	struct rpc_message msg = {
 		.rpc_proc       = &nfs41_cb_procedures[NFSPROC4_CLNT_CB_NULL],
@@ -616,11 +616,14 @@ nfsd41_probe_callback(struct nfs4_client *clp)
 	if (atomic_read(&cb->cb_set))
 		return;
 
-	/* Initialize address */
+	/*
+	 * Temporarily set the IP address to 0 and port to 2049. Realistically,
+	 * we'll never need this as we'll never launch a connection.
+	 */
 	memset(&addr, 0, sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(cb->cb_port);
-	addr.sin_addr.s_addr = htonl(cb->cb_addr);
+	addr.sin_port = htons(NFS_PORT);
+	addr.sin_addr.s_addr = htonl(0);
 
 	/* Initialize rpc_program */
 	program->name = "nfs4_cb";
