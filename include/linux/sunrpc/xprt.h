@@ -168,6 +168,9 @@ struct rpc_xprt {
 	spinlock_t		reserve_lock;	/* lock slot table */
 	u32			xid;		/* Next XID value to use */
 	struct rpc_task *	snd_task;	/* Task blocked in send */
+#if defined(CONFIG_NFSD_V4_1)
+	struct svc_sock	       *svsk;           /* If this is a callback xprt */
+#endif
 	struct list_head	recv;
 
 	struct {
@@ -192,6 +195,7 @@ struct xprt_create {
 	struct sockaddr *	dstaddr;	/* remote peer address */
 	size_t			addrlen;
 	struct rpc_timeout *	timeout;	/* optional timeout parameters */
+	struct svc_sock	       *svsk;		/* for backchannel */
 };
 
 struct xprt_class {
