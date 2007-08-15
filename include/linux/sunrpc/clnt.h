@@ -105,6 +105,12 @@ struct rpc_create_args {
 	u32			version;
 	rpc_authflavor_t	authflavor;
 	unsigned long		flags;
+#if defined(CONFIG_NFSD_V4_1)
+	/*
+	 * For v4.1 callbacks
+	 */
+	struct svc_sock	       *svsk;
+#endif
 };
 
 /* Values for "flags" field */
