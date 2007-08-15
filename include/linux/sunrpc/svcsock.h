@@ -62,6 +62,10 @@ struct svc_sock {
 	struct sockaddr_storage	sk_local;	/* local address */
 	struct sockaddr_storage	sk_remote;	/* remote peer's address */
 	int			sk_remotelen;	/* length of address */
+
+#if defined(CONFIG_NFSD_V4_1)
+	struct rpc_xprt	       *sk_xprt;
+#endif
 };
 
 /*
