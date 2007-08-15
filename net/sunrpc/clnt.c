@@ -245,7 +245,10 @@ struct rpc_clnt *rpc_create(struct rpc_create_args *args)
 		.srcaddr = args->saddress,
 		.dstaddr = args->address,
 		.addrlen = args->addrsize,
-		.timeout = args->timeout
+		.timeout = args->timeout,
+#if defined(CONFIG_NFSD_V4_1)
+		.svsk = args->svsk
+#endif
 	};
 	char servername[20];
 

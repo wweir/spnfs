@@ -32,6 +32,7 @@
 #include <linux/tcp.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/sched.h>
+#include <linux/sunrpc/svcsock.h>
 #include <linux/sunrpc/xprtsock.h>
 #include <linux/file.h>
 
@@ -1753,6 +1754,215 @@ static void xs_tcp_print_stats(struct rpc_xprt *xprt, struct seq_file *seq)
 			xprt->stat.bklog_u);
 }
 
+#if defined(CONFIG_NFSD_V4_1)
+/*
+ * The connect worker for the backchannel
+ * This should never be called as we should never need to connect
+ */
+static void bc_connect_worker(struct work_struct *work)
+{
+	BUG();
+}
+
+/*
+ * The set_port routine of the rpc_xprt_ops. This is related to the portmapper
+ * and should never be called
+ */
+
+static void bc_set_port(struct rpc_xprt *xprt, unsigned short port)
+{
+	BUG();
+}
+
+/*
+ * The connect routine for the backchannel rpc_xprt ops
+ * Again, should never be called!
+ */
+
+static void bc_connect(struct rpc_task *task)
+{
+	BUG();
+}
+
+/*
+ * Allocate a bunch of pages for a scratch buffer for the rpc code. The reason
+ * we allocate pages instead doing a kmalloc like rpc_malloc is because we want
+ * to use the server side send routines.
+ */
+void *bc_malloc(struct rpc_task *task, size_t size)
+{
+	struct page *page;
+	struct rpc_rqst *req = task->tk_rqstp;
+
+	BUG_ON(size > PAGE_SIZE);
+	page = alloc_page(GFP_KERNEL);
+
+	if (!page)
+		return NULL;
+
+	req->rq_buffer = page_address(page);
+	req->rq_bufsize = PAGE_SIZE;
+
+	return req->rq_buffer;
+}
+
+/*
+ * Free the space allocated in the bc_alloc routine
+ */
+void bc_free(void *buffer)
+{
+	struct rpc_rqst *req = container_of(buffer, struct rpc_rqst, rq_buffer);
+
+	free_pages((unsigned long)req->rq_buffer, get_order(req->rq_bufsize));
+
+	req->rq_buffer = NULL;
+	req->rq_bufsize = 0;
+
+	return;
+}
+
+/*
+ * Use the svc_sock to send the callback. Must be called with svsk->sk_mutex
+ * held. Borrows heavily from svc_tcp_sendto and xs_tcp_semd_request.
+ */
+static int bc_sendto(struct rpc_rqst *req)
+{
+	int total_len;
+	int len;
+	int size;
+	int result;
+	struct xdr_buf *xbufp = &req->rq_snd_buf;
+	struct page **pages = xbufp->pages;
+	unsigned int flags = MSG_MORE;
+	unsigned int pglen = xbufp->page_len;
+	size_t base = xbufp->page_base;
+	struct rpc_xprt *xprt = req->rq_xprt;
+	struct sock_xprt *transport =
+				container_of(xprt, struct sock_xprt, xprt);
+	struct socket *sock = transport->sock;
+
+	total_len = xbufp->len;
+
+	/*
+	 * Set up the rpc header and record marker stuff
+	 */
+	xs_encode_tcp_record_marker(xbufp);
+
+	/*
+	 * The RPC message is divided into 3 pieces:
+	 * - The header: This is what most of the smaller RPC messages consist
+	 *   of. Often the whole message is in this.
+	 *
+	 *   - xdr->pages: This is a list of pages that contain data, for
+	 *   example in a write request or while using rpcsec gss
+	 *
+	 *   - The tail: This is the rest of the rpc message
+	 *
+	 *  First we send the header, then the pages and then finally the tail.
+	 *  The code borrows heavily from svc_sendto.
+	 */
+
+	/*
+	 * Send the head
+	 */
+	if (total_len == xbufp->head[0].iov_len)
+		flags = 0;
+
+	len = sock->ops->sendpage(sock, virt_to_page(req->rq_buffer), 0,
+				  xbufp->head[0].iov_len, flags);
+
+	if (len != xbufp->head[0].iov_len)
+		goto out;
+
+	/*
+	 * send page data
+	 *
+	 * Check the amount of data to be sent. If it is less than the
+	 * remaining page, then send it else send the current page
+	 */
+
+	size = PAGE_SIZE - base < pglen ? PAGE_SIZE - base : pglen;
+	while (pglen > 0) {
+		if (total_len == size)
+			flags = 0;
+		result = sock->ops->sendpage(sock, *pages, base, size, flags);
+		if (result > 0)
+			len += result;
+		if (result != size)
+			goto out;
+		total_len -= size;
+		pglen -= size;
+		size = PAGE_SIZE < pglen ? PAGE_SIZE : pglen;
+		base = 0;
+		pages++;
+	}
+	/*
+	 * send tail
+	 */
+	if (xbufp->tail[0].iov_len) {
+		result = sock->ops->sendpage(sock,
+					     virt_to_page(req->rq_buffer),
+					     xbufp->head[0].iov_len,
+					     xbufp->tail[0].iov_len,
+					     0);
+
+		if (result > 0)
+			len += result;
+	}
+out:
+	if (len != xbufp->len)
+		printk(KERN_NOTICE "Error sending entire callback!\n");
+
+	return len;
+}
+
+/*
+ * The send routine. Borrows from svc_send
+ */
+static int bc_send_request(struct rpc_task *task)
+{
+	struct rpc_rqst *req = task->tk_rqstp;
+	struct rpc_xprt *xprt = req->rq_xprt;
+	struct svc_sock         *svsk;
+	u32                     len;
+
+	dprintk("sending request with xid: %u\n", req->rq_xid);
+	/*
+	 * Get the server socket associated with this callback xprt
+	 */
+	svsk = xprt->svsk;
+
+	mutex_lock(&svsk->sk_mutex);
+	if (test_bit(SK_DEAD, &svsk->sk_flags))
+		len = -ENOTCONN;
+	else
+		len = bc_sendto(req);
+	mutex_unlock(&svsk->sk_mutex);
+
+	return 0;
+
+}
+
+/*
+ * The close routine. Since this is client initiated, we do nothing
+ */
+
+static void bc_close(struct rpc_xprt *xprt)
+{
+	return;
+}
+
+/*
+ * The xprt destroy routine. Again, because this connection is client
+ * initiated, we do nothing
+ */
+
+static void bc_destroy(struct rpc_xprt *xprt)
+{
+	return;
+}
+#endif /* CONFIG_NFSD_V4_1 */
+
 static struct rpc_xprt_ops xs_udp_ops = {
 	.set_buffer_size	= xs_udp_set_buffer_size,
 	.reserve_xprt		= xprt_reserve_xprt_cong,
@@ -1785,6 +1995,26 @@ static struct rpc_xprt_ops xs_tcp_ops = {
 	.destroy		= xs_destroy,
 	.print_stats		= xs_tcp_print_stats,
 };
+
+#if defined(CONFIG_NFSD_V4_1)
+/*
+ * The rpc_xprt_ops for the backchannel
+ */
+
+static struct rpc_xprt_ops bc_tcp_ops = {
+	.reserve_xprt		= xprt_reserve_xprt,
+	.release_xprt		= xprt_release_xprt,
+	.set_port		= bc_set_port,
+	.connect		= bc_connect,
+	.buf_alloc		= bc_malloc,
+	.buf_free		= bc_free,
+	.send_request		= bc_send_request,
+	.set_retrans_timeout	= xprt_set_retrans_timeout_def,
+	.close			= bc_close,
+	.destroy		= bc_destroy,
+	.print_stats		= xs_tcp_print_stats,
+};
+#endif /* CONFIG_NFSD_V4_1 */
 
 static struct rpc_xprt *xs_setup_xprt(struct xprt_create *args,
 				      unsigned int slot_table_size)
@@ -1909,17 +2139,30 @@ static struct rpc_xprt *xs_setup_tcp(struct xprt_create *args)
 	xprt->tsh_size = sizeof(rpc_fraghdr) / sizeof(u32);
 	xprt->max_payload = RPC_MAX_FRAGMENT_SIZE;
 
-	xprt->bind_timeout = XS_BIND_TO;
-	xprt->connect_timeout = XS_TCP_CONN_TO;
-	xprt->reestablish_timeout = XS_TCP_INIT_REEST_TO;
-	xprt->idle_timeout = XS_IDLE_DISC_TO;
+#if defined(CONFIG_NFSD_V4_1)
+	if (args->svsk) {
+		/* backchannel */
+		INIT_DELAYED_WORK(&transport->connect_worker,
+				  bc_connect_worker);
+		xprt->bind_timeout = 0;
+		xprt->connect_timeout = 0;
+		xprt->reestablish_timeout = 0;
+		xprt->idle_timeout = (~0);
 
-	xprt->ops = &xs_tcp_ops;
+		/*
+		 * The backchannel uses the same socket connection as the
+		 * forechannel
+		 */
+		xprt->svsk = args->svsk;
+		xprt->svsk->sk_xprt = xprt;
+		transport->sock = xprt->svsk->sk_sock;
+		transport->inet = xprt->svsk->sk_sk;
 
-	if (args->timeout)
-		xprt->timeout = *args->timeout;
-	else
-		xprt_set_timeout(&xprt->timeout, 2, 60 * HZ);
+		xprt->ops = &bc_tcp_ops;
+
+		goto next;
+	}
+#endif /* CONFIG_NFSD_V4_1 */
 
 	switch (addr->sa_family) {
 	case AF_INET:
@@ -1927,13 +2170,32 @@ static struct rpc_xprt *xs_setup_tcp(struct xprt_create *args)
 			xprt_set_bound(xprt);
 
 		INIT_DELAYED_WORK(&transport->connect_worker, xs_tcp_connect_worker4);
-		xs_format_ipv4_peer_addresses(xprt);
 		break;
 	case AF_INET6:
 		if (((struct sockaddr_in6 *)addr)->sin6_port != htons(0))
 			xprt_set_bound(xprt);
 
 		INIT_DELAYED_WORK(&transport->connect_worker, xs_tcp_connect_worker6);
+		break;
+	}
+	xprt->bind_timeout = XS_BIND_TO;
+	xprt->connect_timeout = XS_TCP_CONN_TO;
+	xprt->reestablish_timeout = XS_TCP_INIT_REEST_TO;
+	xprt->idle_timeout = XS_IDLE_DISC_TO;
+
+	xprt->ops = &xs_tcp_ops;
+
+next:
+	if (args->timeout)
+		xprt->timeout = *args->timeout;
+	else
+		xprt_set_timeout(&xprt->timeout, 2, 60 * HZ);
+
+	switch (addr->sa_family) {
+	case AF_INET:
+		xs_format_ipv4_peer_addresses(xprt);
+		break;
+	case AF_INET6:
 		xs_format_ipv6_peer_addresses(xprt);
 		break;
 	default:
