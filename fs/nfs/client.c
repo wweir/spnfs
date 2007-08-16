@@ -865,7 +865,13 @@ static int nfs4_init_client(struct nfs_client *clp,
 	}
 
 	/* Check NFS protocol revision and initialize RPC op vector */
-	clp->rpc_ops = &nfs_v4_clientops;
+#ifdef CONFIG_NFS_V4_1
+	clp->rpc_ops = nfsv4_minorversion_clientops[NFSV4_MAX_MINORVERSION];
+#else
+	clp->rpc_ops = &nfs_v40_clientops;
+#endif /* CONFIG_NFS_V4_1 */
+
+	/* XXX TODO: Need to start the callback server here */
 
 	error = nfs_create_rpc_client(clp, proto, timeo, retrans, authflavour,
 					RPC_CLNT_CREATE_DISCRTRY);
@@ -880,7 +886,6 @@ static int nfs4_init_client(struct nfs_client *clp,
 		goto error;
 	}
 	__set_bit(NFS_CS_IDMAP, &clp->cl_res_state);
-
 	nfs_mark_client_ready(clp, NFS_CS_READY);
 	return 0;
 

@@ -6986,7 +6986,7 @@ nfs4_stat_to_errno(int stat)
 	.p_name   = #proc,					\
     }
 
-struct rpc_procinfo	nfs4_procedures[] = {
+struct rpc_procinfo	nfs40_procedures[] = {
   PROC(READ,		enc_read,	dec_read, 0),
   PROC(WRITE,		enc_write,	dec_write, 0),
   PROC(COMMIT,		enc_commit,	dec_commit, 0),
@@ -7067,11 +7067,37 @@ struct rpc_procinfo	nfs41_procedures[] = {
 };
 #endif /* CONFIG_NFS_V4_1 */
 
-struct rpc_version		nfs_version4 = {
-	.number			= 4,
-	.nrprocs		= ARRAY_SIZE(nfs4_procedures),
-	.procs			= nfs4_procedures
+struct rpc_version      nfs_version4 = {
+	.number                 = 4,
+	.nrprocs                = ARRAY_SIZE(nfs40_procedures),
+	.procs                  = nfs40_procedures
 };
+
+struct rpc_version      nfs_version40 = {
+	.number                 = 4,
+	.nrprocs                = ARRAY_SIZE(nfs40_procedures),
+	.procs                  = nfs40_procedures
+};
+
+#ifdef CONFIG_NFS_V4_1
+struct rpc_version      nfs_version41 = {
+	.number                 = 4,
+	.nrprocs                = ARRAY_SIZE(nfs41_procedures),
+	.procs                  = nfs41_procedures
+};
+
+struct rpc_version *nfs4_minorversions[] = {
+	&nfs_version40,
+	&nfs_version41,
+};
+
+struct rpc_procinfo *nfs4_minorversion_procedures[] = {
+	nfs40_procedures,
+	nfs41_procedures,
+};
+#endif /* CONFIG_NFS_V4_1 */
+
+struct rpc_procinfo *nfs4_procedures = nfs40_procedures;
 
 /*
  * Local variables:
