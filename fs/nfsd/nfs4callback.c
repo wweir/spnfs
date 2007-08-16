@@ -642,7 +642,7 @@ nfsd41_probe_callback(struct nfs4_client *clp)
 		dprintk("NFSD: couldn't create callback client\n");
 		goto out_err;
 	}
-	dprintk("nfsd: %s: clp %p cb_client %p\n", __FUNCTION__,
+	dprintk("NFSD: %s: clp %p cb_client %p\n", __FUNCTION__,
 		clp, clp->cl_callback.cb_client);
 
 	status = rpc_call_async(cb->cb_client, &msg, RPC_TASK_ASYNC,

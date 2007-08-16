@@ -1789,10 +1789,7 @@ void nfsd_break_deleg_cb(struct file_lock *fl)
 		nfs4_unlock_state();
 		return;
 	}
-	/*
-	 * FIXME: should use kref now
-	 */
-	//atomic_inc(&clnt->cl_users);
+	kref_get(&clnt->cl_kref);
 	nfs4_unlock_state();
 
 	/* We're assuming the state code never drops its reference
