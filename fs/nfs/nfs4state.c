@@ -62,12 +62,16 @@ static LIST_HEAD(nfs4_clientid_list);
 
 int nfs4_init_clientid(struct nfs_client *clp, struct rpc_cred *cred)
 {
-	int status = nfs4_proc_setclientid(clp, NFS4_CALLBACK,
+	int status = -ENOENT;
+	if (cred == NULL)
+		return status;
+	status = nfs4_proc_setclientid(clp, NFS4_CALLBACK,
 			nfs_callback_tcpport, cred);
 	if (status == 0)
 		status = nfs4_proc_setclientid_confirm(clp, cred);
 	if (status == 0)
 		nfs4_schedule_state_renewal(clp);
+	put_rpccred(cred);
 	return status;
 }
 
@@ -932,11 +936,7 @@ restart_loop:
 	}
 	/* We're going to have to re-establish a clientid */
 	nfs4_state_mark_reclaim(clp);
-	status = -ENOENT;
-	if (cred != NULL) {
-		status = ops->establish_clid(clp, cred);
-		put_rpccred(cred);
-	}
+	status = ops->establish_clid(clp, cred);
 	if (status)
 		goto out_error;
 	/* Mark all delegations for reclaim */
