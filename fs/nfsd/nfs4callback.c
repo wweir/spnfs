@@ -764,6 +764,8 @@ _nfsd41_cb_recall(struct nfs4_delegation *dp, struct rpc_message *msg)
 	};
 	int status;
 
+	dprintk("NFSD: _nfs41_cb_recall: dp %p\n", dp);
+
 	nfs41_cb_sequence_setup(clp, &seq);
 	msg->rpc_proc = &nfs41_cb_procedures[NFSPROC4_CLNT_CB_RECALL];
 	msg->rpc_argp = &args;
@@ -788,6 +790,8 @@ nfsd4_cb_recall(struct nfs4_delegation *dp)
 	struct nfs4_cb_recall *cbr = &dp->dl_recall;
 	struct rpc_message msg;
 	int status = 0;
+
+	dprintk("NFSD: nfs4_cb_recall: dp %p\n", dp);
 
 	if ((!atomic_read(&clp->cl_callback.cb_set)) || !clnt)
 		return;

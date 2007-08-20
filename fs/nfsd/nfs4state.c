@@ -115,6 +115,15 @@ nfs4_unlock_state(void)
 	mutex_unlock(&client_mutex);
 }
 
+static int
+nfs4_lock_state_nested(void)
+{
+	if (client_mutex_owner == current_thread_info())
+		return 0;
+	nfs4_lock_state();
+	return 1;
+}
+
 static inline u32
 opaque_hashval(const void *ptr, int nbytes)
 {
@@ -1778,19 +1787,22 @@ void nfsd_break_deleg_cb(struct file_lock *fl)
 	struct nfs4_delegation *dp=  (struct nfs4_delegation *)fl->fl_owner;
 	struct rpc_clnt *clnt;
 	struct task_struct *t;
+	int did_lock;
 
 	dprintk("NFSD nfsd_break_deleg_cb: dp %p fl %p\n",dp,fl);
 	if (!dp)
 		return;
 
-	nfs4_lock_state();
+	did_lock = nfs4_lock_state_nested();
 	clnt = dp->dl_client->cl_callback.cb_client;
 	if (!atomic_read(&dp->dl_client->cl_callback.cb_set) || !clnt) {
-		nfs4_unlock_state();
+		if (did_lock)
+			nfs4_unlock_state();
 		return;
 	}
 	kref_get(&clnt->cl_kref);
-	nfs4_unlock_state();
+	if (did_lock)
+		nfs4_unlock_state();
 
 	/* We're assuming the state code never drops its reference
 	 * without first removing the lease.  Since we're in this lease
