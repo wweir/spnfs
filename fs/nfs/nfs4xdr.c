@@ -3216,7 +3216,10 @@ static int nfs41_xdr_enc_delegreturn(struct rpc_rqst *req, __be32 *p,
 /*
  * Encode FS_LOCATIONS request
  */
-static int nfs4_xdr_enc_fs_locations(struct rpc_rqst *req, struct xdr_stream *xdr, struct nfs4_fs_locations_arg *args)
+static int nfs4_xdr_enc_fs_locations(struct rpc_rqst *req,
+					struct xdr_stream *xdr,
+					struct nfs4_fs_locations_arg *args,
+					unsigned int fsinfo_sz)
 {
 	struct rpc_auth *auth = req->rq_task->tk_msg.rpc_cred->cr_auth;
 	int replen;
@@ -3232,7 +3235,7 @@ static int nfs4_xdr_enc_fs_locations(struct rpc_rqst *req, struct xdr_stream *xd
 	 *   toplevel_status + OP_PUTFH + status
 	 *   + OP_LOOKUP + status + OP_GETATTR + status = 7
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + 7) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + fsinfo_sz) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen, &args->page,
 			0, PAGE_SIZE);
 out:
@@ -3249,7 +3252,7 @@ static int nfs40_xdr_enc_fs_locations(struct rpc_rqst *req, __be32 *p, struct nf
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
 	encode_compound_hdr(&xdr, &hdr, 0);
 
-	return nfs4_xdr_enc_fs_locations(req, &xdr, args);
+	return nfs4_xdr_enc_fs_locations(req, &xdr, args, NFS40_enc_fsinfo_sz);
 }
 
 #if defined(CONFIG_NFS_V4_1)
@@ -3265,7 +3268,7 @@ static int nfs41_xdr_enc_fs_locations(struct rpc_rqst *req, __be32 *p,
 	encode_compound_hdr(&xdr, &hdr, 1);
 	encode_sequence(&xdr, &args->seq_args);
 
-	return nfs4_xdr_enc_fs_locations(req, &xdr, args);
+	return nfs4_xdr_enc_fs_locations(req, &xdr, args, NFS41_enc_fsinfo_sz);
 }
 #endif /* CONFIG_NFS_V4_1 */
 
