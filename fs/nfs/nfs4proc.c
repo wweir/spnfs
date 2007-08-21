@@ -3603,7 +3603,7 @@ struct nfs4_session *nfs4_alloc_session(void)
 	if (!session)
 		return NULL;
 
-	session->expired = 1;
+	nfs41_set_session_expired(session);
 
 	INIT_LIST_HEAD(&session->session_hashtbl);
 	spin_lock_init(&session->session_lock);
@@ -3743,7 +3743,6 @@ int nfs4_proc_create_session(struct nfs_server *sp)
 
 	dprintk("--> %s()\n", __FUNCTION__);
 	BUG_ON(sp->session == NULL);
-	BUG_ON(!sp->session->expired);
 
 	status = _nfs4_proc_create_session(clp, sp->session, clp->cl_rpcclient);
 	if (status)
@@ -3783,7 +3782,7 @@ int nfs4_proc_create_session(struct nfs_server *sp)
 		spin_unlock(&clp->cl_lock);
 
 		nfs4_schedule_state_renewal(clp);
-		session->expired = 0;	/* Activate session */
+		nfs41_set_session_valid(session);	/* Activate session */
 	} else {
 		nfs4_put_session(&sp->session);
 	}
@@ -3820,7 +3819,7 @@ int nfs4_proc_destroy_session(struct nfs_server *sp)
 	 * Since the caller has serialized access to this routine I don't
 	 * grab a lock to modify the expired value.
 	 */
-	sp->session->expired = 1;	/* Mark session as expired */
+	nfs41_set_session_expired(sp->session);	/* Mark session as expired */
 
 	dprintk("<-- nfs4_proc_destroy_session\n");
 	return status;

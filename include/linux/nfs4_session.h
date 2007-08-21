@@ -56,7 +56,6 @@ struct nfs4_session {
 	struct nfs4_channel		fore_channel;
 	struct nfs4_channel		back_channel;
 
-	unsigned int			expired;
 	struct list_head		session_hashtbl;
 	spinlock_t 			session_lock;
 	atomic_t			ref_count;

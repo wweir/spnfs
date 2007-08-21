@@ -18,6 +18,7 @@ int nfs41_recover_session_sync(struct rpc_clnt *, struct nfs_server *server);
 int nfs41_recover_session_async(struct rpc_task *, struct nfs_server *server);
 int nfs41_recover_expired_session(struct rpc_clnt *clnt, struct nfs_server
 *server);
+int nfs41_test_session_expired(struct nfs4_session *session);
 
 #endif	/* CONFIG_NFS_V4_1 */
 #endif	/* __NFS41_SESSION_RECOVERY_H__ */

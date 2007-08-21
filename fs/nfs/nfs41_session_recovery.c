@@ -39,6 +39,11 @@ int nfs41_set_session_expired(struct nfs4_session *session)
 	return 0;
 }
 
+int nfs41_test_session_expired(struct nfs4_session *session)
+{
+	return test_bit(NFS41_SESSION_EXPIRED, &session->session_state);
+}
+
 /*
  * Set the session state == valid. Returns previous value of the session state
  */
