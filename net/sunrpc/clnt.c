@@ -612,6 +612,19 @@ struct rpc_task *rpc_run_task(struct rpc_clnt *clnt, int flags,
 }
 EXPORT_SYMBOL(rpc_run_task);
 
+#if defined(CONFIG_NFS_V4_1)
+void
+rpc_call_validate_args(struct rpc_task *task)
+{
+	if (task->tk_ops->rpc_call_validate_args)
+		task->tk_ops->rpc_call_validate_args(task, task->tk_calldata);
+	else
+		task->tk_action = call_start;
+}
+#else /* CONFIG_NFS_V4_1 */
+#define rpc_call_validate_args	call_start
+#endif /* CONFIG_NFS_V4_1 */
+
 void
 rpc_call_setup(struct rpc_task *task, struct rpc_message *msg, int flags)
 {
@@ -624,7 +637,7 @@ rpc_call_setup(struct rpc_task *task, struct rpc_message *msg, int flags)
 		rpcauth_bindcred(task);
 
 	if (task->tk_status == 0)
-		task->tk_action = call_start;
+		task->tk_action = rpc_call_validate_args;
 	else
 		task->tk_action = rpc_exit_task;
 }
@@ -701,6 +714,15 @@ void rpc_force_rebind(struct rpc_clnt *clnt)
 }
 EXPORT_SYMBOL_GPL(rpc_force_rebind);
 
+void
+rpc_start_call(struct rpc_task *task)
+{
+	if (RPC_ASSASSINATED(task))
+		return;
+
+	task->tk_action = call_start;
+}
+
 /*
  * Restart an (async) RPC call. Usually called from within the
  * exit handler.
@@ -711,7 +733,7 @@ rpc_restart_call(struct rpc_task *task)
 	if (RPC_ASSASSINATED(task))
 		return;
 
-	task->tk_action = call_start;
+	task->tk_action = rpc_call_validate_args;
 }
 
 /*
@@ -1353,13 +1375,8 @@ call_verify(struct rpc_task *task)
 	}
 	if ((len -= 3) < 0)
 		goto out_overflow;
-	p += 1;	/* skip XID */
+	p += 2;	/* skip XID and the call/reply flag */
 
-	if ((n = ntohl(*p++)) != RPC_REPLY) {
-		dprintk("RPC: %5u %s: not an RPC reply: %x\n",
-				task->tk_pid, __FUNCTION__, n);
-		goto out_garbage;
-	}
 	if ((n = ntohl(*p++)) != RPC_MSG_ACCEPTED) {
 		if (--len < 0)
 			goto out_overflow;
