@@ -975,6 +975,39 @@ static int nfs4_init_server(struct nfs_server *server,
 }
 
 /*
+ * Allocate and initialize a session if required
+ */
+int nfs4_init_session(struct nfs_server *server)
+{
+	int error = 0;
+
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs_client *clp;
+
+	clp = server->nfs_client;
+	switch (clp->cl_minorversion) {
+	case 1:
+		/*
+		 * Create the session and mark it expired.
+		 * When a SEQUENCE operation encounters the expired session
+		 * it will do session recovery to initialize it.
+		 */
+		server->session = nfs4_alloc_session();
+		if (!server->session)
+			error = NFSERR_RESOURCE;
+		else
+			server->session->clnt = server->client;
+
+		break;
+	case 0:
+		server->session = NULL;
+		break;
+	}
+#endif /* CONFIG_NFS_V4_1 */
+	return error;
+}
+
+/*
  * Create a version 4 volume record
  * - keyed on server and FSID
  */
@@ -1002,19 +1035,6 @@ struct nfs_server *nfs4_create_server(const struct nfs_parsed_mount_data *data,
 	if (error < 0)
 		goto error;
 
-#if defined(CONFIG_NFS_V4_1)
-	/*
-	 * Create the session and mark it expired.  When a SEQUENCE operation
-	 * encounters the expired session it will do session recovery to
-	 * initialize it.
-	 */
-	server->session = nfs4_alloc_session();
-	if (!server->session) {
-		error = NFSERR_RESOURCE;
-		goto error;
-	}
-#endif /* CONFIG_NFS_V4_1 */
-
 	/* set up the general RPC client */
 	error = nfs4_init_server(server, data);
 	if (error < 0)
@@ -1024,10 +1044,14 @@ struct nfs_server *nfs4_create_server(const struct nfs_parsed_mount_data *data,
 	BUG_ON(!server->nfs_client->rpc_ops);
 	BUG_ON(!server->nfs_client->rpc_ops->file_inode_ops);
 
+	error = nfs4_init_session(server);
+	if (error)
+		goto error;
+
 	/* Probe the root fh to retrieve its FSID */
 	error = nfs4_path_walk(server, mntfh, data->nfs_server.export_path);
 	if (error < 0)
-		goto error;
+		goto error_session;
 
 	dprintk("Server FSID: %llx:%llx\n",
 		(unsigned long long) server->fsid.major,
@@ -1036,7 +1060,7 @@ struct nfs_server *nfs4_create_server(const struct nfs_parsed_mount_data *data,
 
 	error = nfs_probe_fsinfo(server, mntfh, &fattr);
 	if (error < 0)
-		goto error;
+		goto error_session;
 
 	if (server->namelen == 0 || server->namelen > NFS4_MAXNAMLEN)
 		server->namelen = NFS4_MAXNAMLEN;
@@ -1054,11 +1078,12 @@ struct nfs_server *nfs4_create_server(const struct nfs_parsed_mount_data *data,
 	dprintk("<-- nfs4_create_server() = %p\n", server);
 	return server;
 
-error:
+error_session:
 #if defined(CONFIG_NFS_V4_1)
 	if (server->session)
 		nfs4_put_session(&server->session);
 #endif /* CONFIG_NFS_V4_1 */
+error:
 	nfs_free_server(server);
 	dprintk("<-- nfs4_create_server() = error %d\n", error);
 	return ERR_PTR(error);
