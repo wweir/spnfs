@@ -142,6 +142,7 @@ int		rpc_call_sync(struct rpc_clnt *clnt, struct rpc_message *msg,
 struct rpc_task *rpc_call_null(struct rpc_clnt *clnt, struct rpc_cred *cred,
 			       int flags);
 void		rpc_restart_call(struct rpc_task *);
+void		rpc_start_call(struct rpc_task *);
 void		rpc_clnt_sigmask(struct rpc_clnt *clnt, sigset_t *oldset);
 void		rpc_clnt_sigunmask(struct rpc_clnt *clnt, sigset_t *oldset);
 void		rpc_setbufsize(struct rpc_clnt *, unsigned int, unsigned int);
