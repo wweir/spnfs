@@ -1370,13 +1370,8 @@ call_verify(struct rpc_task *task)
 	}
 	if ((len -= 3) < 0)
 		goto out_overflow;
-	p += 1;	/* skip XID */
+	p += 2;	/* skip XID and the call/reply flag */
 
-	if ((n = ntohl(*p++)) != RPC_REPLY) {
-		dprintk("RPC: %5u %s: not an RPC reply: %x\n",
-				task->tk_pid, __FUNCTION__, n);
-		goto out_garbage;
-	}
 	if ((n = ntohl(*p++)) != RPC_MSG_ACCEPTED) {
 		if (--len < 0)
 			goto out_overflow;
