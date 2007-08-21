@@ -36,6 +36,9 @@ struct rpc_wait {
 	struct rpc_wait_queue *	rpc_waitq;	/* RPC wait queue we're on */
 };
 
+struct rpc_task;
+typedef void (rpc_task_fn)(struct rpc_task *);
+
 /*
  * This is the RPC task struct
  */
@@ -62,9 +65,9 @@ struct rpc_task {
 	 * action	next procedure for async tasks
 	 * tk_ops	caller callbacks
 	 */
-	void			(*tk_timeout_fn)(struct rpc_task *);
-	void			(*tk_callback)(struct rpc_task *);
-	void			(*tk_action)(struct rpc_task *);
+	rpc_task_fn		*tk_timeout_fn;
+	rpc_task_fn		*tk_callback;
+	rpc_task_fn		*tk_action;
 	const struct rpc_call_ops *tk_ops;
 	void *			tk_calldata;
 
@@ -113,6 +116,7 @@ typedef void			(*rpc_action)(struct rpc_task *);
 
 struct rpc_call_ops {
 	void (*rpc_call_prepare)(struct rpc_task *, void *);
+	int (*rpc_call_validate_args)(struct rpc_task *, void *);
 	void (*rpc_call_done)(struct rpc_task *, void *);
 	void (*rpc_release)(void *);
 };
