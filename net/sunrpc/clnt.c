@@ -598,9 +598,32 @@ rpc_call_async(struct rpc_clnt *clnt, struct rpc_message *msg, int flags,
 EXPORT_SYMBOL_GPL(rpc_call_async);
 
 void
+rpc_call_validate_args(struct rpc_task *task)
+{
+	int res = task->tk_ops->rpc_call_validate_args(task, task->tk_calldata);
+
+	if (!res)
+		task->tk_action = call_start;
+	else if (res != -EAGAIN) {
+		/* Terminate rpc */
+		task->tk_status = res;
+		task->tk_action = NULL;
+	}
+}
+
+static inline rpc_task_fn *
+rpc_start_action(struct rpc_task *task)
+{
+	if (task->tk_ops->rpc_call_validate_args)
+		return rpc_call_validate_args;
+
+	return call_start;
+}
+
+void
 rpc_call_start(struct rpc_task *task)
 {
-	task->tk_action = call_start;
+	task->tk_action = rpc_start_action(task);
 }
 EXPORT_SYMBOL_GPL(rpc_call_start);
 
@@ -688,7 +711,7 @@ rpc_restart_call(struct rpc_task *task)
 	if (RPC_ASSASSINATED(task))
 		return;
 
-	task->tk_action = call_start;
+	task->tk_action = rpc_start_action(task);
 }
 EXPORT_SYMBOL_GPL(rpc_restart_call);
 
