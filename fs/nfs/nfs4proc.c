@@ -414,12 +414,17 @@ static int nfs41_proc_setup_sequence_call(struct nfs_server *server,
 #ifdef CONFIG_NFS_V4_1
 #define NFS41_SETUP_SEQUENCE(server, args, res, cache_this) \
 do { \
-	if (server->minor_version == 1) { \
+	switch (server->nfs_client->cl_minorversion) { \
+	case 1: \
 		status = nfs41_proc_setup_sequence_call( \
 				server, &args.seq_args, &res.seq_res); \
 		if (status) \
 			return (status); \
 		args.seq_args.sa_cache_this = cache_this; \
+		break; \
+	default: \
+		/* Fall-Through */ \
+		break; \
 	} \
 } while (0)
 #else
@@ -430,9 +435,15 @@ do { } while (0)
 #ifdef CONFIG_NFS_V4_1
 #define NFS41_SEQUENCE_DONE(server, res, status) \
 do { \
-	if (server->minor_version == 1) \
+	switch (server->nfs_client->cl_minorversion) { \
+	case 1: \
 		status = nfs41_proc_sequence_done(server, &res.seq_res, \
 						 status); \
+		break; \
+	default: \
+		/* Fall-Through */ \
+		break; \
+	} \
 } while (0)
 #else
 #define NFS41_SEQUENCE_DONE(server, res, status) \

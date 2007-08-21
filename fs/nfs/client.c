@@ -848,6 +848,17 @@ error:
 }
 
 #ifdef CONFIG_NFS_V4
+
+static int nfs4_setup_nfs4_program(int minorversion)
+{
+	if (minorversion > NFSV4_MAX_MINORVERSION)
+		return -ENOTSUPP;
+
+	nfs_version4 = *(nfs4_minorversions[minorversion]);
+
+	return 0;
+}
+
 /*
  * Initialise an NFS4 client record
  */
@@ -865,11 +876,13 @@ static int nfs4_init_client(struct nfs_client *clp,
 	}
 
 	/* Check NFS protocol revision and initialize RPC op vector */
-#ifdef CONFIG_NFS_V4_1
-	clp->rpc_ops = nfsv4_minorversion_clientops[NFSV4_MAX_MINORVERSION];
-#else
-	clp->rpc_ops = &nfs_v40_clientops;
-#endif /* CONFIG_NFS_V4_1 */
+	clp->rpc_ops = nfsv4_minorversion_clientops[clp->cl_minorversion];
+	nfs4_procedures = nfs4_minorversion_procedures[clp->cl_minorversion];
+
+	/* Setup the nfs_program based on the minorversion */
+	error = nfs4_setup_nfs4_program(clp->cl_minorversion);
+	if (error)
+		goto error;
 
 	/* XXX TODO: Need to start the callback server here */
 
@@ -939,13 +952,6 @@ static int nfs4_init_server(struct nfs_server *server,
 	int error;
 
 	dprintk("--> nfs4_init_server()\n");
-
-	/*
-	 * XXX For development default to minor version 1.  Will want to
-	 * change to 0 for deployment once there's a way to specify the
-	 * minor version from the command line.
-	 */
-	server->minor_version = 1;
 
 	/* Initialise the client representation from the mount data */
 	server->flags = data->flags & NFS_MOUNT_FLAGMASK;

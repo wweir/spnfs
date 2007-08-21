@@ -87,7 +87,6 @@ struct nfs_client {
  * NFS client parameters stored in the superblock.
  */
 struct nfs_server {
-	unsigned int		minor_version;	/* NFS4 minor version */
 	struct nfs_client *	nfs_client;	/* shared client and NFS4 state */
 	struct list_head	client_link;	/* List of other nfs_server structs
 						 * that share the same client

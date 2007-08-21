@@ -1145,6 +1145,8 @@ extern const struct nfs_rpc_ops	nfs_v4_clientops;
 extern const struct nfs_rpc_ops	nfs_v40_clientops;
 extern const struct nfs_rpc_ops	nfs_v41_clientops;
 extern const struct nfs_rpc_ops	*nfsv4_minorversion_clientops[];
+extern struct rpc_version *nfs4_minorversions[];
+extern struct rpc_procinfo *nfs4_minorversion_procedures[];
 
 extern struct rpc_version	nfs_version2;
 extern struct rpc_version	nfs_version3;
