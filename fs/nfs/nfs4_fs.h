@@ -10,7 +10,6 @@
 #define __LINUX_FS_NFS_NFS4_FS_H
 
 #ifdef CONFIG_NFS_V4
-#define NFSV4_MAX_MINORVERSION 0
 
 struct idmap;
 

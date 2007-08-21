@@ -851,7 +851,7 @@ error:
 
 static int nfs4_setup_nfs4_program(int minorversion)
 {
-	if (minorversion > NFSV4_MAX_MINORVERSION)
+	if (minorversion > NFS4_MAX_MINOR_VERSION)
 		return -ENOTSUPP;
 
 	nfs_version4 = *(nfs4_minorversions[minorversion]);
