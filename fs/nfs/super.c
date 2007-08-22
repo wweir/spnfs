@@ -1772,10 +1772,17 @@ static void nfs4_kill_super(struct super_block *sb)
 	kill_anon_super(sb);
 
 #if defined(CONFIG_NFS_V4_1)
-	if (server->session) {
-		dprintk("%s Destroy session %p for superblock server %p\n",
-			__FUNCTION__, server->session, server);
-		nfs4_proc_destroy_session(server);
+	switch (server->nfs_client->cl_minorversion) {
+	case 1:
+		if (server->session) {
+			dprintk("%s Destroy session %p for nfs_server %p\n",
+				__FUNCTION__, server->session, server);
+			nfs4_proc_destroy_session(server);
+		}
+		break;
+	default:
+		/* Fall-through */
+		break;
 	}
 #endif /* CONFIG_NFS_V4_1 */
 	nfs4_renewd_prepare_shutdown(server);
