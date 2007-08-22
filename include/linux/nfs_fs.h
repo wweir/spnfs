@@ -427,6 +427,8 @@ extern int nfs_wb_page_cancel(struct inode *inode, struct page* page);
 extern int  nfs_commit_inode(struct inode *, int);
 extern struct nfs_write_data *nfs_commit_alloc(void);
 extern void nfs_commit_free(struct nfs_write_data *wdata);
+extern struct nfs_write_data *nfs4_commit_alloc(void);
+extern void nfs4_commit_free(struct nfs_write_data *p);
 extern void nfs_commit_release(void *wdata);
 #else
 static inline int
@@ -446,6 +448,7 @@ nfs_have_writebacks(struct inode *inode)
  * Allocate nfs_write_data structures
  */
 extern struct nfs_write_data *nfs_writedata_alloc(unsigned int npages);
+extern struct nfs_write_data *nfs4_writedata_alloc(unsigned int npages);
 
 /*
  * linux/fs/nfs/read.c
@@ -455,11 +458,13 @@ extern int  nfs_readpages(struct file *, struct address_space *,
 		struct list_head *, unsigned);
 extern int  nfs_readpage_result(struct rpc_task *, struct nfs_read_data *);
 extern void nfs_readdata_release(void *data);
+extern void nfs4_readdata_release(void *data);
 
 /*
  * Allocate nfs_read_data structures
  */
 extern struct nfs_read_data *nfs_readdata_alloc(unsigned int npages);
+extern struct nfs_read_data *nfs4_readdata_alloc(unsigned int npages);
 
 /*
  * linux/fs/nfs3proc.c

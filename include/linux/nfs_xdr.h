@@ -131,6 +131,7 @@ struct nfs_openargs {
 	const struct nfs_server *server;	 /* Needed for ID mapping */
 	const u32 *		bitmask;
 	__u32			claim;
+	void *                  minorversion_info;
 };
 
 struct nfs_openres {
@@ -146,6 +147,7 @@ struct nfs_openres {
 	__u32			do_recall;
 	__u64			maxsize;
 	__u32			attrset[NFS4_BITMAP_SIZE];
+	void *                  minorversion_info;
 };
 
 /*
@@ -155,10 +157,12 @@ struct nfs_open_confirmargs {
 	const struct nfs_fh *	fh;
 	nfs4_stateid *		stateid;
 	struct nfs_seqid *	seqid;
+	void *                  minorversion_info;
 };
 
 struct nfs_open_confirmres {
 	nfs4_stateid            stateid;
+	void *                  minorversion_info;
 };
 
 /*
@@ -170,12 +174,14 @@ struct nfs_closeargs {
 	struct nfs_seqid *	seqid;
 	int			open_flags;
 	const u32 *		bitmask;
+	void *                  minorversion_info;
 };
 
 struct nfs_closeres {
 	nfs4_stateid            stateid;
 	struct nfs_fattr *	fattr;
 	const struct nfs_server *server;
+	void *                  minorversion_info;
 };
 /*
  *  * Arguments to the lock,lockt, and locku call.
@@ -196,10 +202,12 @@ struct nfs_lock_args {
 	unsigned char		block : 1;
 	unsigned char		reclaim : 1;
 	unsigned char		new_lock_owner : 1;
+	void *                  minorversion_info;
 };
 
 struct nfs_lock_res {
 	nfs4_stateid			stateid;
+	void *                  minorversion_info;
 };
 
 struct nfs_locku_args {
@@ -207,31 +215,37 @@ struct nfs_locku_args {
 	struct file_lock *	fl;
 	struct nfs_seqid *	seqid;
 	nfs4_stateid *		stateid;
+	void *                  minorversion_info;
 };
 
 struct nfs_locku_res {
 	nfs4_stateid			stateid;
+	void *                  minorversion_info;
 };
 
 struct nfs_lockt_args {
 	struct nfs_fh *		fh;
 	struct file_lock *	fl;
 	struct nfs_lowner	lock_owner;
+	void *                  minorversion_info;
 };
 
 struct nfs_lockt_res {
 	struct file_lock *	denied; /* LOCK, LOCKT failed */
+	void *                  minorversion_info;
 };
 
 struct nfs4_delegreturnargs {
 	const struct nfs_fh *fhandle;
 	const nfs4_stateid *stateid;
 	const u32 * bitmask;
+	void *                  minorversion_info;
 };
 
 struct nfs4_delegreturnres {
 	struct nfs_fattr * fattr;
 	const struct nfs_server *server;
+	void *                  minorversion_info;
 };
 
 /*
@@ -244,12 +258,18 @@ struct nfs_readargs {
 	__u32			count;
 	unsigned int		pgbase;
 	struct page **		pages;
+#ifdef CONFIG_NFS_V4
+	void *                  minorversion_info;
+#endif
 };
 
 struct nfs_readres {
 	struct nfs_fattr *	fattr;
 	__u32			count;
 	int                     eof;
+#ifdef CONFIG_NFS_V4
+	void *                  minorversion_info;
+#endif
 };
 
 /*
@@ -264,6 +284,9 @@ struct nfs_writeargs {
 	unsigned int		pgbase;
 	struct page **		pages;
 	const u32 *		bitmask;
+#ifdef CONFIG_NFS_V4
+	void *                  minorversion_info;
+#endif
 };
 
 struct nfs_writeverf {
@@ -276,6 +299,9 @@ struct nfs_writeres {
 	struct nfs_writeverf *	verf;
 	__u32			count;
 	const struct nfs_server *server;
+#ifdef CONFIG_NFS_V4
+	void *                  minorversion_info;
+#endif
 };
 
 /*
@@ -343,6 +369,9 @@ struct nfs_setattrargs {
 	struct iattr *                  iap;
 	const struct nfs_server *	server; /* Needed for name mapping */
 	const u32 *			bitmask;
+#ifdef CONFIG_NFS_V4
+	void *				minorversion_info;
+#endif
 };
 
 struct nfs_setaclargs {
@@ -350,18 +379,34 @@ struct nfs_setaclargs {
 	size_t				acl_len;
 	unsigned int			acl_pgbase;
 	struct page **			acl_pages;
+	void *				minorversion_info;
 };
+
 
 struct nfs_getaclargs {
 	struct nfs_fh *			fh;
 	size_t				acl_len;
 	unsigned int			acl_pgbase;
 	struct page **			acl_pages;
+	void *                          minorversion_info;
+};
+
+struct nfs_getaclres {
+	size_t *			acl_len;
+	void *				minorversion_info;
 };
 
 struct nfs_setattrres {
 	struct nfs_fattr *              fattr;
 	const struct nfs_server *	server;
+#ifdef CONFIG_NFS_V4
+	void *                          minorversion_info;
+#endif
+};
+
+struct nfs_setaclres {
+	struct nfs_setattrres *		opres;
+	void *				minorversion_info;
 };
 
 struct nfs_linkargs {
@@ -541,6 +586,7 @@ struct nfs4_accessargs {
 	const struct nfs_fh *		fh;
 	const u32 *			bitmask;
 	u32				access;
+	void *				minorversion_info;
 };
 
 struct nfs4_accessres {
@@ -548,6 +594,7 @@ struct nfs4_accessres {
 	struct nfs_fattr *		fattr;
 	u32				supported;
 	u32				access;
+        void *                          minorversion_info;
 };
 
 struct nfs4_create_arg {
@@ -567,6 +614,7 @@ struct nfs4_create_arg {
 	const struct iattr *		attrs;
 	const struct nfs_fh *		dir_fh;
 	const u32 *			bitmask;
+	void *                          minorversion_info;
 };
 
 struct nfs4_create_res {
@@ -575,21 +623,30 @@ struct nfs4_create_res {
 	struct nfs_fattr *		fattr;
 	struct nfs4_change_info		dir_cinfo;
 	struct nfs_fattr *		dir_fattr;
+	void *                          minorversion_info;
 };
 
 struct nfs4_fsinfo_arg {
 	const struct nfs_fh *		fh;
 	const u32 *			bitmask;
+	void *                          minorversion_info;
+};
+
+struct nfs4_fsinfo_res {
+	void *                  	minorversion_info;
+	struct nfs_fsinfo *		fsinfo;
 };
 
 struct nfs4_getattr_arg {
 	const struct nfs_fh *		fh;
 	const u32 *			bitmask;
+	void *                          minorversion_info;
 };
 
 struct nfs4_getattr_res {
 	const struct nfs_server *	server;
 	struct nfs_fattr *		fattr;
+	void *                          minorversion_info;
 };
 
 struct nfs4_link_arg {
@@ -597,6 +654,7 @@ struct nfs4_link_arg {
 	const struct nfs_fh *		dir_fh;
 	const struct qstr *		name;
 	const u32 *			bitmask;
+	void *                          minorversion_info;
 };
 
 struct nfs4_link_res {
@@ -604,6 +662,7 @@ struct nfs4_link_res {
 	struct nfs_fattr *		fattr;
 	struct nfs4_change_info		cinfo;
 	struct nfs_fattr *		dir_attr;
+	void *                          minorversion_info;
 };
 
 
@@ -611,21 +670,30 @@ struct nfs4_lookup_arg {
 	const struct nfs_fh *		dir_fh;
 	const struct qstr *		name;
 	const u32 *			bitmask;
+	void *                          minorversion_info;
 };
 
 struct nfs4_lookup_res {
 	const struct nfs_server *	server;
 	struct nfs_fattr *		fattr;
 	struct nfs_fh *			fh;
+	void *                          minorversion_info;
 };
 
 struct nfs4_lookup_root_arg {
 	const u32 *			bitmask;
+	void *                          minorversion_info;
 };
 
 struct nfs4_pathconf_arg {
 	const struct nfs_fh *		fh;
 	const u32 *			bitmask;
+	void *                          minorversion_info;
+};
+
+struct nfs4_pathconf_res {
+	void *                  minorversion_info;
+	struct nfs_pathconf *	pathconf;
 };
 
 struct nfs4_readdir_arg {
@@ -636,11 +704,13 @@ struct nfs4_readdir_arg {
 	struct page **			pages;	/* zero-copy data */
 	unsigned int			pgbase;	/* zero-copy data */
 	const u32 *			bitmask;
+	void *                  	minorversion_info;
 };
 
 struct nfs4_readdir_res {
 	nfs4_verifier			verifier;
 	unsigned int			pgbase;
+	void *                  	minorversion_info;
 };
 
 struct nfs4_readlink {
@@ -648,6 +718,11 @@ struct nfs4_readlink {
 	unsigned int			pgbase;
 	unsigned int			pglen;   /* zero-copy data */
 	struct page **			pages;   /* zero-copy data */
+	void *                  	minorversion_info;
+};
+
+struct nfs4_readlinkres {
+	void *                  	minorversion_info;
 };
 
 struct nfs4_rename_arg {
@@ -656,6 +731,7 @@ struct nfs4_rename_arg {
 	const struct qstr *		old_name;
 	const struct qstr *		new_name;
 	const u32 *			bitmask;
+	void *                          minorversion_info;
 };
 
 struct nfs4_rename_res {
@@ -664,6 +740,7 @@ struct nfs4_rename_res {
 	struct nfs_fattr *		old_fattr;
 	struct nfs4_change_info		new_cinfo;
 	struct nfs_fattr *		new_fattr;
+	void *                          minorversion_info;
 };
 
 struct nfs4_setclientid {
@@ -678,9 +755,89 @@ struct nfs4_setclientid {
 	u32				sc_cb_ident;      /* request */
 };
 
+struct nfs41_exchange_id_args {
+	nfs4_verifier *			verifier;
+	unsigned int 			id_len;
+	char 				id[NFS4_OPAQUE_LIMIT];
+};
+
+struct server_owner {
+	uint64_t			minor_id;
+	uint32_t			major_id_sz;
+	char				major_id[NFS4_OPAQUE_LIMIT];
+};
+
+struct server_scope {
+	uint32_t			server_scope_sz;
+	char 				server_scope[NFS4_OPAQUE_LIMIT];
+};
+
+struct nfs41_exchange_id_res {
+	struct nfs4_client *		client;
+	struct server_owner		server_owner;
+	struct server_scope		server_scope;
+};
+
+struct nfs41_create_session_args {
+	struct nfs4_client *		client;
+	struct nfs4_session *		session;
+	uint32_t			persist;
+	uint32_t			header_padding;
+	uint32_t			use_for_backchannel;
+	uint32_t			use_for_rdma;
+	uint32_t			cb_program;
+};
+
+struct nfs41_create_session_res {
+	struct nfs4_client *		client;
+	struct nfs4_session *		session;
+	uint32_t			persist;
+	uint32_t			header_padding;
+	uint32_t			use_for_backchannel;
+	uint32_t			use_for_rdma;
+};
+
+struct nfs41_sequence_args {
+	char				sessionid[NFS4_MAX_SESSIONID_LEN];
+	u32				seqid;
+	u32				slotid;
+	u32				maxslots;
+	struct nfs4_client *		client;
+};
+
+struct nfs41_sequence_res {
+	char				sessionid[NFS4_MAX_SESSIONID_LEN];
+	u32				seqid;
+	u32				slotid;
+	u32				maxslots;
+	u32				target_maxslots;
+	u32				status_flags;
+	struct nfs4_state_owner		*sp;
+};
+
+struct nfs4_get_lease_time_args {
+	void                            *minorversion_info;
+};
+
+struct nfs4_get_lease_time_res {
+	struct nfs_fsinfo               *fsinfo;
+	void                            *minorversion_info;
+};
+
 struct nfs4_statfs_arg {
 	const struct nfs_fh *		fh;
 	const u32 *			bitmask;
+	void *                          minorversion_info;
+};
+
+struct nfs4_statfs_res {
+	void *                  minorversion_info;
+	struct nfs_fsstat *	fsstat;
+};
+
+struct nfs4_server_caps_args {
+	void *                  minorversion_info;
+	struct nfs_fh *		fhandle;
 };
 
 struct nfs4_server_caps_res {
@@ -688,6 +845,7 @@ struct nfs4_server_caps_res {
 	u32				acl_bitmask;
 	u32				has_links;
 	u32				has_symlinks;
+	void *                  	minorversion_info;
 };
 
 struct nfs4_string {
@@ -710,11 +868,12 @@ struct nfs4_fs_location {
 
 #define NFS4_FS_LOCATIONS_MAXENTRIES 10
 struct nfs4_fs_locations {
-	struct nfs_fattr fattr;
-	const struct nfs_server *server;
-	struct nfs4_pathname fs_path;
-	int nlocations;
-	struct nfs4_fs_location locations[NFS4_FS_LOCATIONS_MAXENTRIES];
+	struct nfs_fattr 		fattr;
+	const struct nfs_server *	server;
+	struct nfs4_pathname 		fs_path;
+	void *				minorversion_info;
+	int 				nlocations;
+	struct nfs4_fs_location 	locations[NFS4_FS_LOCATIONS_MAXENTRIES];
 };
 
 struct nfs4_fs_locations_arg {
@@ -722,6 +881,12 @@ struct nfs4_fs_locations_arg {
 	const struct qstr *name;
 	struct page *page;
 	const u32 *bitmask;
+	void *                          minorversion_info;
+};
+
+struct nfs4_fs_locations_res {
+	void *                  	minorversion_info;
+	struct nfs4_fs_locations *	fs_locations;
 };
 
 #endif /* CONFIG_NFS_V4 */
@@ -744,6 +909,7 @@ struct nfs_read_data {
 	struct nfs_readres  res;
 #ifdef CONFIG_NFS_V4
 	unsigned long		timestamp;	/* For lease renewal */
+	struct nfs4_session *	session;
 #endif
 	struct page		*page_array[NFS_PAGEVEC_SIZE];
 };
@@ -763,6 +929,7 @@ struct nfs_write_data {
 	struct nfs_writeres	res;		/* result struct */
 #ifdef CONFIG_NFS_V4
 	unsigned long		timestamp;	/* For lease renewal */
+	struct nfs4_session *	session;
 #endif
 	struct page		*page_array[NFS_PAGEVEC_SIZE];
 };
@@ -826,6 +993,9 @@ struct nfs_rpc_ops {
 	int	(*file_release) (struct inode *, struct file *);
 	int	(*lock)(struct file *, int, struct file_lock *);
 	void	(*clear_acl_cache)(struct inode *);
+	int	(*setup_session)(struct nfs4_client *);
+	int	(*setup_sequence)(struct nfs4_session *, struct nfs41_sequence_args *, struct nfs41_sequence_res *);
+	int	(*sequence_done)(struct nfs4_session *, struct nfs41_sequence_res *, int status);
 };
 
 /*
@@ -841,6 +1011,10 @@ struct nfs_rpc_ops {
 extern const struct nfs_rpc_ops	nfs_v2_clientops;
 extern const struct nfs_rpc_ops	nfs_v3_clientops;
 extern const struct nfs_rpc_ops	nfs_v4_clientops;
+extern const struct nfs_rpc_ops	nfs_v40_clientops;
+extern const struct nfs_rpc_ops	nfs_v41_clientops;
+extern const struct nfs_rpc_ops	*nfsv4_minorversion_clientops[];
+
 extern struct rpc_version	nfs_version2;
 extern struct rpc_version	nfs_version3;
 extern struct rpc_version	nfs_version4;

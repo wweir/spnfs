@@ -853,6 +853,7 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	struct nfsd4_op	*op;
 	struct nfsd4_operation *opdesc;
 	struct nfsd4_compound_state *cstate = NULL;
+	sessionid_t	*current_sid = NULL;
 	int		slack_bytes;
 	__be32		status;
 
@@ -860,6 +861,11 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	cstate = cstate_alloc();
 	if (cstate == NULL)
 		goto out;
+
+	current_sid = kzalloc(sizeof(*current_sid), GFP_KERNEL);
+	if (current_sid == NULL)
+		goto out;
+	cstate->current_sid = current_sid;
 
 	resp->xbuf = &rqstp->rq_res;
 	resp->p = rqstp->rq_res.head[0].iov_base + rqstp->rq_res.head[0].iov_len;
@@ -883,7 +889,7 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	while (!status && resp->opcnt < args->opcnt) {
 		op = &args->ops[resp->opcnt++];
 
-		dprintk("nfsv4 compound op #%d: %d\n", resp->opcnt, op->opnum);
+		dprintk("nfsv4 compound op %p #%d: %d\n", args->ops, resp->opcnt, op->opnum);
 
 		/*
 		 * The XDR decode routines may have pre-set op->status;
@@ -946,11 +952,13 @@ encode_op:
 
 out:
 	nfsd4_release_compoundargs(args);
+	if (cstate->current_sid)
+		kfree(cstate->current_sid);
 	cstate_free(cstate);
 	return status;
 }
 
-static struct nfsd4_operation nfsd4_ops[OP_RELEASE_LOCKOWNER+1] = {
+static struct nfsd4_operation nfsd4_ops[OP_SEQUENCE+1] = {
 	[OP_ACCESS] = {
 		.op_func = (nfsd4op_func)nfsd4_access,
 	},
@@ -1064,6 +1072,22 @@ static struct nfsd4_operation nfsd4_ops[OP_RELEASE_LOCKOWNER+1] = {
 	[OP_RELEASE_LOCKOWNER] = {
 		.op_func = (nfsd4op_func)nfsd4_release_lockowner,
 		.op_flags = ALLOWED_WITHOUT_FH | ALLOWED_ON_ABSENT_FS,
+	},
+	[OP_EXCHANGE_ID] = {
+		.op_func = (nfsd4op_func)nfsd4_exchange_id,
+		.op_flags = ALLOWED_WITHOUT_FH,
+	},
+	[OP_CREATE_SESSION] = {
+		.op_func = (nfsd4op_func)nfsd4_create_session,
+		.op_flags = ALLOWED_WITHOUT_FH,
+	},
+	[OP_SEQUENCE] = {
+		.op_func = (nfsd4op_func)nfsd4_sequence,
+		.op_flags = ALLOWED_WITHOUT_FH,
+	},
+	[OP_DESTROY_SESSION] = {
+		.op_func = (nfsd4op_func)nfsd4_destroy_session,
+		.op_flags = ALLOWED_WITHOUT_FH,
 	},
 };
 
