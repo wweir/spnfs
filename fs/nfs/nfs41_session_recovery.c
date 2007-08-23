@@ -125,6 +125,7 @@ static int session_reclaimer(void *arg)
 	int ret;
 	struct nfs_server *server = (struct nfs_server *)arg;
 	struct nfs4_session *session = server->session;
+	struct nfs_client *clp = server->nfs_client;
 
 	allow_signal(SIGKILL);
 
@@ -142,6 +143,14 @@ out_error:
 		NIPQUAD(server->nfs_client->cl_addr.sin_addr),
 		-ret);
 	nfs41_set_session_expired(server->session);
+
+	switch (ret) {
+	case -NFS4ERR_STALE_CLIENTID:
+	case -NFS4ERR_STALE_STATEID:
+	case -NFS4ERR_EXPIRED:
+		set_bit(NFS4CLNT_LEASE_EXPIRED, &clp->cl_state);
+		break;
+	}
 	goto out;
 }
 
@@ -226,7 +235,6 @@ int nfs41_recover_expired_session(struct rpc_clnt *clnt,
 
 		if (!nfs41_set_session_valid(server->session))
 			break;
-
 		ret = nfs41_recover_session_sync(clnt, server);
 	}
 

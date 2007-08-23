@@ -761,8 +761,10 @@ static void nfs4_recover_state(struct nfs_client *clp)
 	atomic_inc(&clp->cl_count);
 	task = kthread_run(reclaimer, clp, "%u.%u.%u.%u-reclaim",
 			NIPQUAD(clp->cl_addr.sin_addr));
+
 	if (!IS_ERR(task))
 		return;
+
 	nfs4_clear_recover_bit(clp);
 	nfs_put_client(clp);
 	module_put(THIS_MODULE);
@@ -911,8 +913,10 @@ static int reclaimer(void *ptr)
 	lock_kernel();
 	down_write(&clp->cl_sem);
 	/* Are there any NFS mounts out there? */
+	/* FIXME
 	if (list_empty(&clp->cl_superblocks))
 		goto out;
+	*/
 restart_loop:
 	ops = nfs4_network_partition_recovery_ops[clp->cl_minorversion];
 	/* Are there any open files on this volume? */

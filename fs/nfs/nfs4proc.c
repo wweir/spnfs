@@ -358,6 +358,9 @@ static int _nfs41_proc_setup_sequence(struct nfs4_session *session,
 	u32 *ptr;
 	struct nfs4_slot *slot;
 
+	if (nfs41_test_session_expired(session))
+		return -NFS4ERR_STALE_CLIENTID;
+
 	ptr = (u32 *)session->sess_id;
 	dprintk("%s: %u:%u:%u:%u\n", __FUNCTION__,
 		ptr[0], ptr[1], ptr[2], ptr[3]);
@@ -391,19 +394,20 @@ static int nfs41_proc_setup_sequence_call(struct nfs_server *server,
 {
 	int status;
 
-	/*
-	 * Ensure we have a valid lease
-	 */
-	status = nfs4_recover_expired_lease(server);
-	if (status)
-		return status;
+	do {
+		/*
+		 * Ensure we have a valid lease
+		 */
+		status = nfs4_recover_expired_lease(server);
+		if (status)
+			return status;
 
-	/*
-	 * Ensure we have a valid session
-	 */
-	status = nfs41_recover_expired_session(server->session->clnt, server);
-	if (status)
-		return status;
+		/*
+		 * Ensure we have a valid session
+		 */
+		status = nfs41_recover_expired_session(server->session->clnt,
+						      server);
+	} while (status);
 
 	status = _nfs41_proc_setup_sequence(server->session, args, res);
 
@@ -3420,7 +3424,7 @@ int nfs4_proc_setclientid(struct nfs_client *clp, u32 program, unsigned short po
 }
 
 #ifdef CONFIG_NFS_V4_1
-int nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
+int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
 {
 	nfs4_verifier verifier;
 	struct nfs41_exchange_id_args args = {
@@ -3454,6 +3458,7 @@ int nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
 			         "AUTH_SYS", clp->cl_id_uniquifier);
 
 		status = rpc_call_sync(clp->cl_rpcclient, &msg, 0);
+
 		if (status != NFS4ERR_CLID_INUSE)
 			break;
 
@@ -3469,6 +3474,21 @@ int nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
 	dprintk("<-- %s status= %d\n", __FUNCTION__, status);
 	return status;
 }
+
+int nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
+{
+	struct nfs_server *server;
+
+	/*
+	 * Since we're going to blow away the client id, invalidate all the
+	 * sessions that were associated with this clientid.
+	 */
+	list_for_each_entry(server, &clp->cl_superblocks, client_link)
+		nfs41_set_session_expired(server->session);
+
+	return _nfs4_proc_exchange_id(clp, cred);
+}
+
 #endif /* CONFIG_NFS_V4_1 */
 
 static int _nfs4_proc_setclientid_confirm(struct nfs_client *clp, struct rpc_cred *cred)
