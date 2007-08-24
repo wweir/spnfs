@@ -517,7 +517,6 @@ static struct nfs4_opendata *nfs4_opendata_alloc(struct path *path,
 	atomic_inc(&sp->so_count);
 	p->o_arg.fh = NFS_FH(dir);
 	p->o_arg.open_flags = flags,
-	p->o_arg.clientid = server->nfs_client->cl_clientid;
 	p->o_arg.id = sp->so_owner_id.id;
 	p->o_arg.name = &p->path.dentry->d_name;
 	p->o_arg.server = server;
@@ -533,7 +532,20 @@ static struct nfs4_opendata *nfs4_opendata_alloc(struct path *path,
 	}
 	p->c_arg.fh = &p->o_res.fh;
 	p->c_arg.stateid = &p->o_res.stateid;
-	p->c_arg.seqid = p->o_arg.seqid;
+	switch (server->nfs_client->cl_minorversion) {
+#ifdef CONFIG_NFS_V4_1
+	case 1:
+		p->o_arg.seqid->sequence->counter = 0;
+		p->o_arg.clientid = 0;
+		break;
+#endif /* CONFIG_NFS_V4_1 */
+	case 0:
+		p->c_arg.seqid = p->o_arg.seqid;
+		p->o_arg.clientid = server->nfs_client->cl_clientid;
+		break;
+	default:
+		BUG();
+	}
 	nfs4_init_opendata_res(p);
 	kref_init(&p->kref);
 	return p;
@@ -1082,7 +1094,18 @@ static void nfs4_open_prepare(struct rpc_task *task, void *calldata)
 	}
 	/* Update sequence id. */
 	data->o_arg.id = sp->so_owner_id.id;
-	data->o_arg.clientid = sp->so_client->cl_clientid;
+	switch (data->o_arg.server->nfs_client->cl_minorversion) {
+#ifdef CONFIG_NFS_V4_1
+	case 1:
+		data->o_arg.clientid = 0;
+		break;
+#endif
+	case 0:
+		data->o_arg.clientid = sp->so_client->cl_clientid;
+		break;
+	default:
+		BUG();
+	}
 	if (data->o_arg.claim == NFS4_OPEN_CLAIM_PREVIOUS) {
 		msg.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_OPEN_NOATTR];
 		nfs_copy_fh(&data->o_res.fh, data->o_arg.fh);
@@ -1167,10 +1190,15 @@ static int _nfs4_proc_open(struct nfs4_opendata *data)
 	data->rpc_done = 0;
 	data->rpc_status = 0;
 	data->cancelled = 0;
+	NFS41_SETUP_SEQUENCE(server, (*o_arg), (*o_res), 1);
 	task = rpc_run_task(server->client, RPC_TASK_ASYNC, &nfs4_open_ops, data);
-	if (IS_ERR(task))
-		return PTR_ERR(task);
+	if (IS_ERR(task)) {
+		status = PTR_ERR(task);
+		NFS41_SEQUENCE_DONE(server, (*o_res), status);
+		return status;
+	}
 	status = nfs4_wait_for_completion_rpc_task(task);
+	NFS41_SEQUENCE_DONE(server, (*o_res), status);
 	if (status != 0) {
 		data->cancelled = 1;
 		smp_wmb();
@@ -1404,6 +1432,11 @@ static int _nfs4_do_setattr(struct inode *inode, struct nfs_fattr *fattr,
 		nfs4_copy_stateid(&arg.stateid, state, current->files);
 	} else
 		memcpy(&arg.stateid, &zero_stateid, sizeof(arg.stateid));
+	/* NFSv4.1 Draft 10 requires stateid sequence to be 0 */
+#ifdef CONFIG_NFS_V4_1
+	if (server->nfs_client->cl_minorversion == 1)
+		memset(&arg.stateid, 0, 4);
+#endif /* CONFIG_NFS_V4_1 */
 
 	NFS41_SETUP_SEQUENCE(server, arg, res, 1);
 	status = rpc_call_sync(server->client, &msg, 0);
@@ -1556,21 +1589,36 @@ int nfs4_do_close(struct path *path, struct nfs4_state *state, int wait)
 	calldata->inode = state->inode;
 	calldata->state = state;
 	calldata->arg.fh = NFS_FH(state->inode);
-	calldata->arg.stateid = &state->open_stateid;
 	/* Serialization for the sequence id */
 	calldata->arg.seqid = nfs_alloc_seqid(&state->owner->so_seqid);
 	if (calldata->arg.seqid == NULL)
 		goto out_free_calldata;
+	switch (server->nfs_client->cl_minorversion) {
+#ifdef CONFIG_NFS_V4_1
+	case 1:
+		calldata->arg.seqid->sequence->counter = 0;
+		calldata->arg.stateid = &state->stateid;
+		memset(&calldata->arg.stateid->data, 0, 4);
+		break;
+#endif /* CONFIG_NFS_V4_1 */
+	case 0:
+		calldata->arg.stateid = &state->open_stateid;
+		break;
+	default:
+		BUG();
+	}
 	calldata->arg.bitmask = server->attr_bitmask;
 	calldata->res.fattr = &calldata->fattr;
 	calldata->res.server = server;
 	calldata->path.mnt = mntget(path->mnt);
 	calldata->path.dentry = dget(path->dentry);
 
+	NFS41_SETUP_SEQUENCE(server, calldata->arg, calldata->res, 1);
 	task = rpc_run_task(server->client, RPC_TASK_ASYNC, &nfs4_close_ops, calldata);
-	if (IS_ERR(task))
-		return PTR_ERR(task);
-	status = 0;
+	status = IS_ERR(task) ? PTR_ERR(task) : 0;
+	NFS41_SEQUENCE_DONE(server, calldata->res, status);
+	if (status)
+		return status;
 	if (wait)
 		status = rpc_wait_for_completion_task(task);
 	rpc_put_task(task);
