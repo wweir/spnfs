@@ -416,7 +416,7 @@ enum lock_type4 {
 
 #define NFSPROC4_NULL 0
 #define NFSPROC4_COMPOUND 1
-#define NFS4_MINOR_VERSION 0
+#define NFS4_MINOR_VERSION 1
 #define NFS4_MAX_MINOR_VERSION 1
 #define NFS4_DEBUG 1
 

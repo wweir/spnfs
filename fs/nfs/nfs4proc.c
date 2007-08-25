@@ -2778,15 +2778,23 @@ static int nfs4_proc_pathconf(struct nfs_server *server, struct nfs_fh *fhandle,
 static int nfs4_read_done(struct rpc_task *task, struct nfs_read_data *data)
 {
 	struct nfs_server *server = NFS_SERVER(data->inode);
+	int status;
 
+	dprintk("--> %s\n", __FUNCTION__);
+	status = task->tk_status >= 0 ? 0 : task->tk_status;
+	NFS41_SEQUENCE_DONE(server, data->res, status);
 	if (nfs4_async_handle_error(task, server) == -EAGAIN) {
+		NFS41_SETUP_SEQUENCE(data->args.server,
+			data->args, data->res, 0);
 		rpc_restart_call(task);
+		dprintk("<-- %s status= %d\n", __FUNCTION__, -EAGAIN);
 		return -EAGAIN;
 	}
 
 	nfs_invalidate_atime(data->inode);
 	if (task->tk_status > 0)
 		renew_lease(server, data->timestamp);
+	dprintk("<-- %s status= 0\n", __FUNCTION__);
 	return 0;
 }
 
@@ -2798,10 +2806,31 @@ static void nfs4_proc_read_setup(struct nfs_read_data *data)
 		.rpc_resp = &data->res,
 		.rpc_cred = data->cred,
 	};
+#ifdef CONFIG_NFS_V4_1
+	int status;
+#endif
 
+	dprintk("--> %s\n", __FUNCTION__);
 	data->timestamp   = jiffies;
 
+	switch (data->args.server->nfs_client->cl_minorversion) {
+#ifdef CONFIG_NFS_V4_1
+	case 1:
+		status = nfs41_proc_setup_sequence_call(data->args.server,
+				&data->args.seq_args, &data->res.seq_res);
+		if (status)
+			printk(KERN_WARNING
+			       "Failed to setup sequence - ignored");
+		data->args.seq_args.sa_cache_this = 0;
+		break;
+#endif /* CONFIG_NFS_V4_1 */
+	case 0:
+		break;
+	default:
+		BUG();
+	}
 	rpc_call_setup(&data->task, &msg, 0);
+	dprintk("<-- %s\n", __FUNCTION__);
 }
 
 static int nfs4_write_done(struct rpc_task *task, struct nfs_write_data *data)

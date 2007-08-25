@@ -334,6 +334,7 @@ struct nfs_readargs {
 	__u32			count;
 	unsigned int		pgbase;
 	struct page **		pages;
+	struct nfs_server	*server;
 #if defined(CONFIG_NFS_V4_1)
 	struct nfs41_sequence_args	seq_args;
 #endif
@@ -1036,8 +1037,9 @@ struct nfs_read_data {
 	struct nfs_page		*req;	/* multi ops per nfs_page */
 	struct page		**pagevec;
 	unsigned int		npages;	/* Max length of pagevec */
-	struct nfs_readargs args;
-	struct nfs_readres  res;
+	struct nfs_readargs	args;
+	struct nfs_readres	res;
+	const struct rpc_call_ops         *call_ops;
 #ifdef CONFIG_NFS_V4
 	unsigned long		timestamp;	/* For lease renewal */
 	struct nfs4_session *	session;

@@ -22,6 +22,7 @@
 
 #include <asm/system.h>
 
+#include "nfs4_fs.h"
 #include "internal.h"
 #include "iostat.h"
 
@@ -160,8 +161,11 @@ static void nfs_read_rpcsetup(struct nfs_page *req, struct nfs_read_data *data,
 		const struct rpc_call_ops *call_ops,
 		unsigned int count, unsigned int offset)
 {
-	struct inode		*inode;
+	struct inode *inode;
 	int flags;
+	struct nfs_server *server = data->args.server;
+
+	BUG_ON(server == NULL);
 
 	data->req	  = req;
 	data->inode	  = inode = req->wb_context->path.dentry->d_inode;
@@ -252,6 +256,7 @@ static int nfs_pagein_multi(struct inode *inode, struct list_head *head, unsigne
 		data = nfs_readdata_alloc(1);
 		if (!data)
 			goto out_bad;
+		data->args.server = NFS_SERVER(inode);
 		INIT_LIST_HEAD(&data->pages);
 		list_add(&data->pages, &list);
 		requests++;
@@ -300,6 +305,7 @@ static int nfs_pagein_one(struct inode *inode, struct list_head *head, unsigned 
 	if (!data)
 		goto out_bad;
 
+	data->args.server = NFS_SERVER(inode);
 	INIT_LIST_HEAD(&data->pages);
 	pages = data->pagevec;
 	while (!list_empty(head)) {
