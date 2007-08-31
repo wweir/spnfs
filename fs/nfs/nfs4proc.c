@@ -325,18 +325,13 @@ struct nfs4_slot *nfs4_find_slot(struct nfs4_slot_table *tbl, struct rpc_task
 }
 
 static int nfs41_setup_sequence(struct nfs4_session *session,
-					void *argp,
-					void *resp,
+					struct nfs41_sequence_args *args,
+					struct nfs41_sequence_res *res,
 					int cache_reply,
 					struct rpc_task *task)
 {
 	struct nfs4_slot *slot;
 	struct nfs4_slot_table *tbl;
-	struct nfs41_sequence_args *args;
-	struct nfs41_sequence_res *res;
-
-	args = argp;
-	res = resp;
 
 	tbl = &session->fore_channel.slot_table;
 	slot = nfs4_find_slot(tbl, task);
@@ -357,6 +352,17 @@ static int nfs41_setup_sequence(struct nfs4_session *session,
 	res->sr_slot = slot;
 	res->sr_renewal_time = jiffies;
 	return 0;
+}
+
+static int nfs41_validate_seq_args(struct nfs_server *server,
+					void *args,
+					void *res,
+					int cache_this,
+					struct rpc_task *task)
+{
+	return nfs41_setup_sequence(server->session,
+					args, res,
+					cache_this, task);
 }
 
 static int nfs4_setup_sequence(struct nfs_server *server,
@@ -4980,7 +4986,7 @@ const struct nfs_rpc_ops nfs_v41_clientops = {
 	.file_release   = nfs_release,
 	.lock		= nfs4_proc_lock,
 	.clear_acl_cache = nfs4_zap_acl_attr,
-	.validate_sequence_args = nfs41_setup_sequence,
+	.validate_sequence_args = nfs41_validate_seq_args,
 };
 #endif /* CONFIG_NFS_V4_1 */
 

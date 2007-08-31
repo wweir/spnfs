@@ -406,7 +406,6 @@ void nfs_read_validate(struct rpc_task *task, void *calldata)
 	int (*setup_sequence)(struct nfs_server *,
 				void *, void *, int, struct rpc_task *);
 
-	printk(KERN_EMERG "in %s\n", __FUNCTION__);
 	setup_sequence = server->nfs_client->rpc_ops->validate_sequence_args;
 
 	if (!setup_sequence || !setup_sequence(server,
