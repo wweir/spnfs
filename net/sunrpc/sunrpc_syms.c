@@ -42,6 +42,7 @@ EXPORT_SYMBOL(rpc_clnt_sigmask);
 EXPORT_SYMBOL(rpc_clnt_sigunmask);
 EXPORT_SYMBOL(rpc_delay);
 EXPORT_SYMBOL(rpc_restart_call);
+EXPORT_SYMBOL(rpc_start_call);
 EXPORT_SYMBOL(rpc_setbufsize);
 EXPORT_SYMBOL(rpc_unlink);
 EXPORT_SYMBOL(rpc_wake_up);

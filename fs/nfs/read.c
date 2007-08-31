@@ -398,7 +398,29 @@ static void nfs_readpage_result_partial(struct rpc_task *task, void *calldata)
 	}
 }
 
+#if defined(CONFIG_NFS_V4_1)
+void nfs_read_validate(struct rpc_task *task, void *calldata)
+{
+	struct nfs_read_data *data = calldata;
+	struct nfs_server *server = data->args.server;
+	int (*setup_sequence)(struct nfs_server *,
+				void *, void *, int, struct rpc_task *);
+
+	printk(KERN_EMERG "in %s\n", __FUNCTION__);
+	setup_sequence = server->nfs_client->rpc_ops->validate_sequence_args;
+
+	if (!setup_sequence || !setup_sequence(server,
+						&data->args.seq_args,
+						&data->res.seq_res,
+						0, task))
+		rpc_start_call(task);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 static const struct rpc_call_ops nfs_read_partial_ops = {
+#if defined(CONFIG_NFS_V4_1)
+	.rpc_call_validate_args = nfs_read_validate,
+#endif
 	.rpc_call_done = nfs_readpage_result_partial,
 	.rpc_release = nfs_readdata_release,
 };
@@ -456,6 +478,9 @@ static void nfs_readpage_result_full(struct rpc_task *task, void *calldata)
 }
 
 static const struct rpc_call_ops nfs_read_full_ops = {
+#if defined(CONFIG_NFS_V4_1)
+	.rpc_call_validate_args = nfs_read_validate,
+#endif
 	.rpc_call_done = nfs_readpage_result_full,
 	.rpc_release = nfs_readdata_release,
 };

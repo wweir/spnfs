@@ -180,7 +180,7 @@ struct nfs_openargs {
 		int		delegation_type;	/* CLAIM_PREVIOUS */
 	} u;
 	const struct qstr *	name;
-	const struct nfs_server *server;	 /* Needed for ID mapping */
+	struct nfs_server *server;	 /* Needed for ID mapping */
 	const u32 *		bitmask;
 	__u32			claim;
 #if defined(CONFIG_NFS_V4_1)
@@ -318,7 +318,7 @@ struct nfs4_delegreturnargs {
 
 struct nfs4_delegreturnres {
 	struct nfs_fattr * fattr;
-	const struct nfs_server *server;
+	struct nfs_server *server;
 #if defined(CONFIG_NFS_V4_1)
 	struct nfs41_sequence_res	seq_res;
 #endif
@@ -1126,9 +1126,11 @@ struct nfs_rpc_ops {
 	int	(*file_release) (struct inode *, struct file *);
 	int	(*lock)(struct file *, int, struct file_lock *);
 	void	(*clear_acl_cache)(struct inode *);
-	int	(*setup_session)(struct nfs4_client *);
-	int	(*setup_sequence)(struct nfs4_session *, struct nfs41_sequence_args *, struct nfs41_sequence_res *);
-	int	(*sequence_done)(struct nfs4_session *, struct nfs41_sequence_res *, int status);
+	int 	(*validate_sequence_args)(struct nfs_server *,
+						void *args,
+						void *res,
+						int,
+						struct rpc_task *);
 };
 
 /*

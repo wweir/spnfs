@@ -26,13 +26,13 @@ struct nfs4_slot {
 	u32		 	slot_nr;
 	u32		 	seq_nr;
 	unsigned long		flags;
-	u32	 		nr_waiters;
-	spinlock_t		slot_lock;
 };
 
 struct nfs4_slot_table {
-	struct nfs4_slot	*slots;
-	atomic_t		max_slots;
+	struct nfs4_slot 	*slots;
+	spinlock_t		slot_tbl_lock;
+	struct rpc_wait_queue	slot_tbl_waitq;
+	int			max_slots;
 };
 
 struct nfs4_channel {

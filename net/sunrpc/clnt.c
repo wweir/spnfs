@@ -609,6 +609,14 @@ struct rpc_task *rpc_run_task(struct rpc_clnt *clnt, int flags,
 }
 EXPORT_SYMBOL(rpc_run_task);
 
+void rpc_call_validate_args(struct rpc_task *task)
+{
+	if (task->tk_ops->rpc_call_validate_args)
+		task->tk_ops->rpc_call_validate_args(task, task->tk_calldata);
+	else
+		task->tk_action = call_start;
+}
+
 void
 rpc_call_setup(struct rpc_task *task, struct rpc_message *msg, int flags)
 {
@@ -621,7 +629,7 @@ rpc_call_setup(struct rpc_task *task, struct rpc_message *msg, int flags)
 		rpcauth_bindcred(task);
 
 	if (task->tk_status == 0)
-		task->tk_action = call_start;
+		task->tk_action = rpc_call_validate_args;
 	else
 		task->tk_action = rpc_exit_task;
 }
@@ -698,6 +706,15 @@ void rpc_force_rebind(struct rpc_clnt *clnt)
 }
 EXPORT_SYMBOL_GPL(rpc_force_rebind);
 
+void
+rpc_start_call(struct rpc_task *task)
+{
+	if (RPC_ASSASSINATED(task))
+		return;
+
+	task->tk_action = call_start;
+}
+
 /*
  * Restart an (async) RPC call. Usually called from within the
  * exit handler.
@@ -708,7 +725,7 @@ rpc_restart_call(struct rpc_task *task)
 	if (RPC_ASSASSINATED(task))
 		return;
 
-	task->tk_action = call_start;
+	task->tk_action = rpc_call_validate_args;
 }
 
 /*
