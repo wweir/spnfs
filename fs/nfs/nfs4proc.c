@@ -246,7 +246,7 @@ static int nfs41_sequence_done(struct nfs_server *server,
 	tbl = &server->session->fore_channel.slot_table;
 	slot = res->sr_slot;
 
-	if (status == 0) {
+	if (status >= 0) {
 		++slot->seq_nr;
 		/*
 		 * The sequence call was successful,
@@ -258,9 +258,12 @@ static int nfs41_sequence_done(struct nfs_server *server,
 		if (time_before(clp->cl_last_renewal, timestamp))
 			clp->cl_last_renewal = timestamp;
 		spin_unlock(&clp->cl_lock);
-	}
+	} else
+		printk(KERN_EMERG "status was %d\n", status);
 
 	/* Clear the 'busy' bit on the slot that was used */
+	printk(KERN_EMERG "released slot %u, seq_nr, %u\n",
+			slot->slot_nr, slot->seq_nr);
 	smp_mb__before_clear_bit();
 	clear_bit(NFS4_SLOT_BUSY, &slot->flags);
 	smp_mb__after_clear_bit();
@@ -318,8 +321,11 @@ struct nfs4_slot *nfs4_find_slot(struct nfs4_slot_table *tbl, struct rpc_task
 	slot = __nfs4_find_slot(tbl);
 	spin_unlock(&tbl->slot_tbl_lock);
 
-	if (slot)
+	if (slot) {
+		printk(KERN_EMERG "Got slot %u, seq_nr %u\n",
+				slot->slot_nr, slot->seq_nr);
 		rpc_wake_up_task(task);
+	}
 
 	return slot;
 }
@@ -2956,6 +2962,7 @@ static int nfs4_write_done(struct rpc_task *task, struct nfs_write_data *data)
 	struct inode *inode = data->inode;
 
 #if defined(CONFIG_NFS_V4_1)
+	printk(KERN_EMERG "%s called!\n", __FUNCTION__);
 	nfs4_sequence_done(NFS_SERVER(inode), &data->res.seq_res,
 				task->tk_status);
 #endif
@@ -3026,7 +3033,7 @@ static void nfs4_proc_commit_setup(struct nfs_write_data *data, int how)
 		.rpc_cred = data->cred,
 	};	
 	struct nfs_server *server = NFS_SERVER(data->inode);
-	
+	printk(KERN_EMERG "%s called!\n", __FUNCTION__);
 	data->args.bitmask = server->attr_bitmask;
 	data->res.server = server;
 
@@ -3142,9 +3149,9 @@ void nfs41_sequence_call_done(struct rpc_task *task, void *data)
 		case -NFS4ERR_STALE_CLIENTID:
 		case -NFS4ERR_EXPIRED:
 		case -NFS4ERR_CB_PATH_DOWN:
-		case -NFS4ERR_BADSESSION:
 			nfs4_schedule_state_recovery(clp);
 		case -NFS4ERR_BADSLOT:
+		case -NFS4ERR_BADSESSION:
 		case -NFS4ERR_CONN_NOT_BOUND_TO_SESSION:
 		case -NFS4ERR_BACK_CHAN_BUSY:
 		case -NFS4ERR_SEQ_MISORDERED:
@@ -3443,17 +3450,15 @@ nfs4_async_handle_error(struct rpc_task *task, const struct nfs_server *server)
 		case -NFS4ERR_STALE_CLIENTID:
 		case -NFS4ERR_STALE_STATEID:
 		case -NFS4ERR_EXPIRED:
-#if defined(CONFIG_NFS_V4_1)
-		case -NFS4ERR_BADSESSION:
-#endif
 			rpc_sleep_on(&clp->cl_rpcwaitq, task, NULL, NULL);
 			nfs4_schedule_state_recovery(clp);
 			if (test_bit(NFS4CLNT_STATE_RECOVER, &clp->cl_state) == 0)
 				rpc_wake_up_task(task);
 			task->tk_status = 0;
-			if (!server->nfs_client->cl_minorversion)
-				return -EAGAIN;
+			return -EAGAIN;
 #if defined(CONFIG_NFS_V4_1)
+		case -NFS4ERR_BADSESSION:
+			BUG();
 		case -NFS4ERR_BADSLOT:
 		case -NFS4ERR_CONN_NOT_BOUND_TO_SESSION:
 		case -NFS4ERR_BACK_CHAN_BUSY:
@@ -3543,9 +3548,6 @@ static int nfs4_handle_exception(const struct nfs_server *server, int errorcode,
 		case -NFS4ERR_STALE_CLIENTID:
 		case -NFS4ERR_STALE_STATEID:
 		case -NFS4ERR_EXPIRED:
-#if defined(CONFIG_NFS_V4_1)
-		case -NFS4ERR_BADSESSION:
-#endif
 			nfs4_schedule_state_recovery(clp);
 			ret = nfs4_wait_clnt_recover(server->client, clp);
 			if (ret == 0)
@@ -3556,6 +3558,7 @@ static int nfs4_handle_exception(const struct nfs_server *server, int errorcode,
 			if (!server->nfs_client->cl_minorversion)
 				break;
 			/* FALLTHROUGH */
+		case -NFS4ERR_BADSESSION:
 		case -NFS4ERR_BADSLOT:
 		case -NFS4ERR_CONN_NOT_BOUND_TO_SESSION:
 		case -NFS4ERR_BACK_CHAN_BUSY:
