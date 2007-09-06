@@ -3203,10 +3203,14 @@ nfsd4_encode_devlist_item(struct nfsd4_compoundres *resp,
 	int len;
 	ENCODE_HEAD;
 
-	RESERVE_SPACE(8);
+	RESERVE_SPACE(28);
 	WRITE32(dlist->dev_id);
-	WRITE32(lotype);
+
+	WRITE32(1); /* 1 in list of device_addr */
+	WRITE32(lotype); /* layout type */
+
 	ADJUST_ARGS();
+	dprintk("%s: device id %d\n", __FUNCTION__, dlist->dev_id);
 
 	if (ex_ops->devaddr_encode == NULL && lotype == LAYOUT_NFSV4_FILES) {
 		len = filelayout_encode_devaddr(p, resp->end, dlist->dev_addr);
@@ -3281,11 +3285,13 @@ nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp, int nfserr,
 
 	printk("%s: err %d\n", __FUNCTION__, nfserr);
 	if (!nfserr) {
-		RESERVE_SPACE(8);
+		RESERVE_SPACE(28);
 		WRITE32(gdev->gd_type);
+		ADJUST_ARGS();
+
 		if (gdev->gd_ops->devaddr_encode == NULL &&
 					gdev->gd_type == LAYOUT_NFSV4_FILES) {
-			len = filelayout_encode_devaddr(p, resp->end,gdev->gd_devaddr);
+			len = filelayout_encode_devaddr(p, resp->end, gdev->gd_devaddr);
 			filelayout_free_devaddr(gdev->gd_devaddr);
 		} else {
 			len = gdev->gd_ops->devaddr_encode(p, resp->end, gdev->gd_devaddr);
