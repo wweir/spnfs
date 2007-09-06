@@ -60,7 +60,6 @@
 
 /* the nfsd4_pnfs_devlist dev_addr for the file layout type */
 struct pnfs_filelayout_devaddr {
-	u32			r_dev_type;
 	struct xdr_netobj	r_netid;
 	struct xdr_netobj	r_addr;
 };
@@ -68,6 +67,7 @@ struct pnfs_filelayout_devaddr {
 struct nfsd4_pnfs_layoutlist {
 	u32				dev_id;
 	u32                             dev_index;
+	u32                             dev_util;
 	struct knfsd_fh                 dev_fh;
 };
 
