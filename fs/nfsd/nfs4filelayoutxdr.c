@@ -55,14 +55,18 @@ filelayout_encode_devaddr(u32 *p, u32 *end, void *dev_addr)
 	u32 *p_in = p;
 
 	fdev = (struct pnfs_filelayout_devaddr *)dev_addr;
-	len = 4 + XDR_QUADLEN(fdev->r_netid.len) +
+	len = 6 + XDR_QUADLEN(fdev->r_netid.len) +
 	      XDR_QUADLEN(fdev->r_addr.len);
 	len = len << 2;
 	if (p + XDR_QUADLEN(len) > end)
 		return -ENOMEM;
 	WRITE32(len);
-	WRITE32(fdev->r_dev_type);
-	WRITE32(1);
+
+	WRITE32(1);  /* 1 in indices list */
+	WRITE32(0);  /* index 0 */
+	WRITE32(1);  /* 1 DS per device id */
+	WRITE32(1);  /* 1 in list of multipath */
+
 	WRITE32(fdev->r_netid.len);
 	WRITEMEM(fdev->r_netid.data, fdev->r_netid.len);
 	WRITE32(fdev->r_addr.len);
@@ -92,11 +96,13 @@ filelayout_encode_layoutlist_item(u32 *p, u32 *end,
 	int len;
 	unsigned int fhlen = item->dev_fh.fh_size;
 
-	len = 12 + fhlen;
+	len = 20 + fhlen;
 	if (p + XDR_QUADLEN(len) > end)
 		return -ENOMEM;
 	WRITE32(item->dev_id);
+	WRITE32(item->dev_util); /* nfl_util4 */
 	WRITE32(item->dev_index);
+	WRITE32(1); /* One for now can be an array of FHs */
 	WRITE32(fhlen);
 	WRITEMEM(&item->dev_fh.fh_base, fhlen);
 	return len;
@@ -110,19 +116,20 @@ filelayout_encode_layout(u32 *p, u32 *end, void *layout)
 	struct nfsd4_pnfs_layoutlist *item;
 	int i, full_len, len;
 	u32 *totlen;
+	u32 nfl_util;
 
 	flp = (struct nfsd4_pnfs_filelayout *)layout;
-	len = 32;
+	len = 4;
 	if (p + XDR_QUADLEN(len + 4) > end)
 		return -ENOMEM;
 	full_len = len + 4;
 	totlen = p; 	/* fill-in opaque layout length later*/
 	p++;
-	WRITE32(flp->lg_stripe_type);
-	WRITE32(flp->lg_commit_through_mds);
-	WRITE64(flp->lg_stripe_unit);
-	WRITE64(flp->lg_file_size);
-	WRITE32(flp->lg_indexlen);
+	nfl_util = flp->lg_stripe_unit;
+	if (flp->lg_commit_through_mds)
+		nfl_util |= NFL4_UFLG_COMMIT_THRU_MDS;
+	if (flp->lg_stripe_type)
+		nfl_util |= NFL4_UFLG_DENSE;
 
 	if (flp->lg_indexlen > 0) {   //??? if>0 must build index list
 		printk("filelayout_encode_layout: XXX add loop for index list\n");
@@ -130,6 +137,7 @@ filelayout_encode_layout(u32 *p, u32 *end, void *layout)
 	WRITE32(flp->lg_llistlen);
 	for (i = 0; i < flp->lg_llistlen; i++) {
 		item = &flp->lg_llist[i];
+		item->dev_util = nfl_util;
 		len = filelayout_encode_layoutlist_item(p, end, item);
 		if (len > 0) {
 			p += XDR_QUADLEN(len);
