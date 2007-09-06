@@ -980,7 +980,8 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	while (!status && resp->opcnt < args->opcnt) {
 		op = &args->ops[resp->opcnt++];
 
-		dprintk("nfsv4 compound op %p #%d: %d\n", args->ops, resp->opcnt, op->opnum);
+		dprintk("nfsv4 compound op %p opcnt %d #%d: %d\n",
+			args->ops, args->opcnt, resp->opcnt, op->opnum);
 
 		/*
 		 * The XDR decode routines may have pre-set op->status;
