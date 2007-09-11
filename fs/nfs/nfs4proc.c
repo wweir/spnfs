@@ -246,7 +246,20 @@ static int nfs41_sequence_done(struct nfs_server *server,
 	tbl = &server->session->fore_channel.slot_table;
 	slot = res->sr_slot;
 
-	if (status >= 0) {
+	switch (status) {
+	case -NFS4ERR_STALE_CLIENTID:
+	case -NFS4ERR_STALE_STATEID:
+	case -NFS4ERR_EXPIRED:
+	case -NFS4ERR_BADSESSION:
+	case -NFS4ERR_BADSLOT:
+	case -NFS4ERR_CONN_NOT_BOUND_TO_SESSION:
+	case -NFS4ERR_SEQ_MISORDERED:
+	case -NFS4ERR_SEQUENCE_POS:
+	case -NFS4ERR_RETRY_UNCACHED_REP:
+	case -NFS4ERR_TOO_MANY_OPS:
+	case -NFS4ERR_OP_NOT_IN_SESSION:
+		break;
+	default:
 		++slot->seq_nr;
 		/*
 		 * The sequence call was successful,
@@ -258,12 +271,9 @@ static int nfs41_sequence_done(struct nfs_server *server,
 		if (time_before(clp->cl_last_renewal, timestamp))
 			clp->cl_last_renewal = timestamp;
 		spin_unlock(&clp->cl_lock);
-	} else
-		printk(KERN_EMERG "status was %d\n", status);
+	}
 
 	/* Clear the 'busy' bit on the slot that was used */
-	printk(KERN_EMERG "released slot %u, seq_nr, %u\n",
-			slot->slot_nr, slot->seq_nr);
 	smp_mb__before_clear_bit();
 	clear_bit(NFS4_SLOT_BUSY, &slot->flags);
 	smp_mb__after_clear_bit();
@@ -314,7 +324,6 @@ struct nfs4_slot *nfs4_find_slot(struct nfs4_slot_table *tbl, struct rpc_task
 {
 	struct nfs4_slot *slot;
 
-
 	rpc_sleep_on(&tbl->slot_tbl_waitq, task, NULL, NULL);
 
 	spin_lock(&tbl->slot_tbl_lock);
@@ -322,8 +331,6 @@ struct nfs4_slot *nfs4_find_slot(struct nfs4_slot_table *tbl, struct rpc_task
 	spin_unlock(&tbl->slot_tbl_lock);
 
 	if (slot) {
-		printk(KERN_EMERG "Got slot %u, seq_nr %u\n",
-				slot->slot_nr, slot->seq_nr);
 		rpc_wake_up_task(task);
 	}
 
@@ -381,6 +388,9 @@ static int nfs4_setup_sequence(struct nfs_server *server,
 
 	switch (server->nfs_client->cl_minorversion) {
 	case 1:
+		ret = nfs41_recover_expired_session(task, server);
+		if (ret)
+			break;
 		ret = nfs41_setup_sequence(server->session, args,
 				res, cache_reply, task);
 		break;
@@ -403,14 +413,15 @@ static int nfs41_validate_state(struct nfs_server *server)
 		 * Ensure we have a valid lease
 		 */
 		status = nfs4_recover_expired_lease(server);
+		/* FIXME
 		if (status)
 			return status;
+		*/
 
 		/*
 		 * Ensure we have a valid session
 		 */
-		status = nfs41_recover_expired_session(server->session->clnt,
-						      server);
+		/* FIXME: status = nfs41_recover_expired_session(server->session->clnt, server); */
 	} while (status);
 
 	return status;
@@ -600,20 +611,10 @@ static struct nfs4_opendata *nfs4_opendata_alloc(struct path *path,
 	}
 	p->c_arg.fh = &p->o_res.fh;
 	p->c_arg.stateid = &p->o_res.stateid;
-	switch (server->nfs_client->cl_minorversion) {
-#ifdef CONFIG_NFS_V4_1
-	case 1:
-		p->o_arg.seqid->sequence->counter = 0;
-		p->o_arg.clientid = 0;
-		break;
-#endif /* CONFIG_NFS_V4_1 */
-	case 0:
-		p->c_arg.seqid = p->o_arg.seqid;
-		p->o_arg.clientid = server->nfs_client->cl_clientid;
-		break;
-	default:
-		BUG();
-	}
+	p->c_arg.seqid = p->o_arg.seqid;
+
+	p->o_arg.clientid =
+		server->nfs_client->rpc_ops->nfs4_clientid(server->nfs_client);
 	nfs4_init_opendata_res(p);
 	kref_init(&p->kref);
 	return p;
@@ -1162,18 +1163,9 @@ static void nfs4_open_prepare(struct rpc_task *task, void *calldata)
 	}
 	/* Update sequence id. */
 	data->o_arg.id = sp->so_owner_id.id;
-	switch (data->o_arg.server->nfs_client->cl_minorversion) {
-#ifdef CONFIG_NFS_V4_1
-	case 1:
-		data->o_arg.clientid = 0;
-		break;
-#endif
-	case 0:
-		data->o_arg.clientid = sp->so_client->cl_clientid;
-		break;
-	default:
-		BUG();
-	}
+	data->o_arg.clientid =
+		sp->so_client->rpc_ops->nfs4_clientid(sp->so_client);
+
 	if (data->o_arg.claim == NFS4_OPEN_CLAIM_PREVIOUS) {
 		msg.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_OPEN_NOATTR];
 		nfs_copy_fh(&data->o_res.fh, data->o_arg.fh);
@@ -1217,7 +1209,8 @@ static void nfs4_open_done(struct rpc_task *task, void *calldata)
 		if (!(data->o_res.rflags & NFS4_OPEN_RESULT_CONFIRM))
 			nfs_confirm_seqid(&data->owner->so_seqid, 0);
 	}
-	nfs_increment_open_seqid(data->rpc_status, data->o_arg.seqid);
+	server->nfs_client->rpc_ops->increment_open_seqid(data->rpc_status,
+							  data->o_arg.seqid);
 	data->rpc_done = 1;
 }
 
@@ -1590,7 +1583,8 @@ static void nfs4_close_done(struct rpc_task *task, void *data)
         /* hmm. we are done with the inode, and in the process of freeing
 	 * the state_owner. we keep this around to process errors
 	 */
-	nfs_increment_open_seqid(task->tk_status, calldata->arg.seqid);
+	server->nfs_client->rpc_ops->increment_open_seqid(task->tk_status,
+							  calldata->arg.seqid);
 	switch (task->tk_status) {
 		case 0:
 			nfs_set_open_stateid(state, &calldata->res.stateid, 0);
@@ -1714,7 +1708,6 @@ int nfs4_do_close(struct path *path, struct nfs4_state *state, int wait)
 	switch (server->nfs_client->cl_minorversion) {
 #ifdef CONFIG_NFS_V4_1
 	case 1:
-		calldata->arg.seqid->sequence->counter = 0;
 		calldata->arg.stateid = &state->stateid;
 		memset(&calldata->arg.stateid->data, 0, 4);
 		break;
@@ -2962,7 +2955,6 @@ static int nfs4_write_done(struct rpc_task *task, struct nfs_write_data *data)
 	struct inode *inode = data->inode;
 
 #if defined(CONFIG_NFS_V4_1)
-	printk(KERN_EMERG "%s called!\n", __FUNCTION__);
 	nfs4_sequence_done(NFS_SERVER(inode), &data->res.seq_res,
 				task->tk_status);
 #endif
@@ -3033,7 +3025,6 @@ static void nfs4_proc_commit_setup(struct nfs_write_data *data, int how)
 		.rpc_cred = data->cred,
 	};	
 	struct nfs_server *server = NFS_SERVER(data->inode);
-	printk(KERN_EMERG "%s called!\n", __FUNCTION__);
 	data->args.bitmask = server->attr_bitmask;
 	data->res.server = server;
 
@@ -3442,7 +3433,6 @@ static int
 nfs4_async_handle_error(struct rpc_task *task, const struct nfs_server *server)
 {
 	struct nfs_client *clp = server->nfs_client;
-	int ret;
 
 	if (!clp || task->tk_status >= 0)
 		return 0;
@@ -3458,7 +3448,6 @@ nfs4_async_handle_error(struct rpc_task *task, const struct nfs_server *server)
 			return -EAGAIN;
 #if defined(CONFIG_NFS_V4_1)
 		case -NFS4ERR_BADSESSION:
-			BUG();
 		case -NFS4ERR_BADSLOT:
 		case -NFS4ERR_CONN_NOT_BOUND_TO_SESSION:
 		case -NFS4ERR_BACK_CHAN_BUSY:
@@ -3470,9 +3459,12 @@ nfs4_async_handle_error(struct rpc_task *task, const struct nfs_server *server)
 		case -NFS4ERR_RETRY_UNCACHED_REP:
 		case -NFS4ERR_TOO_MANY_OPS:
 		case -NFS4ERR_OP_NOT_IN_SESSION:
+			/* FIXME:
 			ret = nfs41_recover_session_async(task, server);
 			if (ret)
 				return ret;
+			*/
+			nfs41_set_session_expired(server->session);
 			task->tk_status = 0;
 			return -EAGAIN;
 #endif /* CONFIG_NFS_V4_1 */
@@ -3749,22 +3741,73 @@ int nfs4_proc_setclientid_confirm(struct nfs_client *clp, struct rpc_cred *cred)
 }
 
 #ifdef CONFIG_NFS_V4_1
+struct nfs4_get_lease_time_data {
+	struct nfs4_get_lease_time_args *args;
+	struct nfs4_get_lease_time_res *res;
+	struct nfs_server *server;
+};
+
+static void nfs4_get_lease_time_prepare(struct rpc_task *task,
+					void *calldata)
+{
+	int ret;
+	struct nfs4_get_lease_time_data *data =
+			(struct nfs4_get_lease_time_data *)calldata;
+
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_GET_LEASE_TIME],
+		.rpc_argp = data->args,
+		.rpc_resp = data->res,
+	};
+
+	rpc_call_setup(task, &msg, 0);
+
+	ret = nfs41_setup_sequence(data->server->session,
+					&data->args->la_seq_args,
+					&data->res->lr_seq_res, 0, task);
+
+	BUG_ON((ret == -EAGAIN));
+}
+
+static void nfs4_get_lease_time_done(struct rpc_task *task,
+					void *calldata)
+{
+	struct nfs4_get_lease_time_data *data =
+			(struct nfs4_get_lease_time_data *)calldata;
+
+	nfs41_sequence_done(data->server, &data->res->lr_seq_res,
+				task->tk_status);
+}
+
+struct rpc_call_ops nfs4_get_lease_time_ops = {
+	.rpc_call_prepare = nfs4_get_lease_time_prepare,
+	.rpc_call_done = nfs4_get_lease_time_done,
+};
+
 int nfs4_proc_get_lease_time(struct nfs_server *sp, struct nfs_fsinfo *fsinfo)
 {
+	struct rpc_task *task;
 	struct nfs4_get_lease_time_args args;
 	struct nfs4_get_lease_time_res res = {
 		.lr_fsinfo = fsinfo,
 	};
 
-	struct rpc_message msg = {
-		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_GET_LEASE_TIME],
-		.rpc_argp = &args,
-		.rpc_resp = &res,
+	struct nfs4_get_lease_time_data data = {
+		.args = &args,
+		.res = &res,
+		.server = sp,
 	};
 	int status;
 
-	status = nfs4_call_sync(sp, sp->nfs_client->cl_rpcclient,
-				&msg, &args.la_seq_args, &res.lr_seq_res, 0);
+	task = rpc_run_task(sp->session->clnt, 0,
+			&nfs4_get_lease_time_ops, &data);
+
+	if (IS_ERR(task))
+		status = PTR_ERR(task);
+	else {
+		status = task->tk_status;
+		rpc_put_task(task);
+	}
 
 	return status;
 }
@@ -3775,17 +3818,20 @@ int nfs4_init_slot_table(struct nfs4_channel *channel)
 	int i;
 	struct nfs4_slot_table *tbl;
 	struct nfs4_slot *slot;
+	int ret = 0;
 
 	tbl = &channel->slot_table;
+
+	spin_lock(&tbl->slot_tbl_lock);
+
 	tbl->max_slots = channel->chan_attrs.max_reqs;
 
 	tbl->slots = kzalloc(channel->chan_attrs.max_reqs *
 				sizeof(struct nfs4_slot), GFP_ATOMIC);
-	if (!tbl->slots)
-		return -ENOMEM;
-
-	spin_lock_init(&tbl->slot_tbl_lock);
-	rpc_init_wait_queue(&tbl->slot_tbl_waitq, "Slot table");
+	if (!tbl->slots) {
+		ret = -ENOMEM;
+		goto out;
+	}
 
 	for (i = 0; i < channel->chan_attrs.max_reqs; ++i) {
 		slot = &tbl->slots[i];
@@ -3793,7 +3839,10 @@ int nfs4_init_slot_table(struct nfs4_channel *channel)
 		slot->seq_nr = 1;
 		slot->flags = 0;
 	}
-	return 0;
+
+out:
+	spin_unlock(&tbl->slot_tbl_lock);
+	return ret;
 }
 
 /* Destroy the slot table */
@@ -3806,6 +3855,18 @@ void nfs4_destroy_slot_table(struct nfs4_channel *channel)
 	channel->slot_table.slots = NULL;
 
 	return;
+}
+
+static int nfs4_init_channel(struct nfs4_channel *channel)
+{
+	struct nfs4_slot_table *tbl;
+
+	tbl = &channel->slot_table;
+
+	spin_lock_init(&tbl->slot_tbl_lock);
+	rpc_init_wait_queue(&tbl->slot_tbl_waitq, "Slot table");
+
+	return 0;
 }
 
 struct nfs4_session *nfs4_alloc_session(void)
@@ -3821,6 +3882,8 @@ struct nfs4_session *nfs4_alloc_session(void)
 	spin_lock_init(&session->session_lock);
 	atomic_set(&session->ref_count, 1);
 
+	nfs4_init_channel(&session->fore_channel);
+	/* XXX: Init back channel here */
 	return session;
 }
 
@@ -3982,7 +4045,6 @@ int nfs4_proc_create_session(struct nfs_server *sp)
 	dprintk("%s client>seqid %d\n", __FUNCTION__, clp->cl_seqid);
 	ptr = (int *)session->sess_id;
 	dprintk("sessionid is: %d:%d:%d:%d\n", ptr[0], ptr[1], ptr[2], ptr[3]);
-
 	/* Get the lease time */
 	status = nfs4_proc_get_lease_time(sp, &fsinfo);
 	if (status == 0) {
@@ -3992,9 +4054,9 @@ int nfs4_proc_create_session(struct nfs_server *sp)
 		clp->cl_last_renewal = jiffies;
 		clear_bit(NFS4CLNT_LEASE_EXPIRED, &clp->cl_state);
 		spin_unlock(&clp->cl_lock);
+		nfs41_set_session_valid(session);	/* Activate session */
 
 		nfs4_schedule_state_renewal(clp);
-		nfs41_set_session_valid(session);	/* Activate session */
 	} /*else {
 		nfs4_put_session(&sp->session);
 	}*/
@@ -4202,7 +4264,7 @@ static int _nfs4_proc_getlk(struct nfs4_state *state, int cmd, struct file_lock 
 
 	NFS4_VALIDATE_STATE(server);
 	down_read(&clp->cl_sem);
-	arg.lock_owner.clientid = clp->cl_clientid;
+	arg.lock_owner.clientid = clp->rpc_ops->nfs4_clientid(clp);
 	status = nfs4_set_lock_state(state, request);
 	if (status != 0)
 		goto out;
@@ -4305,7 +4367,8 @@ static void nfs4_locku_done(struct rpc_task *task, void *data)
 #endif
 	if (RPC_ASSASSINATED(task))
 		return;
-	nfs_increment_lock_seqid(task->tk_status, calldata->arg.seqid);
+	server->nfs_client->rpc_ops->increment_lock_seqid(task->tk_status,
+							  calldata->arg.seqid);
 	switch (task->tk_status) {
 		case 0:
 			memcpy(calldata->lsp->ls_stateid.data,
@@ -4451,7 +4514,8 @@ static struct nfs4_lockdata *nfs4_alloc_lockdata(struct file_lock *fl,
 	if (p->arg.lock_seqid == NULL)
 		goto out_free;
 	p->arg.lock_stateid = &lsp->ls_stateid;
-	p->arg.lock_owner.clientid = server->nfs_client->cl_clientid;
+	p->arg.lock_owner.clientid =
+		server->nfs_client->rpc_ops->nfs4_clientid(server->nfs_client);
 	p->arg.lock_owner.id = lsp->ls_id.id;
 	p->lsp = lsp;
 	p->server = server;
@@ -4511,7 +4575,8 @@ static void nfs4_lock_done(struct rpc_task *task, void *calldata)
 	if (RPC_ASSASSINATED(task))
 		goto out;
 	if (data->arg.new_lock_owner != 0) {
-		nfs_increment_open_seqid(data->rpc_status, data->arg.open_seqid);
+		server->nfs_client->rpc_ops->increment_open_seqid(
+			data->rpc_status, data->arg.open_seqid);
 		if (data->rpc_status == 0)
 			nfs_confirm_seqid(&data->lsp->ls_seqid, 0);
 		else
@@ -4523,7 +4588,8 @@ static void nfs4_lock_done(struct rpc_task *task, void *calldata)
 		data->lsp->ls_flags |= NFS_LOCK_INITIALIZED;
 		renew_lease(NFS_SERVER(data->ctx->path.dentry->d_inode), data->timestamp);
 	}
-	nfs_increment_lock_seqid(data->rpc_status, data->arg.lock_seqid);
+	server->nfs_client->rpc_ops->increment_lock_seqid(data->rpc_status,
+							data->arg.lock_seqid);
 out:
 	dprintk("%s: done, ret = %d!\n", __FUNCTION__, data->rpc_status);
 }
@@ -4948,6 +5014,9 @@ const struct nfs_rpc_ops nfs_v40_clientops = {
 	.file_release   = nfs_release,
 	.lock		= nfs4_proc_lock,
 	.clear_acl_cache = nfs4_zap_acl_attr,
+	.increment_open_seqid = nfs_increment_open_seqid,
+	.increment_lock_seqid = nfs_increment_lock_seqid,
+	.nfs4_clientid	= nfs40_clientid,
 };
 
 #if defined(CONFIG_NFS_V4_1)
@@ -4990,6 +5059,9 @@ const struct nfs_rpc_ops nfs_v41_clientops = {
 	.lock		= nfs4_proc_lock,
 	.clear_acl_cache = nfs4_zap_acl_attr,
 	.validate_sequence_args = nfs41_validate_seq_args,
+	.increment_open_seqid = nfs41_increment_open_seqid,
+	.increment_lock_seqid = nfs41_increment_lock_seqid,
+	.nfs4_clientid	= nfs41_clientid,
 };
 #endif /* CONFIG_NFS_V4_1 */
 

@@ -75,6 +75,18 @@ int nfs4_init_clientid(struct nfs_client *clp, struct rpc_cred *cred)
 	return status;
 }
 
+u64 nfs40_clientid(struct nfs_client *clp)
+{
+	return clp->cl_clientid;
+}
+
+#if defined(CONFIG_NFS_V4_1)
+u64 nfs41_clientid(struct nfs_client *clp)
+{
+	return 0;
+}
+#endif
+
 struct rpc_cred *nfs4_get_renew_cred(struct nfs_client *clp)
 {
 	struct nfs4_state_owner *sp;
@@ -702,15 +714,27 @@ static void nfs_increment_seqid(int status, struct nfs_seqid *seqid)
 	seqid->sequence->counter++;
 }
 
-void nfs_increment_open_seqid(int status, struct nfs_seqid *seqid)
+void __nfs_increment_open_seqid(int status, struct nfs_seqid *seqid)
 {
 	if (status == -NFS4ERR_BAD_SEQID) {
 		struct nfs4_state_owner *sp = container_of(seqid->sequence,
 				struct nfs4_state_owner, so_seqid);
 		nfs4_drop_state_owner(sp);
 	}
+}
+void nfs_increment_open_seqid(int status, struct nfs_seqid *seqid)
+{
+	__nfs_increment_open_seqid(status, seqid);
+
 	nfs_increment_seqid(status, seqid);
 }
+
+#if defined(CONFIG_NFS_V4_1)
+void nfs41_increment_open_seqid(int status, struct nfs_seqid *seqid)
+{
+	__nfs_increment_open_seqid(status, seqid);
+}
+#endif
 
 /*
  * Increment the seqid if the LOCK/LOCKU succeeded, or
@@ -721,6 +745,16 @@ void nfs_increment_lock_seqid(int status, struct nfs_seqid *seqid)
 {
 	nfs_increment_seqid(status, seqid);
 }
+
+/*
+ * XXX: Server bug!! needs to set counter to 0, not increment
+ */
+#if defined(CONFIG_NFS_V4_1)
+void nfs41_increment_lock_seqid(int status, struct nfs_seqid *seqid)
+{
+	return;
+}
+#endif
 
 int nfs_wait_on_sequence(struct nfs_seqid *seqid, struct rpc_task *task)
 {

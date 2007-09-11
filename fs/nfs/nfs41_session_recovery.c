@@ -112,10 +112,12 @@ static int nfs41_wait_session_recover_sync(struct rpc_clnt *clnt,
 static int nfs41_wait_session_recover_async(struct rpc_task *task,
 					    struct nfs_server *server)
 {
-	if (nfs41_recovery_complete(server->session))
+	if (nfs41_recovery_complete(server->session)) {
 		rpc_wake_up_task(task);
+		return 0;
+	}
 
-	return 0;
+	return -EAGAIN;
 }
 
 int nfs4_proc_create_session(struct nfs_server *sp);
@@ -218,12 +220,12 @@ int nfs41_recover_session_async(struct rpc_task *task,
 	rpc_sleep_on(&server->session->recovery_waitq, task, NULL, NULL);
 	ret = nfs41_recover_session(server);
 
-	nfs41_wait_session_recover_async(task, server);
+	ret = nfs41_wait_session_recover_async(task, server);
 
 	return ret;
 }
 
-int nfs41_recover_expired_session(struct rpc_clnt *clnt,
+int nfs41_recover_expired_session1(struct rpc_clnt *clnt,
 				  struct nfs_server *server)
 {
 	int ret;
@@ -236,6 +238,28 @@ int nfs41_recover_expired_session(struct rpc_clnt *clnt,
 		if (!nfs41_set_session_valid(server->session))
 			break;
 		ret = nfs41_recover_session_sync(clnt, server);
+	}
+
+	return ret;
+}
+
+int nfs41_recover_expired_session(struct rpc_task *task, struct nfs_server
+*server)
+{
+	int ret = 0;
+
+	while (1) {
+		rpc_sleep_on(&server->session->recovery_waitq, task, NULL,
+			     NULL);
+
+		ret = nfs41_wait_session_recover_async(task, server);
+		if (ret == -EAGAIN)
+			break;
+		ret = nfs41_set_session_valid(server->session);
+		if (!ret)
+			break;
+
+		nfs41_recover_session(server);
 	}
 
 	return ret;

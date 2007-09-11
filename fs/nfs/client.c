@@ -766,7 +766,6 @@ void nfs_free_server(struct nfs_server *server)
 		 * The session must be destroyed before
 		 * deallocating its structure
 		 */
-		BUG_ON(!nfs41_test_session_expired(server->session));
 		nfs4_put_session(&server->session);
 	}
 #endif /* CONFIG_NFS_V4_1 */

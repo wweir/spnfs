@@ -1131,6 +1131,9 @@ struct nfs_rpc_ops {
 						void *res,
 						int,
 						struct rpc_task *);
+	void 	(*increment_open_seqid)(int status, struct nfs_seqid *seqid);
+	void 	(*increment_lock_seqid)(int status, struct nfs_seqid *seqid);
+	u64	(*nfs4_clientid)(struct nfs_client *);
 };
 
 /*
