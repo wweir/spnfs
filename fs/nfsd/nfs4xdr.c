@@ -3203,10 +3203,9 @@ nfsd4_encode_devlist_item(struct nfsd4_compoundres *resp,
 	int len;
 	ENCODE_HEAD;
 
-	RESERVE_SPACE(28);
+	RESERVE_SPACE(24);
 	WRITE32(dlist->dev_id);
 
-	WRITE32(1); /* 1 in list of device_addr */
 	WRITE32(lotype); /* layout type */
 
 	ADJUST_ARGS();
