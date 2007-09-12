@@ -300,7 +300,10 @@ nfs4_close_delegation(struct nfs4_delegation *dp)
 	 * but we want to remove the lease in any case. */
 	if (dp->dl_flock)
 		vfs_setlease(filp, F_UNLCK, &dp->dl_flock);
+	BUG_ON_UNLOCKED_STATE();
+	nfs4_unlock_state();	/* allow nested layout recall/return */
 	nfsd_close(filp);
+	nfs4_lock_state();
 }
 
 /* Called under the state lock. */
