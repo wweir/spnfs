@@ -1650,6 +1650,16 @@ config NFS_V4_1
 
 	  If unsure, say N.
 
+config PNFS
+	bool "Provide NFSv4.1 pNFS client support (EXPERIMENTAL)"
+	depends on NFS_V4_1
+	select RPCSEC_GSS_KRB5
+	help
+	  Say Y here if you want your NFS client use pNFS to issue parallel
+	  I/O requests to storage devices.
+
+	  If unsure, say N.
+
 config NFS_DIRECTIO
 	bool "Allow direct I/O on NFS files"
 	depends on NFS_FS
@@ -1750,6 +1760,16 @@ config NFSD_V4_1
 	  If you would like to include the NFSv4.1 server as well as the NFSv4,
 	  NFSv2 and NFSv3 servers, say Y here.  This feature is experimental, and
 	  should only be used if you are interested in helping to test NFSv4.
+	  If unsure, say N.
+
+config PNFSD
+	bool "Provide NFSv4.1 pNFS server support (EXPERIMENTAL)"
+	depends on NFSD_V4_1
+	select RPCSEC_GSS_KRB5
+	help
+	  Say Y here if you want your NFS server to support pNFS metadata
+	  to pNFS clients for issuing parallel I/O to data servers.
+
 	  If unsure, say N.
 
 config NFSD_TCP
