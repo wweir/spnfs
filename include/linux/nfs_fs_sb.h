@@ -80,10 +80,6 @@ struct nfs_client {
 #endif
 };
 
-#ifdef CONFIG_NFS_V4_1
-	struct nfs4_session;	/* NFSv4.1 session */
-#endif
-
 /*
  * NFS client parameters stored in the superblock.
  */
@@ -129,7 +125,20 @@ struct nfs_server {
 
 #ifdef CONFIG_NFS_V4_1
 	struct nfs4_session *	session;	/* NFSv4.1 session */
-#endif
+#endif /* CONFIG_NFS_V4_1 */
+
+#ifdef CONFIG_PNFS
+	struct pnfs_layoutdriver_type  *pnfs_curr_ld; /* Active layout driver */
+	struct pnfs_mount_type         *pnfs_mountid; /* Mount identifier for
+							 layout driver */
+	/* Data server values will equal NFS server values if
+	 * no pNFS layout driver exists for the mountpoint
+	 */
+	unsigned int	ds_rsize;	/* Data server read size */
+	unsigned int	ds_rpages;	/* Data server read size (in pages) */
+	unsigned int	ds_wsize;	/* Data server write size */
+	unsigned int	ds_wpages;	/* Data server write size (in pages) */
+#endif /* CONFIG_PNFS */
 
 	void (*destroy)(struct nfs_server *);
 };
