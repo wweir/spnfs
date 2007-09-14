@@ -1083,7 +1083,8 @@ struct nfs_write_data {
 #endif
 #if defined(CONFIG_PNFS)
 	const struct rpc_call_ops *call_ops;
-	struct rpc_clnt		*pnfs_client;	/* Holds pNFS device across async calls */
+	struct rpc_clnt		*pnfs_client;	/* Holds pNFS device across
+						   async calls */
 	int			pnfsflags;
 	__u64			orig_offset;
 	int			how;		/* for FLUSH_STABLE */
@@ -1093,6 +1094,10 @@ struct nfs_write_data {
 };
 
 struct nfs_access_entry;
+struct nfs4_pnfs_layoutget;
+struct pnfs_layoutcommit_data;
+struct pnfs_layoutcommit_data;
+struct nfs4_pnfs_layoutreturn;
 
 /*
  * RPC procedure vector for NFSv2/NFSv3 demuxing
@@ -1192,6 +1197,7 @@ extern const struct nfs_rpc_ops	nfs_v3_clientops;
 extern const struct nfs_rpc_ops	nfs_v4_clientops;
 extern const struct nfs_rpc_ops	nfs_v40_clientops;
 extern const struct nfs_rpc_ops	nfs_v41_clientops;
+extern const struct nfs_rpc_ops	pnfs_v41_clientops;
 extern const struct nfs_rpc_ops	*nfsv4_minorversion_clientops[];
 extern struct rpc_version *nfs4_minorversions[];
 extern struct rpc_procinfo *nfs4_minorversion_procedures[];

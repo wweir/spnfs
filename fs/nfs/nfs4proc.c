@@ -48,6 +48,9 @@
 #include <linux/smp_lock.h>
 #include <linux/namei.h>
 #include <linux/mount.h>
+#ifdef CONFIG_PNFS
+#include <linux/pnfs_xdr.h>
+#endif /* CONFIG_PNFS */
 
 #include "nfs4_fs.h"
 #include "delegation.h"
@@ -56,6 +59,9 @@
 #include "callback.h"
 #include <linux/nfs41_session_recovery.h>
 #endif /* CONFIG_NFS_V4_1 */
+#ifdef CONFIG_PNFS
+#include "pnfs.h"
+#endif /* CONFIG_PNFS */
 
 #define NFSDBG_FACILITY		NFSDBG_PROC
 
@@ -2086,6 +2092,19 @@ nfs4_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 	return status;
 }
 
+#ifdef CONFIG_PNFS
+/*
+ * Return layout before issueing a setattr
+ */
+static int
+pnfs4_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
+		    struct iattr *sattr)
+{
+	/* XXX Need to implement */
+	return -1;
+}
+#endif /* CONFIG_PNFS */
+
 static int _nfs4_proc_lookupfh(struct nfs_server *server, const struct nfs_fh *dirfh,
 		const struct qstr *name, struct nfs_fh *fhandle,
 		struct nfs_fattr *fattr)
@@ -2915,6 +2934,15 @@ static int nfs4_read_done(struct rpc_task *task, struct nfs_read_data *data)
 	return 0;
 }
 
+#ifdef CONFIG_PNFS
+static int pnfs4_read_done(struct rpc_task *task, struct nfs_read_data *data)
+{
+	/* XXX Needs to be implemented */
+
+	return 0;
+}
+#endif /* CONFIG_PNFS */
+
 static void nfs4_proc_read_setup(struct nfs_read_data *data)
 {
 	struct rpc_message msg = {
@@ -2971,6 +2999,14 @@ static int nfs4_write_done(struct rpc_task *task, struct nfs_write_data *data)
 	}
 	return 0;
 }
+
+#ifdef CONFIG_PNFS
+static int pnfs4_write_done(struct rpc_task *task, struct nfs_write_data *data)
+{
+	/* XXX Need to implement */
+	return -1;
+}
+#endif /* CONFIG_PNFS */
 
 static void nfs4_proc_write_setup(struct nfs_write_data *data, int how)
 {
@@ -3032,6 +3068,13 @@ static void nfs4_proc_commit_setup(struct nfs_write_data *data, int how)
 
 	rpc_call_setup(&data->task, &msg, 0);
 }
+
+#ifdef CONFIG_PNFS
+static void pnfs4_proc_commit_setup(struct nfs_write_data *data, int how)
+{
+	/* XXX Need to Implement */
+}
+#endif /* CONFIG_PNFS */
 
 /*
  * nfs4_proc_async_renew(): This is not one of the nfs_rpc_ops; it is a special
@@ -4916,6 +4959,48 @@ int nfs4_proc_fs_locations(struct inode *dir, const struct qstr *name,
 	return status;
 }
 
+#ifdef CONFIG_PNFS
+static int nfs4_proc_pnfs_layoutget(struct nfs4_pnfs_layoutget *layout)
+{
+	/* XXX Need to implement */
+	return -1;
+}
+
+static void
+nfs4_proc_pnfs_layoutcommit_setup(struct pnfs_layoutcommit_data *data)
+{
+	/* XXX Need to implement */
+}
+
+static int pnfs_proc_layoutcommit(struct pnfs_layoutcommit_data *data)
+{
+	/* XXX Need to implement */
+	return -1;
+}
+
+static int nfs4_proc_pnfs_layoutreturn(struct nfs4_pnfs_layoutreturn *layout)
+{
+	/* XXX Need to implement */
+	return -1;
+}
+
+int nfs4_pnfs_getdevicelist(struct nfs_server *server,
+			    struct pnfs_devicelist *devlist)
+{
+	/* XXX Need to implement */
+	return -1;
+}
+
+int nfs4_pnfs_getdeviceinfo(struct nfs_server *server,
+			    u32 dev_id,
+			    struct pnfs_device *res)
+{
+	/* XXX Need to implement */
+	return -1;
+}
+
+#endif /* CONFIG_PNFS */
+
 struct nfs4_state_recovery_ops nfs40_reboot_recovery_ops = {
 	.recover_open	= nfs4_open_reclaim,
 	.recover_lock	= nfs4_lock_reclaim,
@@ -5081,10 +5166,68 @@ const struct nfs_rpc_ops nfs_v41_clientops = {
 };
 #endif /* CONFIG_NFS_V4_1 */
 
+#if defined(CONFIG_PNFS)
+const struct nfs_rpc_ops pnfs_v41_clientops = {
+	.version	= 4,			/* protocol version */
+	.dentry_ops	= &nfs4_dentry_operations,
+	.dir_inode_ops	= &nfs4_dir_inode_operations,
+	.file_inode_ops	= &nfs4_file_inode_operations,
+	.getroot	= nfs4_proc_get_root,
+	.getattr	= nfs4_proc_getattr,
+	.setattr	= pnfs4_proc_setattr,
+	.lookupfh	= nfs4_proc_lookupfh,
+	.lookup		= nfs4_proc_lookup,
+	.access		= nfs4_proc_access,
+	.readlink	= nfs4_proc_readlink,
+	.create		= nfs4_proc_create,
+	.remove		= nfs4_proc_remove,
+	.unlink_setup	= nfs4_proc_unlink_setup,
+	.unlink_done	= nfs4_proc_unlink_done,
+	.rename		= nfs4_proc_rename,
+	.link		= nfs4_proc_link,
+	.symlink	= nfs4_proc_symlink,
+	.mkdir		= nfs4_proc_mkdir,
+	.rmdir		= nfs4_proc_remove,
+	.readdir	= nfs4_proc_readdir,
+	.mknod		= nfs4_proc_mknod,
+	.statfs		= nfs4_proc_statfs,
+	.fsinfo		= nfs4_proc_fsinfo,
+	.pathconf	= nfs4_proc_pathconf,
+	.set_capabilities = nfs4_server_capabilities,
+	.decode_dirent	= nfs4_decode_dirent,
+	.read_setup	= nfs4_proc_read_setup,
+	.read_done	= pnfs4_read_done,
+	.write_setup	= nfs4_proc_write_setup,
+	.write_done	= pnfs4_write_done,
+	.commit_setup	= pnfs4_proc_commit_setup,
+	.commit_done	= nfs4_commit_done,
+	.file_open      = nfs_open,
+	.file_release   = nfs_release,
+	.lock		= nfs4_proc_lock,
+	.rsize		= pnfs_rsize,
+	.wsize		= pnfs_wsize,
+	.rpages		= pnfs_rpages,
+	.wpages		= pnfs_wpages,
+	.boundary	= pnfs_getboundary,
+	.clear_acl_cache = nfs4_zap_acl_attr,
+	.pnfs_layoutget      = nfs4_proc_pnfs_layoutget,
+	.pnfs_layoutcommit_setup = nfs4_proc_pnfs_layoutcommit_setup,
+	.pnfs_layoutcommit       = pnfs_proc_layoutcommit,
+	.pnfs_layoutreturn       = nfs4_proc_pnfs_layoutreturn,
+	.validate_sequence_args = nfs41_validate_seq_args,
+	.increment_open_seqid = nfs41_increment_open_seqid,
+	.increment_lock_seqid = nfs41_increment_lock_seqid,
+	.nfs4_clientid	= nfs41_clientid,
+};
+#endif /* CONFIG_PNFS */
+
 const struct nfs_rpc_ops *nfsv4_minorversion_clientops[] = {
 	&nfs_v40_clientops,
 #if defined(CONFIG_NFS_V4_1)
 	&nfs_v41_clientops,
+#endif
+#if defined(CONFIG_PNFS)
+	&pnfs_v41_clientops,
 #endif
 };
 

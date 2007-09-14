@@ -814,7 +814,18 @@ static void nfs_write_rpcsetup(struct nfs_page *req,
 		(unsigned long long)data->args.offset);
 }
 
-static void nfs_execute_write(struct nfs_write_data *data)
+inline int nfs_flush_task_priority(int how)
+{
+	switch (how & (FLUSH_HIGHPRI|FLUSH_LOWPRI)) {
+	case FLUSH_HIGHPRI:
+		return RPC_PRIORITY_HIGH;
+	case FLUSH_LOWPRI:
+		return RPC_PRIORITY_LOW;
+	}
+	return RPC_PRIORITY_NORMAL;
+}
+
+void nfs_execute_write(struct nfs_write_data *data)
 {
 	struct rpc_clnt *clnt = NFS_CLIENT(data->inode);
 	sigset_t oldset;
@@ -822,6 +833,32 @@ static void nfs_execute_write(struct nfs_write_data *data)
 	rpc_clnt_sigmask(clnt, &oldset);
 	rpc_execute(&data->task);
 	rpc_clnt_sigunmask(clnt, &oldset);
+}
+
+void nfs_initiate_write(struct nfs_write_data *data,
+			struct rpc_clnt *clnt,
+			const struct rpc_call_ops *call_ops,
+			int how)
+{
+	struct inode *inode = data->inode;
+	int flags;
+
+	/* Set up the initial task struct.  */
+	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
+	rpc_init_task(&data->task, clnt, flags, call_ops, data);
+	NFS_PROTO(inode)->write_setup(data, how);
+
+	data->task.tk_priority = nfs_flush_task_priority(how);
+	data->task.tk_cookie = (unsigned long)inode;
+
+	dprintk("NFS: %4d initiated write call (req %s/%Ld, %u bytes @ offset %Lu)\n",
+		data->task.tk_pid,
+		inode->i_sb->s_id,
+		(long long)NFS_FILEID(inode),
+		data->args.count,
+		(unsigned long long)data->args.offset);
+
+	nfs_execute_write(data);
 }
 
 /*
@@ -939,6 +976,18 @@ static void nfs_pageio_init_write(struct nfs_pageio_descriptor *pgio,
 	else
 		nfs_pageio_init(pgio, inode, nfs_flush_one, wsize, ioflags);
 }
+
+#ifdef CONFIG_PNFS
+void pnfs_writeback_done_norpc(struct rpc_task *task, void *calldata)
+{
+	/* XXX Need to Implement */
+}
+
+void pnfs_commit_done_norpc(struct rpc_task *task, void *calldata)
+{
+	/* XXX Need to Implement */
+}
+#endif /* CONFIG_PNFS */
 
 /*
  * Handle a write reply that flushed part of a page.
@@ -1166,7 +1215,7 @@ void nfs_commit_release(void *wdata)
 /*
  * Set up the argument/result storage required for the RPC call.
  */
-static void nfs_commit_rpcsetup(struct list_head *head,
+void nfs_commit_rpcsetup(struct list_head *head,
 		struct nfs_write_data *data,
 		int how)
 {
@@ -1550,3 +1599,8 @@ void nfs_destroy_writepagecache(void)
 	kmem_cache_destroy(nfs_wdata_cachep);
 }
 
+EXPORT_SYMBOL(nfs_execute_write);
+EXPORT_SYMBOL(nfs_writedata_release);
+EXPORT_SYMBOL(nfs_flush_task_priority);
+EXPORT_SYMBOL(nfs_commit_rpcsetup);
+EXPORT_SYMBOL(nfs_initiate_write);
