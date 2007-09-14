@@ -518,6 +518,22 @@ enum pnfs_iomode {
 };
 #endif /* defined(CONFIG_PNFS) || defined(CONFIG_PNFSD) */
 
+/* pnfs client and file layout protocol definitions */
+#if defined(CONFIG_PNFS)
+#define NFL4_UFLG_MASK			0x0000003F
+#define NFL4_UFLG_DENSE			0x00000001
+#define NFL4_UFLG_COMMIT_THRU_MDS	0x00000002
+#define NFL4_UFLG_STRIPE_UNIT_SIZE_MASK	0xFFFFFFC0
+
+/* Encoded in the loh_body field of type layouthint4 */
+enum filelayout_hint_care4 {
+	NFLH4_CARE_DENSE		= NFL4_UFLG_DENSE,
+	NFLH4_CARE_COMMIT_THRU_MDS	= NFL4_UFLG_COMMIT_THRU_MDS,
+	NFLH4_CARE_STRIPE_UNIT_SIZE	= 0x00000040,
+	NFLH4_CARE_STRIPE_COUNT		= 0x00000080
+};
+#endif /* CONFIG_PNFS */
+
 #endif
 #endif
 
