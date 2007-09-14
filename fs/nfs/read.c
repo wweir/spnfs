@@ -224,6 +224,30 @@ static void nfs_execute_read(struct nfs_read_data *data)
 	rpc_clnt_sigunmask(clnt, &oldset);
 }
 
+void nfs_initiate_read(struct nfs_read_data *data, struct rpc_clnt *clnt,
+		       const struct rpc_call_ops *call_ops)
+{
+	struct inode *inode = data->inode;
+	int flags;
+
+	/* Set up the initial task struct. */
+	flags = RPC_TASK_ASYNC | (IS_SWAPFILE(inode)?NFS_RPC_SWAPFLAGS : 0);
+	rpc_init_task(&data->task, clnt, flags, call_ops, data);
+
+	NFS_PROTO(inode)->read_setup(data);
+
+	data->task.tk_cookie = (unsigned long)inode;
+
+	dprintk("NFS: %4d initiated read call (req %s/%Ld, %u bytes @ offset %Lu)\n",
+		data->task.tk_pid,
+		inode->i_sb->s_id,
+		(long long)NFS_FILEID(inode),
+		data->args.count,
+		(unsigned long long)data->args.offset);
+
+	nfs_execute_read(data);
+}
+
 /*
  * Generate multiple requests to fill a single page.
  *
@@ -441,6 +465,13 @@ static void nfs_readpage_set_pages_uptodate(struct nfs_read_data *data)
 	if (data->res.eof || data->res.count == data->args.count)
 		SetPageUptodate(*pages);
 }
+
+#ifdef CONFIG_PNFS
+void pnfs_readpage_result_norpc(struct rpc_task *task, void *calldata)
+{
+	/* XXX Need to implement */
+}
+#endif
 
 /*
  * This is the callback from RPC telling us whether a reply was
