@@ -2669,15 +2669,22 @@ nfs4_preprocess_stateid_op(struct svc_fh *current_fh, stateid_t *stateid, int fl
 			goto out;
 		stidp = &stp->st_stateid;
 	}
-	if (flags & NFS_4_1 && stateid->si_generation !=0 )
-		goto out;
-	if (!(flags & NFS_4_1) && stateid->si_generation > stidp->si_generation)
+	/*
+	* 4.1 is allowed to ignore the generation number when it is zero
+	* whereas 4.0 returns bad_stateid or stale stateid.
+	*/
+	if ((flags & NFS_4_1) && stateid->si_generation == 0)
+		goto checkmode;
+
+	if (stateid->si_generation > stidp->si_generation)
 		goto out;
 
 	/* OLD STATEID */
 	status = nfserr_old_stateid;
-	if (!(flags & NFS_4_1) && stateid->si_generation < stidp->si_generation)
+	if (stateid->si_generation < stidp->si_generation)
 		goto out;
+
+checkmode:
 	if (stp) {
 		if ((status = nfs4_check_openmode(stp->st_access_bmap,flags)))
 			goto out;
@@ -2800,12 +2807,11 @@ nfs4_preprocess_seqid_op(struct svc_fh *current_fh, u32 seqid, stateid_t *statei
 		return nfserr_bad_stateid;
 	}
 
-	if (sop->so_minorversion == 1) {
-		if (stateid->si_generation != 0)
-			return nfserr_bad_stateid;
-		else
+	/*
+	* 4.1 is allowed to ignore the generation number when it is zero
+	*/
+	if (sop->so_minorversion == 1 && stateid->si_generation == 0)
 			goto renew; /* skip v4.0 generation number checks */
-	}
 
 	if (stateid->si_generation > stp->st_stateid.si_generation) {
 		dprintk("NFSD: preprocess_seqid_op: future stateid?!\n");
