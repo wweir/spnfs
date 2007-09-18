@@ -954,6 +954,45 @@ nfsd4_decode_exchange_id(struct nfsd4_compoundargs *argp, struct nfsd4_exchange_
         READ_BUF(4);
         READ32(clid->flags);
 
+	/* Ignore state_protect4_a */
+	READ_BUF(4);
+	READ32(dummy);
+	switch (dummy) {
+	case SP4_NONE:
+		break;
+	case SP4_MACH_CRED:
+		READ_BUF(8);
+		READ32(dummy);
+		READ32(dummy);
+		break;
+	case SP4_SSV:
+		/* ssp_ops */
+		READ_BUF(8);
+		READ32(dummy);
+		READ32(dummy);
+
+		/* ssp_hash_algs<> */
+		READ_BUF(4);
+		READ32(dummy);
+		READ_BUF(dummy);
+		p += XDR_QUADLEN(dummy);
+
+		/* ssp_encr_algs<> */
+		READ_BUF(4);
+		READ32(dummy);
+		READ_BUF(dummy);
+		p += XDR_QUADLEN(dummy);
+
+		/* ssp_window and ssp_num_gss_handles */
+		READ_BUF(8);
+		READ32(dummy);
+		READ32(dummy);
+
+		break;
+	default:
+		goto xdr_error;
+	}
+
         /* Ignore Implementation ID */
         READ_BUF(4);    /* nfs_impl_id4 array length */
         READ32(dummy);
@@ -2827,6 +2866,9 @@ nfsd4_encode_exchange_id(struct nfsd4_compoundres *resp, int nfserr, struct nfsd
 		WRITEMEM(&exid->clientid, 8);
 		WRITE32(exid->seqid);
 		WRITE32(exid->flags);
+
+		/* state_protect4_r */
+		WRITE32(SP4_NONE);
 
 		/* The server_owner struct */
 		WRITE64(minor_id);      /* Minor id */
