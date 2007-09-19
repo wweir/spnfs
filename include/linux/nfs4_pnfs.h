@@ -73,7 +73,7 @@ struct layoutdriver_io_operations {
 
 	/* Registration information for a new mounted file system
 	 */
-	struct pnfs_mount_type * (*initialize_mountpoint) (struct super_block *);
+	struct pnfs_mount_type * (*initialize_mountpoint) (struct super_block *, struct nfs_fh *fh);
 	int (*uninitialize_mountpoint) (struct pnfs_mount_type *mountid);
 
 	/* Other ops... */
@@ -144,7 +144,7 @@ struct pnfs_devicelist {
  */
 struct pnfs_client_operations {
 	int (*nfs_fsync) (struct file *file, struct dentry *dentry, int datasync);
-	int (*nfs_getdevicelist) (struct super_block *sb, struct pnfs_devicelist *devlist);
+	int (*nfs_getdevicelist) (struct super_block *sb, struct nfs_fh *fh, struct pnfs_devicelist *devlist);
 	int (*nfs_getdeviceinfo) (struct super_block *sb, u32 dev_id, struct pnfs_device *dev);
 
 	/* Post read callback.  Layout driver calls this function if unstable data was

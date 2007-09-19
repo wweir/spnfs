@@ -1693,7 +1693,8 @@ out_no_client_address:
 /*
  * Initialize the pNFS layout driver and setup pNFS related parameters
  */
-int nfs4_init_pnfs(struct super_block *sb, struct nfs_server *server)
+int nfs4_init_pnfs(struct super_block *sb, struct nfs_server *server,
+		   struct nfs_fh *fh)
 {
 	int error = 0;
 
@@ -1703,7 +1704,7 @@ int nfs4_init_pnfs(struct super_block *sb, struct nfs_server *server)
 	clp = server->nfs_client;
 	switch (clp->cl_minorversion) {
 	case 1:
-		set_pnfs_layoutdriver(sb, server->pnfs_fs_ltype);
+		set_pnfs_layoutdriver(sb, fh, server->pnfs_fs_ltype);
 		break;
 	case 0:
 		break;
@@ -1768,7 +1769,7 @@ static int nfs4_get_sb(struct file_system_type *fs_type,
 		goto error_splat_super;
 	}
 
-	nfs4_init_pnfs(s, server);
+	nfs4_init_pnfs(s, server, &mntfh);
 
 	s->s_flags |= MS_ACTIVE;
 	mnt->mnt_sb = s;
