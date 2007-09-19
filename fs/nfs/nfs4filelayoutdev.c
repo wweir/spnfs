@@ -339,9 +339,6 @@ decode_and_add_device(struct filelayout_mount_type *mt, struct pnfs_device *dev)
 		return NULL;
 	}
 
-	/*
-	 * XXX Need to add the device to the list of devices!
-	 */
 /*
 	if (nfs4_pnfs_device_add(mt, file_dev))
 		return NULL;
