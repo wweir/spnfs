@@ -81,7 +81,7 @@ struct pnfs_client_operations *pnfs_callback_ops;
  * pNFS_client can refer to the mount point later on
  */
 struct pnfs_mount_type*
-filelayout_initialize_mountpoint(struct super_block *sb)
+filelayout_initialize_mountpoint(struct super_block *sb, struct nfs_fh *fh)
 {
 	struct filelayout_mount_type *fl_mt;
 	struct pnfs_mount_type *mt;
@@ -107,7 +107,7 @@ filelayout_initialize_mountpoint(struct super_block *sb)
 
 	/* Retrieve device list from server */
 	dprintk("%s invoking pnfs_callback_ops->nfs_getdevicelist()\n", __FUNCTION__);
-	status = pnfs_callback_ops->nfs_getdevicelist(sb, dlist);
+	status = pnfs_callback_ops->nfs_getdevicelist(sb, fh, dlist);
 	dprintk("%s pnfs_callback_ops->nfs_getdevicelist() returned status=%d\n", __FUNCTION__, status);
 	if (status)
 		goto cleanup_mt;
