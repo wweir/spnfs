@@ -226,12 +226,11 @@ set_pnfs_layoutdriver(struct super_block *sb, struct nfs_fh *fh, u32 id)
 	struct pnfs_mount_type *mt;
 	struct nfs_server *server = NFS_SB(sb);
 
-	if (id > 0 &&
-	    find_pnfs(id, &mod)) {
+	if (id > 0 && find_pnfs(id, &mod)) {
 		dprintk("%s: Setting pNFS module\n", __FUNCTION__);
 		server->pnfs_curr_ld = mod->pnfs_ld_type;
 		mt = server->pnfs_curr_ld->ld_io_ops->initialize_mountpoint(
-								sb, fh);
+			sb, fh);
 		if (!mt) {
 			printk(KERN_ERR "%s: Error initializing mount point "
 			       "for layout driver %u. ", __FUNCTION__, id);
