@@ -4969,8 +4969,19 @@ static int nfs41_proc_async_sequence(struct nfs_client *clp,
 #ifdef CONFIG_PNFS
 static int nfs4_proc_pnfs_layoutget(struct nfs4_pnfs_layoutget *layout)
 {
-	/* XXX Need to implement */
-	return -1;
+	struct inode *ino = layout->args->inode;
+	int status;
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_PNFS_LAYOUTGET],
+		.rpc_argp = layout->args,
+		.rpc_resp = layout->res,
+	};
+	struct nfs_server *server = NFS_SERVER(ino);
+
+	status = nfs4_call_sync(server, NFS_CLIENT(ino), &msg,
+		layout->args, layout->res, 0);
+
+	return status;
 }
 
 static int pnfs_proc_layoutcommit(struct pnfs_layoutcommit_data *data)
