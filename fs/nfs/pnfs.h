@@ -18,7 +18,7 @@ int virtual_update_layout(struct inode *ino, struct nfs_open_context *ctx,
 
 int pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range);
 int pnfs_return_layout_rpc(struct nfs_server *server, struct nfs4_pnfs_layoutreturn_arg *argp);
-void set_pnfs_layoutdriver(struct super_block *sb, u32 id);
+void set_pnfs_layoutdriver(struct super_block *sb, struct nfs_fh *fh, u32 id);
 void unmount_pnfs_layoutdriver(struct super_block *sb);
 ssize_t pnfs_file_write(struct file *filp, const char __user *buf, size_t count, loff_t *pos);
 ssize_t pnfs_file_read(struct file *filp, char __user *buf, size_t count, loff_t *pos);
