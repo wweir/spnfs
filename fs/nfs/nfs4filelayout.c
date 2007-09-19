@@ -91,13 +91,16 @@ filelayout_initialize_mountpoint(struct super_block *sb, struct nfs_fh *fh)
 	dlist = kmalloc(sizeof(struct pnfs_devicelist), GFP_KERNEL);
 	if (!dlist)
 		goto error_ret;
+
 	fl_mt = kmalloc(sizeof(struct filelayout_mount_type), GFP_KERNEL);
 	if (!fl_mt)
 		goto cleanup_dlist;
+
 	/* Initialize nfs4 file layout specific device list structure */
 	fl_mt->hlist = kmalloc(sizeof(struct nfs4_pnfs_dev_hlist), GFP_KERNEL);
 	if (!fl_mt->hlist)
 		goto cleanup_fl_mt;
+
 	mt = kmalloc(sizeof(struct pnfs_mount_type), GFP_KERNEL);
 	if (!mt)
 		goto cleanup_fl_mt;
@@ -106,36 +109,41 @@ filelayout_initialize_mountpoint(struct super_block *sb, struct nfs_fh *fh)
 	mt->mountid = (void *)fl_mt;
 
 	/* Retrieve device list from server */
-	dprintk("%s invoking pnfs_callback_ops->nfs_getdevicelist()\n", __FUNCTION__);
 	status = pnfs_callback_ops->nfs_getdevicelist(sb, fh, dlist);
-	dprintk("%s pnfs_callback_ops->nfs_getdevicelist() returned status=%d\n", __FUNCTION__, status);
 	if (status)
 		goto cleanup_mt;
+
 	status = nfs4_pnfs_devlist_init(fl_mt->hlist);
 	if (status)
 		goto cleanup_mt;
 
-	/* Decode opaque devicelist and add to list of available
-	* devices (data servers.
-	*/
+	/*
+	 * Decode opaque devicelist and add to list of available
+	 * devices (data servers
+	 */
 	status = decode_and_add_devicelist(fl_mt, dlist);
-	dprintk("%s decode_and_add_devicelist status=%d\n", __FUNCTION__, status);
 	if (status)
 		goto cleanup_mt;
 
 	kfree(dlist);
-	dprintk("%s device list has been initialized successfully\n", __FUNCTION__);
+	dprintk("%s device list has been initialized successfully\n",
+		__FUNCTION__);
 	return mt;
 
 cleanup_mt: ;
 	kfree(mt);
+
 cleanup_fl_mt: ;
 	kfree(fl_mt->hlist);
 	kfree(fl_mt);
+
 cleanup_dlist: ;
 	kfree(dlist);
+
 error_ret: ;
-	printk(KERN_ERR "%s device list could not be initialized\n", __FUNCTION__);
+	printk(KERN_WARNING "%s device list could not be initialized\n",
+				__FUNCTION__);
+
 	return NULL;
 }
 
@@ -154,6 +162,7 @@ filelayout_uninitialize_mountpoint(struct pnfs_mount_type *mountid)
 	if (fl_mt != NULL)
 		kfree(fl_mt);
 	kfree(mountid);
+
 	return 0;
 }
 

@@ -164,7 +164,6 @@ nfs4_pnfs_devlist_init(struct nfs4_pnfs_dev_hlist *hlist)
 {
 	int i;
 
-	printk("%s ricardo invoked\n", __FUNCTION__);
 	hlist->dev_lock = __RW_LOCK_UNLOCKED("pnfs_devlist_lock");
 
 	for (i = 0; i < NFS4_PNFS_DEV_HASH; i++)
@@ -197,9 +196,9 @@ nfs4_pnfs_devlist_destroy(struct nfs4_pnfs_dev_hlist *hlist)
 	}
 }
 
-/* Create the rpc client to the data server specific in
- * 'dev', and add it to the list of available devices
- * for this mount point.
+/*
+ * Add the device to the list of available devices for this mount point.
+ * The * rpc client is created during first I/O.
  */
 static int
 nfs4_pnfs_device_add(struct filelayout_mount_type *mt,
@@ -208,32 +207,9 @@ nfs4_pnfs_device_add(struct filelayout_mount_type *mt,
 	struct nfs4_pnfs_dev_item *tmp_dev;
 	int err;
 	struct nfs4_pnfs_dev_hlist *hlist = mt->hlist;
-	struct nfs_server *server = NFS_SB(mt->fl_sb);
 
 	dprintk("nfs4_pnfs_device_add\n");
 
-	/* Create device */
-	err = device_create(server->client, dev);
-	if (err) {
-		printk(KERN_EMERG "%s: cannot create RPC client. Error = %d\n",
-						__FUNCTION__, err);
-		return err;
-	}
-
-	if (dev->server->session == NULL) {
-		/* Set exchange id and create session flags */
-		dev->server->session->flags = 0;
-		dev->server->nfs_client->cl_exchange_flags =
-			EXCHGID4_FLAG_USE_PNFS_DS;
-
-		/* XXX Need to setup session */
-		BUG_ON(1);	/* Flag that we need to call setup_sequence */
-/*
-		err = server->rpc_ops->setup_session(dev->clp);
-		if (err)
-			return err;
-*/
-	}
 	/* Write lock, do lookup again, and then add device */
 	write_lock(&hlist->dev_lock);
 	tmp_dev = _device_lookup(hlist, dev->dev_id);
@@ -333,16 +309,15 @@ decode_and_add_device(struct filelayout_mount_type *mt, struct pnfs_device *dev)
 	struct nfs4_pnfs_dev_item *file_dev;
 
 	file_dev = decode_device(dev);
-
 	if (!file_dev) {
-		printk("%s Could not decode device\n", __FUNCTION__);
+		printk(KERN_WARNING "%s Could not decode device\n",
+					__FUNCTION__);
 		return NULL;
 	}
 
-/*
 	if (nfs4_pnfs_device_add(mt, file_dev))
 		return NULL;
-*/
+
 	return file_dev;
 }
 
@@ -362,7 +337,7 @@ decode_and_add_devicelist(struct filelayout_mount_type *mt, struct pnfs_deviceli
 	     i < devlist->num_devs && cnt < NFS4_PNFS_DEV_MAXCOUNT;
 	     i++) {
 		if (!decode_and_add_device(mt, &devlist->devs[cnt])) {
-			dprintk("%s ricardo success count=%d\n", __FUNCTION__, cnt);
+			dprintk("%s error count=%d\n", __FUNCTION__, cnt);
 			return 1;
 		}
 		cnt++;
