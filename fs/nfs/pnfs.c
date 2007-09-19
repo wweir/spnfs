@@ -220,7 +220,7 @@ unmount_pnfs_layoutdriver(struct super_block *sb)
  * Only one pNFS layout driver is supported.
  */
 void
-set_pnfs_layoutdriver(struct super_block *sb, u32 id)
+set_pnfs_layoutdriver(struct super_block *sb, struct nfs_fh *fh, u32 id)
 {
 	struct pnfs_module *mod;
 	struct pnfs_mount_type *mt;
@@ -230,7 +230,8 @@ set_pnfs_layoutdriver(struct super_block *sb, u32 id)
 	    find_pnfs(id, &mod)) {
 		dprintk("%s: Setting pNFS module\n", __FUNCTION__);
 		server->pnfs_curr_ld = mod->pnfs_ld_type;
-		mt = server->pnfs_curr_ld->ld_io_ops->initialize_mountpoint(sb);
+		mt = server->pnfs_curr_ld->ld_io_ops->initialize_mountpoint(
+								sb, fh);
 		if (!mt) {
 			printk(KERN_ERR "%s: Error initializing mount point "
 			       "for layout driver %u. ", __FUNCTION__, id);
@@ -1261,10 +1262,10 @@ out:
 }
 
 int
-pnfs_getdevicelist(struct super_block *sb, struct pnfs_devicelist *devlist)
+pnfs_getdevicelist(struct super_block *sb, struct nfs_fh *fh,
+		   struct pnfs_devicelist *devlist)
 {
 	struct nfs_server *server = NFS_SB(sb);
-	struct nfs_fh *fh = NFS_FH(sb->s_root->d_inode);
 
 	return nfs4_pnfs_getdevicelist(fh, server, devlist);
 }
