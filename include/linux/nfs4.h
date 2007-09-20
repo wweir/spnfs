@@ -467,12 +467,18 @@ enum {
 
 #ifdef CONFIG_NFS_V4_1
 typedef unsigned char nfs41_sessionid[16];
-#endif
 
 /* Create Session Flags */
 #define SESSION4_PERSIST	 0x001
 #define SESSION4_BACK_CHAN 	 0x002
 #define SESSION4_RDMA		 0x004
+
+enum state_protect_how4 {
+	SP4_NONE        = 0,
+	SP4_MACH_CRED   = 1,
+	SP4_SSV         = 2
+};
+#endif /* CONFIG_NFS_V4_1 */
 
 #endif
 #endif

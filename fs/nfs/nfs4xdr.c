@@ -1520,8 +1520,9 @@ static int encode_exchange_id(struct xdr_stream *xdr, struct nfs41_exchange_id_a
 
 	encode_string(xdr, args->id_len, args->id);
 
-	RESERVE_SPACE(8);
+	RESERVE_SPACE(12);
 	WRITE32(args->flags);
+	WRITE32(0);	/* zero length state_protect4_a */
 	WRITE32(0);     /* zero length implementation id array */
 
 	return 0;
@@ -4841,7 +4842,7 @@ static int decode_setclientid(struct xdr_stream *xdr, struct nfs_client *clp)
 static int decode_exchange_id(struct xdr_stream *xdr, struct nfs41_exchange_id_res *res)
 {
 	uint32_t *p;
-	int status, implen;
+	int status, dummy;
 	struct nfs_client *clp = res->client;
 
 	status = decode_op_hdr(xdr, OP_EXCHANGE_ID);
@@ -4850,16 +4851,14 @@ static int decode_exchange_id(struct xdr_stream *xdr, struct nfs41_exchange_id_r
 
 	READ_BUF(8);
 	READ64(clp->cl_clientid);
-	READ_BUF(8);
+	READ_BUF(12);
 	READ32(clp->cl_seqid);
 	READ32(clp->cl_exchange_flags);
 
-	/* Draft 12 includes state_protect switch here */
-
-	/*
-	 * We currently only suppot SP4_NONE.
-	 * No support available for SP4_MACH_CRED or SP4_SSV.
-	 */
+	/* We ask for SP4_NONE */
+	READ32(dummy);
+	if (dummy != SP4_NONE)
+		return -EIO;
 
 	/* minor_id */
 	READ_BUF(8);
@@ -4879,8 +4878,8 @@ static int decode_exchange_id(struct xdr_stream *xdr, struct nfs41_exchange_id_r
 		res->server_scope.server_scope_sz);
 	/* Throw away Implementation id array */
 	READ_BUF(4);
-	READ32(implen);
-	p += XDR_QUADLEN(implen);
+	READ32(dummy);
+	p += XDR_QUADLEN(dummy);
 
 	return 0;
 }
