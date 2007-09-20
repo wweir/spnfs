@@ -65,7 +65,7 @@ struct layoutdriver_io_operations {
 	 * a set_layout call to set the opaque layout in the layout driver.*/
 	struct pnfs_layout_type * (*alloc_layout) (struct pnfs_mount_type *mountid, struct inode *inode);
 	int (*has_layout) (struct pnfs_layout_type *layoutid, struct inode *inode, struct nfs4_pnfs_layout_segment *range);
-	void (*free_layout) (struct pnfs_layout_type *layoutid, struct inode *inode, struct nfs4_pnfs_layout_segment *range);
+	void (*free_layout) (struct pnfs_layout_type **layoutidp, struct inode *inode, struct nfs4_pnfs_layout_segment *range);
 	struct pnfs_layout_type * (*set_layout) (struct pnfs_layout_type *layoutid, struct inode *inode, struct nfs4_pnfs_layoutget_res *lgr);
 
 	int (*setup_layoutcommit) (struct pnfs_layout_type *layoutid, struct inode *inode, struct pnfs_layoutcommit_arg *arg);
