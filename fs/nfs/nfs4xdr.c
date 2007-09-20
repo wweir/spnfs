@@ -5224,11 +5224,6 @@ static int decode_getdevicelist(struct xdr_stream *xdr,
 		READ32(res->devs[cnt].dev_id);	/* device id */
 
 		READ_BUF(4);
-		READ32(len); /* 1 in list of device_addr */
-		if (len > 1)
-			printk(KERN_EMERG "%s: list of %d device addr\n",
-				__FUNCTION__, len);
-		READ_BUF(4);
 		READ32(res->layout_type);
 
 		READ_BUF(4);
