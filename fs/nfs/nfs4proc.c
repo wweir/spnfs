@@ -3928,6 +3928,7 @@ void nfs4_init_channel_attrs(struct nfs_client *clp,
 				struct nfs4_channel_attrs *bc_attrs)
 {
 	/* XXX: We need to have good values here... 32K is a wild guess */
+	fc_attrs->headerpadsz = bc_attrs->headerpadsz = 0;
 	fc_attrs->max_rqst_sz = bc_attrs->max_rqst_sz = NFS_MAX_FILE_IO_SIZE;
 	fc_attrs->max_resp_sz = bc_attrs->max_resp_sz = NFS_MAX_FILE_IO_SIZE;
 	fc_attrs->max_resp_sz_cached = bc_attrs->max_resp_sz_cached =
@@ -3970,7 +3971,6 @@ int _nfs4_proc_create_session(struct nfs_client *clp, struct nfs4_session *sessi
 	struct nfs41_create_session_args args = {
 		.client = clp,
 		.session = session,
-		.header_padding = 0,
 		.cb_program = NFS4_CALLBACK,
 	};
 

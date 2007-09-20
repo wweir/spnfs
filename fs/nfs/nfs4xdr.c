@@ -1588,14 +1588,13 @@ static int encode_create_session(struct xdr_stream *xdr,
 	RESERVE_SPACE(8);
 	WRITE64(clp->cl_clientid);
 
-	RESERVE_SPACE(16);
+	RESERVE_SPACE(8);
 	WRITE32(clp->cl_seqid);				/*Sequence id */
 	WRITE32(args->flags);                         	/*flags */
-	WRITE32(args->header_padding);                  /* Header padding */
-	WRITE32(0);                                    /*conn_binding4args */
 
-	RESERVE_SPACE(2*24);                    /* 2 channel_attrs */
+	RESERVE_SPACE(2*28);                    /* 2 channel_attrs */
 	/* Fore Channel */
+	WRITE32(args->fc_attrs.headerpadsz);	/* header padding size */
 	WRITE32(args->fc_attrs.max_rqst_sz);	/* max req size */
 	WRITE32(args->fc_attrs.max_resp_sz);	/* max resp size */
 	WRITE32(args->fc_attrs.max_resp_sz_cached);	/* Max resp sz cached */
@@ -1604,6 +1603,7 @@ static int encode_create_session(struct xdr_stream *xdr,
 	WRITE32(0);                             /*rdmachannel_attrs */
 
 	/* Back Channel */
+	WRITE32(args->fc_attrs.headerpadsz);	/* header padding size */
 	WRITE32(args->bc_attrs.max_rqst_sz);	/* max req size */
 	WRITE32(args->bc_attrs.max_resp_sz);	/* max resp size */
 	WRITE32(args->bc_attrs.max_resp_sz_cached);	/* Max resp sz cached */
@@ -4889,7 +4889,6 @@ static int decode_create_session(struct xdr_stream *xdr,
 {
 	uint32_t *p;
 	int status;
-	u32 cbr_enforce;
 	u32 nr_attrs;
 
 	struct nfs4_session *session = res->session;
@@ -4904,24 +4903,15 @@ static int decode_create_session(struct xdr_stream *xdr,
 	READ_BUF(NFS4_MAX_SESSIONID_LEN);
 	COPYMEM(&session->sess_id, NFS4_MAX_SESSIONID_LEN);
 
-	/* seqid, flags, header padding */
-	READ_BUF(12);
+	/* seqid, flags */
+	READ_BUF(8);
 	READ32(clp->cl_seqid);
 	READ32(session->flags);
-	READ32(session->header_padding);
-
-	/* conn_binding4res */
-	READ_BUF(4);
-	READ32(cbr_enforce);
-	if (cbr_enforce) {
-		READ_BUF(8);
-		READ32(session->hash_alg);
-		READ32(session->ssv_len);
-	}
 
 	/* Channel attributes */
 	/* fore channel */
-	READ_BUF(20);
+	READ_BUF(24);
+	READ32(session->fore_channel.chan_attrs.headerpadsz);
 	READ32(session->fore_channel.chan_attrs.max_rqst_sz);
 	READ32(session->fore_channel.chan_attrs.max_resp_sz);
 	READ32(session->fore_channel.chan_attrs.max_resp_sz_cached);
@@ -4935,7 +4925,8 @@ static int decode_create_session(struct xdr_stream *xdr,
 	}
 
 	/* back channel */
-	READ_BUF(20);
+	READ_BUF(24);
+	READ32(session->fore_channel.chan_attrs.headerpadsz);
 	READ32(session->back_channel.chan_attrs.max_rqst_sz);
 	READ32(session->back_channel.chan_attrs.max_resp_sz);
 	READ32(session->back_channel.chan_attrs.max_resp_sz_cached);

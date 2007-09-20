@@ -14,6 +14,7 @@ typedef u32			streamchannel_attrs;
 typedef u32			rdmachannel_attrs;
 
 struct nfs4_channel_attrs {
+	u32			headerpadsz;
 	u32			max_rqst_sz;
 	u32			max_resp_sz;
 	u32			max_resp_sz_cached;
@@ -48,7 +49,6 @@ struct nfs4_session {
 	nfs41_sessionid			sess_id;
 	u32				flags;
 	unsigned long			session_state;
-	u32				header_padding;
 	u32				hash_alg;
 	u32				ssv_len;
 

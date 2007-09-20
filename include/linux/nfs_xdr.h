@@ -1010,7 +1010,6 @@ struct nfs41_create_session_args {
 	struct nfs_client	       *client;
 	struct nfs4_session	       *session;
 	uint32_t			flags;
-	uint32_t			header_padding;
 	uint32_t			cb_program;
 	struct nfs4_channel_attrs	fc_attrs;	/* Fore Channel */
 	struct nfs4_channel_attrs	bc_attrs;	/* Back Channel */
