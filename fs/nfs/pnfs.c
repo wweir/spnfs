@@ -360,8 +360,8 @@ pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range)
 
 	if (!status && nfsi->current_layout) {
 		dprintk("%s: removing layout\n", __FUNCTION__);
-		server->pnfs_curr_ld->ld_io_ops->free_layout(nfsi->current_layout, ino, &arg.lseg);
-		nfsi->current_layout = NULL;
+		server->pnfs_curr_ld->ld_io_ops->free_layout(
+			&nfsi->current_layout, ino, &arg.lseg);
 	}
 
 	dprintk("%s:Exit status %d\n", __FUNCTION__, status);
