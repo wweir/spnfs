@@ -414,18 +414,22 @@ filelayout_alloc_layout(struct pnfs_mount_type *mountid, struct inode *inode)
 /* Free a filelayout layout structure
  */
 void
-filelayout_free_layout(struct pnfs_layout_type *layoutid, struct inode *inode,
-			struct nfs4_pnfs_layout_segment *range)
+filelayout_free_layout(struct pnfs_layout_type **layoutidp,
+		       struct inode *inode,
+		       struct nfs4_pnfs_layout_segment *range)
 {
 	struct nfs4_filelayout *nfslay = NULL;
+	struct pnfs_layout_type *layoutid;
 
 	dprintk("NFS_FILELAYOUT: freeing layout\n");
 
+	layoutid = *layoutidp;
 	if (layoutid)
 		nfslay = (struct nfs4_filelayout *)layoutid->layoutid;
 	if (nfslay != NULL)
 		kfree(nfslay);
 	kfree(layoutid);
+	*layoutidp = NULL;
 }
 
 /* Decode layout and store in layoutid.  Overwrite any existing layout
