@@ -18,5 +18,5 @@ nfs-$(CONFIG_NFS_V4_1)	+= nfs41_session_recovery.o
 nfs-$(CONFIG_NFS_DIRECTIO) += direct.o
 nfs-$(CONFIG_SYSCTL) += sysctl.o
 
-obj-y += nfslayoutdriver.o
+obj-m += nfslayoutdriver.o
 nfslayoutdriver-objs := nfs4filelayout.o nfs4filelayoutdev.o
