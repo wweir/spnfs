@@ -1533,7 +1533,7 @@ pnfs_wpages(struct inode *inode)
 	return NFS_SERVER(inode)->ds_wpages;
 }
 
-//EXPORT_SYMBOL(pnfs_unregister_layoutdriver);
-//EXPORT_SYMBOL(pnfs_register_layoutdriver);
+EXPORT_SYMBOL(pnfs_unregister_layoutdriver);
+EXPORT_SYMBOL(pnfs_register_layoutdriver);
 
 #endif /* CONFIG_PNFS */
