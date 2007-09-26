@@ -21,6 +21,7 @@
 #include <linux/smp_lock.h>
 
 #include <asm/system.h>
+#include <linux/module.h>
 
 #include "nfs4_fs.h"
 #include "internal.h"
@@ -247,6 +248,7 @@ void nfs_initiate_read(struct nfs_read_data *data, struct rpc_clnt *clnt,
 
 	nfs_execute_read(data);
 }
+EXPORT_SYMBOL(nfs_initiate_read);
 
 /*
  * Generate multiple requests to fill a single page.
