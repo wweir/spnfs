@@ -64,15 +64,16 @@ struct layoutdriver_io_operations {
 	 * inode specific layout structure.  Each subsequent layoutget operation results in
 	 * a set_layout call to set the opaque layout in the layout driver.*/
 	struct pnfs_layout_type * (*alloc_layout) (struct pnfs_mount_type *mountid, struct inode *inode);
-	void (*free_layout) (struct pnfs_layout_type *layoutid, struct inode *inode, loff_t offset, size_t count);
-	struct pnfs_layout_type * (*set_layout) (struct pnfs_layout_type *layoutid, struct inode *inode, void *layout);
+	int (*has_layout) (struct pnfs_layout_type *layoutid, struct inode *inode, struct nfs4_pnfs_layout_segment *range);
+	void (*free_layout) (struct pnfs_layout_type **layoutidp, struct inode *inode, struct nfs4_pnfs_layout_segment *range);
+	struct pnfs_layout_type * (*set_layout) (struct pnfs_layout_type *layoutid, struct inode *inode, struct nfs4_pnfs_layoutget_res *lgr);
 
 	int (*setup_layoutcommit) (struct pnfs_layout_type *layoutid, struct inode *inode, struct pnfs_layoutcommit_arg *arg);
 	void (*cleanup_layoutcommit) (struct pnfs_layout_type *layoutid, struct inode *inode, struct pnfs_layoutcommit_arg *arg, struct pnfs_layoutcommit_res *res);
 
 	/* Registration information for a new mounted file system
 	 */
-	struct pnfs_mount_type * (*initialize_mountpoint) (struct super_block *);
+	struct pnfs_mount_type * (*initialize_mountpoint) (struct super_block *, struct nfs_fh *fh);
 	int (*uninitialize_mountpoint) (struct pnfs_mount_type *mountid);
 
 	/* Other ops... */
@@ -123,13 +124,13 @@ struct pnfs_layoutdriver_type {
 
 struct pnfs_device {
 	int           dev_id;
-	int           dev_type;
 	unsigned int  dev_count;
 	unsigned int  dev_addr_len;
 	char          dev_addr_buf[NFS4_PNFS_DEV_MAXSIZE];
 };
 
 struct pnfs_devicelist {
+	unsigned int        layout_type;
 	unsigned int        num_devs;
 	unsigned int        eof;
 	unsigned int        devs_len;
@@ -143,7 +144,7 @@ struct pnfs_devicelist {
  */
 struct pnfs_client_operations {
 	int (*nfs_fsync) (struct file *file, struct dentry *dentry, int datasync);
-	int (*nfs_getdevicelist) (struct super_block *sb, struct pnfs_devicelist *devlist);
+	int (*nfs_getdevicelist) (struct super_block *sb, struct nfs_fh *fh, struct pnfs_devicelist *devlist);
 	int (*nfs_getdeviceinfo) (struct super_block *sb, u32 dev_id, struct pnfs_device *dev);
 
 	/* Post read callback.  Layout driver calls this function if unstable data was
