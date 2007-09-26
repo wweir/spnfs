@@ -21,6 +21,7 @@
 #include <linux/backing-dev.h>
 
 #include <asm/uaccess.h>
+#include <linux/module.h>
 
 #include "delegation.h"
 #include "internal.h"
@@ -1604,3 +1605,5 @@ EXPORT_SYMBOL(nfs_writedata_release);
 EXPORT_SYMBOL(nfs_flush_task_priority);
 EXPORT_SYMBOL(nfs_commit_rpcsetup);
 EXPORT_SYMBOL(nfs_initiate_write);
+EXPORT_SYMBOL(nfs_commit_alloc);
+EXPORT_SYMBOL(nfs_commit_free);
