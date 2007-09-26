@@ -4160,6 +4160,7 @@ int nfs4_proc_destroy_session(struct nfs_server *sp)
 	dprintk("<-- nfs4_proc_destroy_session\n");
 	return status;
 }
+EXPORT_SYMBOL(nfs4_proc_destroy_session);
 #endif /* CONFIG_NFS_V4_1 */
 
 
@@ -5287,6 +5288,7 @@ const struct nfs_rpc_ops *nfsv4_minorversion_clientops[] = {
 	&pnfs_v41_clientops,
 #endif
 };
+
 
 /*
  * Local variables:
