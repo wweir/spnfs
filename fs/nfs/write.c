@@ -1608,3 +1608,5 @@ EXPORT_SYMBOL(nfs_writedata_release);
 EXPORT_SYMBOL(nfs_flush_task_priority);
 EXPORT_SYMBOL(nfs_commit_rpcsetup);
 EXPORT_SYMBOL(nfs_initiate_write);
+EXPORT_SYMBOL(nfs_commit_alloc);
+EXPORT_SYMBOL(nfs_commit_free);
