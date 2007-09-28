@@ -261,10 +261,10 @@ struct nfs4_fsid {
 
 /* outstanding layout */
 struct nfs4_layout {
-	struct list_head	lo_perfile;    /* hash by f_id */
-	struct list_head	lo_perclnt;    /* hash by clientid */
-	struct nfs4_file        *lo_file;      /* backpointer */
-	struct nfs4_client      *lo_client;
+	struct list_head	lo_perfile;	/* hash by f_id */
+	struct list_head	lo_perclnt;	/* hash by clientid */
+	struct nfs4_file	*lo_file;	/* backpointer */
+	struct nfs4_client	*lo_client;
 	struct nfsd4_layout_seg lo_seg;
 };
 
@@ -388,8 +388,8 @@ struct nfs4_file {
 /* pNFS Metadata server state */
 
 struct pnfs_ds_dev_entry {
-	struct list_head        dd_dev_entry; /* st_pnfs_ds_id entry */
-	u32                     dd_devid;
+	struct list_head	dd_dev_entry; /* st_pnfs_ds_id entry */
+	u32			dd_devid;
 };
 #endif /* CONFIG_PNFSD */
 
