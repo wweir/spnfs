@@ -4194,19 +4194,6 @@ merge_layout(struct nfs4_file *fp, struct nfs4_client *clp,
 	return NULL;
 }
 
-static struct nfs4_layout *
-find_layout(struct nfs4_file *fp, struct nfs4_client *clp)
-{
-	struct nfs4_layout *lp;
-
-	list_for_each_entry (lp, &fp->fi_layouts, lo_perfile) {
-		//??? if the right layout
-		if (lp->lo_client == clp)
-			return lp;
-	}
-	return NULL;
-}
-
 int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
 				struct nfsd4_pnfs_layoutget *lgp)
 {
@@ -4298,38 +4285,104 @@ out:
 	return status;
 }
 
+static void
+trim_layout(struct nfsd4_layout_seg *lo, struct nfsd4_layout_seg *lr)
+{
+	u64 lo_start = lo->offset;
+	u64 lo_end = end_offset(lo_start, lo->length);
+	u64 lr_start = lr->offset;
+	u64 lr_end = end_offset(lr_start, lr->length);
+
+	/* lr fully covers lo? */
+	if (lr_start <= lo_start && lo_end <= lr_end) {
+		lo->length = 0;
+		return;
+	}
+
+	/*
+	 * split not supported yet. retain layout segment.
+	 * remains must be returned by the client
+	 * on the final layout return.
+	 */
+	if (lo_start < lr_start && lr_end < lo_end)
+		return;
+
+	if (lo_start < lr_start)
+		lo_end = lr_start - 1;
+	else /* lr_end < lo_end */
+		lo_start = lr_end + 1;
+
+	lo->offset = lo_start;
+	lo->length = (lo_end == NFS4_LENGTH_EOF) ? lo_end : lo_end - lo_start;
+}
+
 int nfs4_pnfs_return_layout(struct super_block *sb, struct svc_fh *current_fh,
 				struct nfsd4_pnfs_layoutreturn *lrp)
 {
 	int status = -ENOENT;
+	int layouts_found = 0;
 	struct inode *ino = current_fh->fh_dentry->d_inode;
-	struct nfs4_file *fp;
-	struct nfs4_client *clp;
-	struct nfs4_layout *lp;
+	struct nfs4_file *fp = NULL;
+	struct nfs4_client *clp = NULL;
+	struct nfs4_layout *lp, *nextlp;
 
-	dprintk("NFSD: nfs4_pnfs_return_layout\n");
+	dprintk("NFSD: %s\n", __FUNCTION__);
 
+	/* call exported filesystem layout_return first */
+	if (sb->s_export_op->layout_return) {
+		status = sb->s_export_op->layout_return(ino, lrp);
+		if (status)
+			goto out;
+	}
+
+	nfs4_lock_state();
+	clp = find_confirmed_client((clientid_t *)&lrp->lr_seg.clientid);
+	if (!clp)
+		goto out;
 	fp = find_file(ino);
 	if (!fp)
 		goto out;
 
-	dprintk("pNFS %s: fp %p\n", __FUNCTION__, fp);
+	dprintk("pNFS %s: clp %p fp %p layout_type 0x%x iomode %d "
+		"return_type %d fsid 0x%x offset %lld length %lld\n",
+		__FUNCTION__, clp, fp, lrp->lr_seg.layout_type,
+		lrp->lr_seg.iomode, lrp->lr_return_type,
+		current_fh->fh_export->ex_fsid,
+		lrp->lr_seg.offset, lrp->lr_seg.length);
 
-	clp = find_confirmed_client((clientid_t *)&lrp->lr_seg.clientid);
-	dprintk("pNFS %s: clp %p \n", __FUNCTION__, clp);
-	if (!clp)
-		goto out;
+	/* update layouts */
+	if (lrp->lr_return_type == RETURN_FILE) {
+		list_for_each_entry_safe (lp, nextlp, &fp->fi_layouts, lo_perfile) {
+			if (lp->lo_client != clp ||
+			    lp->lo_seg.layout_type != lrp->lr_seg.layout_type ||
+			    (lp->lo_seg.iomode != lrp->lr_seg.iomode &&
+			     lrp->lr_seg.iomode != IOMODE_ANY) ||
+			    !lo_seg_overlapping(&lp->lo_seg, &lrp->lr_seg))
+				continue;
+			layouts_found++;
+			trim_layout(&lp->lo_seg, &lrp->lr_seg);
+			if (!lp->lo_seg.length)
+				destroy_layout(lp);
+		}
+	} else
+		list_for_each_entry_safe (lp, nextlp, &clp->cl_layouts, lo_perclnt) {
+			if (lrp->lr_seg.layout_type != lp->lo_seg.layout_type ||
+			    (lrp->lr_seg.iomode != lp->lo_seg.iomode &&
+			     lrp->lr_seg.iomode != IOMODE_ANY))
+				continue;
 
-	lp = find_layout(fp, clp);
-	dprintk("pNFS %s: lp %p\n", __FUNCTION__, lp);
+			if (lrp->lr_return_type == RETURN_FSID &&
+			    !same_fsid(&lp->lo_file->fi_fsid, current_fh))
+				continue;
 
-	if (lp) {
-		destroy_layout(lp);
-		status = 0;
-	}
+			layouts_found++;
+			destroy_layout(lp);
+		}
+
 out:
 	if (fp)
 		put_nfs4_file(fp);
+	nfs4_unlock_state();
 	dprintk("pNFS %s: exit status %d \n", __FUNCTION__, status);
 	return status;
 }
