@@ -408,7 +408,7 @@ nfs41_xdr_enc_cb_recall(struct rpc_rqst *req, u32 *p,
 	return (encode_cb_recall(&xdr, args));
 }
 
-#ifdef CONFIG_PNFS
+#if defined(CONFIG_PNFSD)
 static int
 nfs41_xdr_enc_cb_layout(struct rpc_rqst *req, u32 *p,
 			struct nfs41_rpc_args *rpc_args)
@@ -425,7 +425,7 @@ nfs41_xdr_enc_cb_layout(struct rpc_rqst *req, u32 *p,
 	encode_cb_sequence(&xdr, rpc_args->args_seq);
 	return (encode_cb_layout(&xdr, args));
 }
-#endif /* CONFIG_PNFS */
+#endif /* CONFIG_PNFSD */
 #endif /* defined(CONFIG_NFSD_V4_1) */
 
 static int
