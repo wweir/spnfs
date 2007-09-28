@@ -1132,6 +1132,23 @@ nfsd4_layoutreturn(struct svc_rqst *rqstp,
 			sb->s_export_op->layout_type());
 		goto out;
 	}
+	status = nfserr_inval;
+	if (lrp->lr_return_type != RETURN_FILE &&
+	    lrp->lr_return_type != RETURN_FSID &&
+	    lrp->lr_return_type != RETURN_ALL) {
+		dprintk("pNFS %s: invalid return_type %d\n", __FUNCTION__,
+			lrp->lr_return_type);
+		goto out;
+	}
+
+	status = nfserr_inval;
+	if (lrp->lr_seg.iomode != IOMODE_READ &&
+	    lrp->lr_seg.iomode != IOMODE_RW &&
+	    lrp->lr_seg.iomode != IOMODE_ANY) {
+		dprintk("pNFS %s: invalid iomode %d\n", __FUNCTION__,
+			lrp->lr_seg.iomode);
+		goto out;
+	}
 
 	/* Set clientid from sessionid */
 	lrp->lr_seg.clientid = *(u64 *)&current_ses->cs_sid.clientid;
