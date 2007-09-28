@@ -47,29 +47,29 @@
  * and encoded in nfsd4_encode_devlist_item with help from
  * the gd_ops->layout_encode() callback */
 struct nfsd4_pnfs_devlist {
-	u32				dev_id;
-	void	 			*dev_addr;	/* encoded by callback */
+	u32			dev_id;
+	void	 		*dev_addr;	/* encoded by callback */
 };
 
 struct nfsd4_pnfs_getdevlist {
-	u32				gd_type;	/* request */
-	u32				gd_maxcount;	/* request */
-	u64				gd_cookie;	/* request - response */
+	u32			gd_type;	/* request */
+	u32			gd_maxcount;	/* request */
+	u64			gd_cookie;	/* request - response */
 	/* nfs4_verifier */
-	u64				gd_verf;	/* request - response */
-	struct export_operations	*gd_ops;
-	u32				gd_devlist_len;	/* response */
-	struct nfsd4_pnfs_devlist 	*gd_devlist;	/*response */
-	u32				gd_eof;
+	u64			gd_verf;	/* request - response */
+	struct export_operations *gd_ops;
+	u32			gd_devlist_len;	/* response */
+	struct nfsd4_pnfs_devlist *gd_devlist;	/*response */
+	u32			gd_eof;
 };
 
 struct nfsd4_pnfs_getdevinfo {
-	u32				gd_type;	/* request - response */
-	u32				gd_dev_id;	/* request */
-	u32				gd_maxcnt;	/* request */
-	struct export_operations	*gd_ops;
-	u32				gd_devlist_len;	/* response */
-	void				*gd_devaddr;	/*response */
+	u32			gd_type;	/* request - response */
+	u32			gd_dev_id;	/* request */
+	u32			gd_maxcnt;	/* request */
+	struct export_operations *gd_ops;
+	u32			gd_devlist_len;	/* response */
+	void			*gd_devaddr;	/*response */
 };
 
 struct nfsd4_layout_seg {
@@ -81,28 +81,28 @@ struct nfsd4_layout_seg {
 };
 
 struct nfsd4_pnfs_layoutget {
-	struct nfsd4_layout_seg		lg_seg;		/* request/response */
-	u32				lg_signal;	/* request */
-	u64				lg_minlength;	/* request */
-	u32				lg_mxcnt;	/* request */
-	struct export_operations	*lg_ops;
+	struct nfsd4_layout_seg	lg_seg;		/* request/response */
+	u32			lg_signal;	/* request */
+	u64			lg_minlength;	/* request */
+	u32			lg_mxcnt;	/* request */
+	struct export_operations *lg_ops;
 
-	struct knfsd_fh                 *lg_fh;
-	u32				lg_return_on_close; /* response */
-	void				*lg_layout;	/* response callback encoded */
+	struct knfsd_fh		*lg_fh;
+	u32			lg_return_on_close; /* response */
+	void			*lg_layout;	/* response callback encoded */
 };
 
 struct nfsd4_pnfs_layoutcommit {
-	struct nfsd4_layout_seg		lc_seg;		/* request */
-	u32				lc_reclaim;	/* request */
-	u32				lc_newoffset;	/* request */
-	u64				lc_last_wr;	/* request */
-	struct nfstime4			lc_mtime;	/* request */
-	struct nfstime4			lc_atime;	/* request */
-	u32				lc_up_len;	/* layout length */
-	void				*lc_up_layout;	/* decoded by callback */
-	u32				lc_size_chg;	/* boolean for response */
-	u64				lc_newsize;	/* response */
+	struct nfsd4_layout_seg	lc_seg;		/* request */
+	u32			lc_reclaim;	/* request */
+	u32			lc_newoffset;	/* request */
+	u64			lc_last_wr;	/* request */
+	struct nfstime4		lc_mtime;	/* request */
+	struct nfstime4		lc_atime;	/* request */
+	u32			lc_up_len;	/* layout length */
+	void			*lc_up_layout;	/* decoded by callback */
+	u32			lc_size_chg;	/* boolean for response */
+	u64			lc_newsize;	/* response */
 };
 
 enum layoutreturn_flags {
@@ -111,17 +111,17 @@ enum layoutreturn_flags {
 };
 
 struct nfsd4_pnfs_layoutreturn {
-	u32				lr_return_type;	/* request */
-	struct nfsd4_layout_seg		lr_seg;		/* request */
-	u32				lr_reclaim;	/* request */
-	u32				lr_flags;
+	u32			lr_return_type;	/* request */
+	struct nfsd4_layout_seg	lr_seg;		/* request */
+	u32			lr_reclaim;	/* request */
+	u32			lr_flags;
 };
 
 struct nfsd4_pnfs_cb_layout {
-	u32                     cbl_recall_type;	/* request */
+	u32			cbl_recall_type;	/* request */
 	struct nfsd4_layout_seg cbl_seg;		/* request */
-	u32                     cbl_layoutchanged;	/* request */
-	struct nfs4_fsid        cbl_fsid;
+	u32			cbl_layoutchanged;	/* request */
+	struct nfs4_fsid	cbl_fsid;
 };
 
 #endif /* CONFIG_PNFSD */
