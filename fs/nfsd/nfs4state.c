@@ -4242,9 +4242,13 @@ lo_seg_overlapping(struct nfsd4_layout_seg *l1, struct nfsd4_layout_seg *l2)
 	u64 last1 = last_byte_offset(start1, l1->length);
 	u64 start2 = l2->offset;
 	u64 last2 = last_byte_offset(start2, l2->length);
+	int ret;
 
-	/* is last1 == start2 there's a single byte overlap */
-	return (last2 >= start1) && (last1 >= start2);
+	/* if last1 == start2 there's a single byte overlap */
+	ret = (last2 >= start1) && (last1 >= start2);
+	dprintk("%s: l1 %llu:%lld l2 %llu:%lld ret=%d\n", __FUNCTION__,
+		l1->offset, l1->length, l2->offset, l2->length, ret);
+	return ret;
 }
 
 static inline int
@@ -4378,8 +4382,10 @@ int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
 	status = sb->s_export_op->layout_get(current_fh->fh_dentry->d_inode,
 				(void *)lgp);
 
-	dprintk("pNFS %s: status %d type %d maxcount %d \n",
-		__FUNCTION__, status, lgp->lg_seg.layout_type, lgp->lg_mxcnt);
+	dprintk("pNFS %s: status %d type %d maxcount %d "
+		"iomode %d offset %llu length %lld\n",
+		__FUNCTION__, status, lgp->lg_seg.layout_type, lgp->lg_mxcnt,
+		lgp->lg_seg.iomode, lgp->lg_seg.offset, lgp->lg_seg.length);
 
 	if (status) {
 		switch (status) {
@@ -4443,10 +4449,13 @@ trim_layout(struct nfsd4_layout_seg *lo, struct nfsd4_layout_seg *lr)
 	u64 lr_start = lr->offset;
 	u64 lr_end = end_offset(lr_start, lr->length);
 
+	dprintk("%s:Begin lo %llu:%lld lr %llu:%lld\n", __FUNCTION__,
+		lo->offset, lo->length, lr->offset, lr->length);
+
 	/* lr fully covers lo? */
 	if (lr_start <= lo_start && lo_end <= lr_end) {
 		lo->length = 0;
-		return;
+		goto out;
 	}
 
 	/*
@@ -4454,8 +4463,10 @@ trim_layout(struct nfsd4_layout_seg *lo, struct nfsd4_layout_seg *lr)
 	 * remains must be returned by the client
 	 * on the final layout return.
 	 */
-	if (lo_start < lr_start && lr_end < lo_end)
-		return;
+	if (lo_start < lr_start && lr_end < lo_end) {
+		dprintk("%s: split not supported\n", __FUNCTION__);
+		goto out;
+	}
 
 	if (lo_start < lr_start)
 		lo_end = lr_start - 1;
@@ -4464,6 +4475,8 @@ trim_layout(struct nfsd4_layout_seg *lo, struct nfsd4_layout_seg *lr)
 
 	lo->offset = lo_start;
 	lo->length = (lo_end == NFS4_LENGTH_EOF) ? lo_end : lo_end - lo_start;
+out:
+	dprintk("%s:End lo %llu:%lld\n", __FUNCTION__, lo->offset, lo->length);
 }
 
 static int
@@ -4541,13 +4554,6 @@ int nfs4_pnfs_return_layout(struct super_block *sb, struct svc_fh *current_fh,
 	if (!fp)
 		goto out;
 
-	dprintk("pNFS %s: clp %p fp %p layout_type 0x%x iomode %d "
-		"return_type %d fsid 0x%x offset %lld length %lld\n",
-		__FUNCTION__, clp, fp, lrp->lr_seg.layout_type,
-		lrp->lr_seg.iomode, lrp->lr_return_type,
-		current_fh->fh_export->ex_fsid,
-		lrp->lr_seg.offset, lrp->lr_seg.length);
-
 	/* update layouts */
 	if (lrp->lr_return_type == RETURN_FILE) {
 		list_for_each_entry_safe (lp, nextlp, &fp->fi_layouts, lo_perfile) {
@@ -4576,6 +4582,14 @@ int nfs4_pnfs_return_layout(struct super_block *sb, struct svc_fh *current_fh,
 			layouts_found++;
 			destroy_layout(lp);
 		}
+
+	dprintk("pNFS %s: clp %p fp %p layout_type 0x%x iomode %d "
+		"return_type %d fsid 0x%x offset %lld length %lld: "
+		"layouts_found %d\n",
+		__FUNCTION__, clp, fp, lrp->lr_seg.layout_type,
+		lrp->lr_seg.iomode, lrp->lr_return_type,
+		current_fh->fh_export->ex_fsid,
+		lrp->lr_seg.offset, lrp->lr_seg.length, layouts_found);
 
 	/* update layoutrecalls */
 	list_for_each_entry_safe (clr, nextclr, &clp->cl_layoutrecalls,
