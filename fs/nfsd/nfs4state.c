@@ -646,7 +646,7 @@ expire_client(struct nfs4_client *clp)
 		destroy_layout(lp);
 	}
 	while (!list_empty(&clp->cl_layoutrecalls)) {
-	       lrp = list_entry(clp->cl_layoutrecalls.next,
+		lrp = list_entry(clp->cl_layoutrecalls.next,
 				struct nfs4_layoutrecall, clr_perclnt);
 		dprintk("NFSD: expire client. lrp %p, fp %p\n", lrp,
 			lrp->clr_file);
@@ -4674,8 +4674,8 @@ int nfs4_pnfs_return_layout(struct super_block *sb, struct svc_fh *current_fh,
 	}
 
 out:
-        if (fp)
-                put_nfs4_file(fp);
+	if (fp)
+		put_nfs4_file(fp);
 	nfs4_unlock_state();
 	dprintk("pNFS %s: exit status %d \n", __FUNCTION__, status);
 	return status;
