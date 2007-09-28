@@ -90,14 +90,6 @@ enum nfs_cb_opnum4 {
 					enc_nfs4_fh_sz)
 #define NFS4_dec_cb_recall_sz		(cb_compound_dec_hdr_sz  +      \
 					op_dec_sz)
-#if defined(CONFIG_PNFSD)
-#define NFS4_enc_cb_layout_sz		(cb_compound_enc_hdr_sz +       \
-					1 + 3 +                         \
-					enc_nfs4_fh_sz + 4)
-
-#define NFS4_dec_cb_layout_sz		(cb_compound_dec_hdr_sz  +      \
-					op_dec_sz)
-#endif /* CONFIG_PNFSD */
 
 #if defined(CONFIG_NFSD_V4_1)
 #define NFS41_enc_cb_null_sz		0
@@ -113,6 +105,13 @@ enum nfs_cb_opnum4 {
 					1 + enc_stateid_sz +            \
 					enc_nfs4_fh_sz)
 #define NFS41_dec_cb_recall_sz		(cb_compound_dec_hdr_sz  +      \
+					cb_sequence41_dec_sz +          \
+					op_dec_sz)
+#define NFS41_enc_cb_layout_sz		(cb_compound_enc_hdr_sz +       \
+					cb_sequence41_enc_sz +          \
+					1 + 3 +                         \
+					enc_nfs4_fh_sz + 4)
+#define NFS41_dec_cb_layout_sz		(cb_compound_dec_hdr_sz  +      \
 					cb_sequence41_dec_sz +          \
 					op_dec_sz)
 
@@ -322,7 +321,7 @@ encode_cb_layout(struct xdr_stream *xdr, struct nfs4_layoutrecall *clr)
 	WRITE32(clr->cb.cbl_layoutchanged);
 	WRITE32(clr->cb.cbl_recall_type);
 	if (unlikely(clr->cb.cbl_recall_type == RECALL_FSID)) {
-		struct nfs4_fsid fsid = clr->clr_file->fi_fsid;
+		struct nfs4_fsid fsid = clr->cb.cbl_fsid;
 		WRITE64(fsid.major);
 		WRITE64(fsid.minor);
 		dprintk("%s: type %x iomode %d changed %d recall_type %d "
@@ -375,25 +374,6 @@ nfs4_xdr_enc_cb_recall(struct rpc_rqst *req, __be32 *p, struct nfs4_cb_recall *a
 	return (encode_cb_recall(&xdr, args));
 }
 
-#if defined(CONFIG_PNFSD)
-static int
-nfs4_xdr_enc_cb_layout(struct rpc_rqst *req, u32 *p,
-		       struct nfs4_layoutrecall *args)
-{
-	struct xdr_stream xdr;
-
-	struct nfs4_cb_compound_hdr hdr = {
-		.ident = 0,
-		.nops   = 1,
-	};
-
-	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_cb_compound_hdr(&xdr, &hdr);
-
-	return (encode_cb_layout(&xdr, args));
-}
-#endif /* CONFIG_PNFSD */
-
 #if defined(CONFIG_NFSD_V4_1)
 static int
 encode_cb_compound41_hdr(struct xdr_stream *xdr,
@@ -424,6 +404,25 @@ nfs41_xdr_enc_cb_recall(struct rpc_rqst *req, u32 *p,
 	encode_cb_sequence(&xdr, rpc_args->args_seq);
 	return encode_cb_recall(&xdr, args);
 }
+
+#if defined(CONFIG_PNFSD)
+static int
+nfs41_xdr_enc_cb_layout(struct rpc_rqst *req, u32 *p,
+			struct nfs41_rpc_args *rpc_args)
+{
+	struct xdr_stream xdr;
+	struct nfs4_layoutrecall *args = rpc_args->args_op;
+	struct nfs4_cb_compound_hdr hdr = {
+		.ident = 0,
+		.nops   = 2,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_cb_compound41_hdr(&xdr, &hdr);
+	encode_cb_sequence(&xdr, rpc_args->args_seq);
+	return (encode_cb_layout(&xdr, args));
+}
+#endif /* CONFIG_PNFSD */
 #endif /* defined(CONFIG_NFSD_V4_1) */
 
 static int
@@ -483,24 +482,6 @@ out:
 	return status;
 }
 
-#if defined(CONFIG_PNFSD)
-static int
-nfs4_xdr_dec_cb_layout(struct rpc_rqst *rqstp, u32 *p)
-{
-	struct xdr_stream xdr;
-	struct nfs4_cb_compound_hdr hdr;
-	int status;
-
-	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
-	status = decode_cb_compound_hdr(&xdr, &hdr);
-	if (status)
-		goto out;
-	status = decode_cb_op_hdr(&xdr, OP_CB_LAYOUT);
-out:
-	return status;
-}
-#endif /* CONFIG_PNFSD */
-
 #if defined(CONFIG_NFSD_V4_1)
 static int
 decode_cb_sequence(struct xdr_stream *xdr, struct nfs41_cb_sequence *res)
@@ -539,6 +520,28 @@ nfs41_xdr_dec_cb_recall(struct rpc_rqst *rqstp, u32 *p,
 out:
 	return status;
 }
+
+#if defined(CONFIG_PNFSD)
+static int
+nfs41_xdr_dec_cb_layout(struct rpc_rqst *rqstp, u32 *p,
+			struct nfs41_rpc_res *rpc_res)
+{
+	struct xdr_stream xdr;
+	struct nfs4_cb_compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_cb_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_cb_sequence(&xdr, rpc_res->res_seq);
+	if (status)
+		goto out;
+	status = decode_cb_op_hdr(&xdr, OP_CB_LAYOUT);
+out:
+	return status;
+}
+#endif /* CONFIG_PNFSD */
 #endif /* defined(CONFIG_NFSD_V4_1) */
 
 /*
@@ -558,9 +561,6 @@ out:
 static struct rpc_procinfo     nfs4_cb_procedures[] = {
     PROC(CB_NULL,      NULL,     enc_cb_null,     dec_cb_null),
     PROC(CB_RECALL,    COMPOUND,   enc_cb_recall,      dec_cb_recall),
-#if defined(CONFIG_PNFSD)
-    PROC(CB_LAYOUT,    COMPOUND,   enc_cb_layout,      dec_cb_layout),
-#endif
 };
 
 static struct rpc_version       nfs_cb_version4 = {
@@ -584,6 +584,9 @@ static struct rpc_version       nfs_cb_version4 = {
 static struct rpc_procinfo     nfs41_cb_procedures[] = {
 	PROC(CB_NULL,        NULL,       enc_cb_null,        dec_cb_null),
 	PROC41(CB_RECALL,    COMPOUND,   enc_cb_recall,      dec_cb_recall),
+#if defined(CONFIG_PNFSD)
+	PROC41(CB_LAYOUT,    COMPOUND,   enc_cb_layout,      dec_cb_layout),
+#endif
 };
 
 static struct rpc_version       nfs_cb_version41 = {
@@ -849,9 +852,18 @@ nfsd4_cb_layout(struct nfs4_layoutrecall *clr)
 {
 	struct nfs4_client *clp = clr->clr_client;
 	struct rpc_clnt *clnt = NULL;
+	struct nfs41_cb_sequence seq;
+	struct nfs41_rpc_args args = {
+		.args_op = clr,
+		.args_seq = &seq
+	};
+	struct nfs41_rpc_res res = {
+		.res_seq = &seq
+	};
 	struct rpc_message msg = {
-		.rpc_proc = &nfs4_cb_procedures[NFSPROC4_CLNT_CB_LAYOUT],
-		.rpc_argp = clr,
+		.rpc_proc = &nfs41_cb_procedures[NFSPROC4_CLNT_CB_LAYOUT],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
 	};
 
 	if (clp)
@@ -861,7 +873,9 @@ nfsd4_cb_layout(struct nfs4_layoutrecall *clr)
 	if ((!atomic_read(&clp->cl_callback.cb_set)) || !clnt)
 		goto out;
 
+	nfs41_cb_sequence_setup(clp, &seq);
 	clr->clr_status = rpc_call_sync(clnt, &msg, RPC_TASK_SOFT);
+	nfs41_cb_sequence_done(clp, &seq);
 
 	if (clr->clr_status == -EIO)
 		atomic_set(&clp->cl_callback.cb_set, 0);
