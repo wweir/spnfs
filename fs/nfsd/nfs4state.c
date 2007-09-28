@@ -4253,9 +4253,15 @@ lo_seg_overlapping(struct nfsd4_layout_seg *l1, struct nfsd4_layout_seg *l2)
 }
 
 static inline int
+same_fsid_major(struct nfs4_fsid *fsid, u64 major)
+{
+	return fsid->major == major;
+}
+
+static inline int
 same_fsid(struct nfs4_fsid *fsid, struct svc_fh *current_fh)
 {
-	return fsid->major == current_fh->fh_export->ex_fsid;
+	return same_fsid_major(fsid, current_fh->fh_export->ex_fsid);
 }
 
 /*
@@ -4481,6 +4487,59 @@ out:
 }
 
 static int
+pnfs_return_file_layouts(struct nfs4_client *clp, struct nfs4_file *fp,
+			 struct nfsd4_pnfs_layoutreturn *lrp)
+{
+	int layouts_found = 0;
+	struct nfs4_layout *lp, *nextlp;
+
+	dprintk("%s: clp %p fp %p\n", __FUNCTION__, clp, fp);
+	list_for_each_entry_safe (lp, nextlp, &fp->fi_layouts, lo_perfile) {
+		dprintk("%s: lp %p client %p,%p lo_type %x,%x iomode %d,%d\n",
+			__FUNCTION__, lp,
+			lp->lo_client, clp,
+			lp->lo_seg.layout_type, lrp->lr_seg.layout_type,
+			lp->lo_seg.iomode, lrp->lr_seg.iomode);
+		if (lp->lo_client != clp ||
+		    lp->lo_seg.layout_type != lrp->lr_seg.layout_type ||
+		    (lp->lo_seg.iomode != lrp->lr_seg.iomode &&
+		     lrp->lr_seg.iomode != IOMODE_ANY) ||
+		    !lo_seg_overlapping(&lp->lo_seg, &lrp->lr_seg))
+			continue;
+		layouts_found++;
+		trim_layout(&lp->lo_seg, &lrp->lr_seg);
+		if (!lp->lo_seg.length)
+			destroy_layout(lp);
+	}
+
+	return layouts_found;
+}
+
+static int
+pnfs_return_client_layouts(struct nfs4_client *clp,
+			   struct nfsd4_pnfs_layoutreturn *lrp, u64 ex_fsid)
+{
+	int layouts_found = 0;
+	struct nfs4_layout *lp, *nextlp;
+
+	list_for_each_entry_safe (lp, nextlp, &clp->cl_layouts, lo_perclnt) {
+		if (lrp->lr_seg.layout_type != lp->lo_seg.layout_type ||
+		    (lrp->lr_seg.iomode != lp->lo_seg.iomode &&
+		     lrp->lr_seg.iomode != IOMODE_ANY))
+			continue;
+
+		if (lrp->lr_return_type == RETURN_FSID &&
+		    !same_fsid_major(&lp->lo_file->fi_fsid, ex_fsid))
+			continue;
+
+		layouts_found++;
+		destroy_layout(lp);
+	}
+
+	return layouts_found;
+}
+
+static int
 recall_return_perfect_match(struct nfs4_layoutrecall *clr,
 			    struct nfsd4_pnfs_layoutreturn *lrp,
 			    struct nfs4_file *fp,
@@ -4535,7 +4594,6 @@ int nfs4_pnfs_return_layout(struct super_block *sb, struct svc_fh *current_fh,
 	struct inode *ino = current_fh->fh_dentry->d_inode;
 	struct nfs4_file *fp = NULL;
 	struct nfs4_client *clp = NULL;
-	struct nfs4_layout *lp, *nextlp;
 	struct nfs4_layoutrecall *clr, *nextclr;
 
 	dprintk("NFSD: %s\n", __FUNCTION__);
@@ -4556,33 +4614,10 @@ int nfs4_pnfs_return_layout(struct super_block *sb, struct svc_fh *current_fh,
 		goto out;
 
 	/* update layouts */
-	if (lrp->lr_return_type == RETURN_FILE) {
-		list_for_each_entry_safe (lp, nextlp, &fp->fi_layouts, lo_perfile) {
-			if (lp->lo_client != clp ||
-			    lp->lo_seg.layout_type != lrp->lr_seg.layout_type ||
-			    (lp->lo_seg.iomode != lrp->lr_seg.iomode &&
-			     lrp->lr_seg.iomode != IOMODE_ANY) ||
-			    !lo_seg_overlapping(&lp->lo_seg, &lrp->lr_seg))
-				continue;
-			layouts_found++;
-			trim_layout(&lp->lo_seg, &lrp->lr_seg);
-			if (!lp->lo_seg.length)
-				destroy_layout(lp);
-		}
-	} else
-		list_for_each_entry_safe (lp, nextlp, &clp->cl_layouts, lo_perclnt) {
-			if (lrp->lr_seg.layout_type != lp->lo_seg.layout_type ||
-			    (lrp->lr_seg.iomode != lp->lo_seg.iomode &&
-			     lrp->lr_seg.iomode != IOMODE_ANY))
-				continue;
-
-			if (lrp->lr_return_type == RETURN_FSID &&
-			    !same_fsid(&lp->lo_file->fi_fsid, current_fh))
-				continue;
-
-			layouts_found++;
-			destroy_layout(lp);
-		}
+	layouts_found += lrp->lr_return_type == RETURN_FILE ?
+		pnfs_return_file_layouts(clp, fp, lrp) :
+		pnfs_return_client_layouts(clp, lrp,
+					   current_fh->fh_export->ex_fsid);
 
 	dprintk("pNFS %s: clp %p fp %p layout_type 0x%x iomode %d "
 		"return_type %d fsid 0x%x offset %lld length %lld: "
