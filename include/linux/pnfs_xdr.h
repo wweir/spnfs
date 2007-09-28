@@ -1,7 +1,7 @@
 /*
  *  include/linux/pnfs_xdr.h
  *
- *  Common xdr data structures needed by pnfs client and server.
+ *  Common xdr data structures needed by pnfs client.
  *
  *  Copyright (c) 2002 The Regents of the University of Michigan.
  *  All rights reserved.
@@ -12,7 +12,7 @@
 #ifndef LINUX_PNFS_XDR_H
 #define LINUX_PNFS_XDR_H
 
-#if defined(CONFIG_PNFS) || defined(CONFIG_PNFSD)
+#if defined(CONFIG_PNFS)
 
 #include <linux/nfs4.h>
 
@@ -131,6 +131,6 @@ struct nfs4_pnfs_getdeviceinfo_res {
 	struct nfs41_sequence_res	seq_res;
 };
 
-#endif /* defined(CONFIG_PNFS) || defined(CONFIG_PNFSD) */
+#endif /* CONFIG_PNFS */
 
 #endif /* LINUX_PNFS_XDR_H */
