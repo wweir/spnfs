@@ -1383,12 +1383,13 @@ nfsd4_decode_layoutreturn(struct nfsd4_compoundargs *argp,
 {
 	DECODE_HEAD;
 
-	READ_BUF(32);
+	READ_BUF(16);
 	READ32(lrp->lr_reclaim);
 	READ32(lrp->lr_seg.layout_type);
 	READ32(lrp->lr_seg.iomode);
 	READ32(lrp->lr_return_type);
 	if (lrp->lr_return_type == RETURN_FILE) {
+		READ_BUF(16);
 		READ64(lrp->lr_seg.offset);
 		READ64(lrp->lr_seg.length);
 	}
