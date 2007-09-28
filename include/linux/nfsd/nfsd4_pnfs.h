@@ -118,9 +118,10 @@ struct nfsd4_pnfs_layoutreturn {
 };
 
 struct nfsd4_pnfs_cb_layout {
-	u32                     cbl_recall_type;	/* request */
+	u32			cbl_recall_type;	/* request */
 	struct nfsd4_layout_seg cbl_seg;		/* request */
-	u32                     cbl_layoutchanged;	/* request */
+	u32			cbl_layoutchanged;	/* request */
+	struct nfs4_fsid	cbl_fsid;
 };
 
 #endif /* CONFIG_PNFSD */
