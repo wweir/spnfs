@@ -4817,12 +4817,36 @@ doit:
 }
 #endif
 
+static void
+nomatching_layout(struct super_block *sb, struct nfs4_layoutrecall *clr)
+{
+	struct nfsd4_pnfs_layoutreturn lr;
+
+	dprintk("%s: clp %p fp %p: "
+		"simulating layout_return\n", __FUNCTION__,
+		clr->clr_client,
+		clr->clr_file);
+	lr.lr_return_type = clr->cb.cbl_recall_type;
+	lr.lr_seg = clr->cb.cbl_seg;
+	lr.lr_reclaim = 0;
+	lr.lr_flags = LR_FLAG_INTERN;
+	if (sb->s_export_op->layout_return)
+		sb->s_export_op->layout_return(clr->clr_file ?
+			clr->clr_file->fi_inode : NULL, &lr);
+
+	if (clr->cb.cbl_recall_type == RECALL_FILE)
+		pnfs_return_file_layouts(clr->clr_client, clr->clr_file, &lr);
+	else
+	       pnfs_return_client_layouts(clr->clr_client, &lr,
+		                          clr->cb.cbl_fsid.major);
+}
+
 /*
  * Recall a layout synchronously
  * must be called under the state lock
  */
 static int
-sync_layout_recall(struct nfs4_layoutrecall *clr)
+sync_layout_recall(struct super_block *sb, struct nfs4_layoutrecall *clr)
 {
 	struct nfs4_layoutrecall *pending;
 	struct nfs4_client *clp = NULL;
@@ -4896,6 +4920,8 @@ doit:
 					pending->clr_client->cl_callback.cb_client,
 					pending->clr_file,
 					status);
+			if (status == -NFSERR_NOMATCHING_LAYOUT)
+				nomatching_layout(sb, pending);
 			layoutrecall_done(pending);
 		}
 
@@ -4909,7 +4935,8 @@ doit:
  * Spawn a thread to perform a recall layout
  *
  */
-int nfsd_layout_recall_cb(struct inode *inode, struct nfsd4_pnfs_cb_layout *cbl)
+int nfsd_layout_recall_cb(struct super_block *sb, struct inode *inode,
+			  struct nfsd4_pnfs_cb_layout *cbl)
 {
 	int status, did_lock;
 	struct nfs4_layoutrecall *clr = NULL;
@@ -4958,23 +4985,13 @@ int nfsd_layout_recall_cb(struct inode *inode, struct nfsd4_pnfs_cb_layout *cbl)
 			clr->cb.cbl_fsid = clr->clr_file->fi_fsid;
 	}
 
-	status = sync_layout_recall(clr);
+	status = sync_layout_recall(sb, clr);
 	if (!status) {
 		if (did_lock)
 			nfs4_unlock_state();
 		return 0;
 	}
 
-#if 0
-	t = kthread_run(do_layout_recall, clr, "%s", "nfs4_cb_recall");
-	dprintk("NFSD %s: kthread_run done error %ld\n", __FUNCTION__,
-		IS_ERR(t) ? PTR_ERR(t) : 0L);
-	if (!IS_ERR(t))
-		return 0;	/* Success!, refcounts handled by kthread */
-
-	status = PTR_ERR(t);
-	did_lock = nfs4_lock_state_nested();
-#endif
 err:
 	put_layoutrecall(clr);
 	if (did_lock)
