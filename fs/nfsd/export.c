@@ -387,7 +387,7 @@ static int cb_layout_recall(struct super_block *sb, struct inode *inode,
 
 	dprintk("cb_layout_recall lr %p\n", lr);
 
-	return nfsd_layout_recall_cb(inode, lr);
+	return nfsd_layout_recall_cb(sb, inode, lr);
 }
 EXPORT_SYMBOL(cb_layout_recall);
 #endif /* CONFIG_PNFSD */
