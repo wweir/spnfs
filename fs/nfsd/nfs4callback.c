@@ -384,9 +384,10 @@ encode_cb_compound41_hdr(struct xdr_stream *xdr,
 {
 	u32 *p;
 
-	RESERVE_SPACE(12);
+	RESERVE_SPACE(16);
 	WRITE32(0);             /* tag length is always 0 */
 	WRITE32(1);             /* minorversion */
+	WRITE32(hdr->ident);   /* callback_ident not used in 4.1 */
 	WRITE32(hdr->nops);
 	return 0;
 }
@@ -399,7 +400,7 @@ nfs41_xdr_enc_cb_recall(struct rpc_rqst *req, u32 *p,
 	struct nfs4_cb_recall *args = rpc_args->args_op;
 	struct nfs4_cb_compound_hdr hdr = {
 		.ident = args->cbr_ident,
-		.nops   = 1,
+		.nops   = 2,
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
