@@ -1518,11 +1518,6 @@ static int _nfs4_do_setattr(struct inode *inode, struct nfs_fattr *fattr,
 		nfs4_copy_stateid(&arg.stateid, state, current->files);
 	} else
 		memcpy(&arg.stateid, &zero_stateid, sizeof(arg.stateid));
-	/* NFSv4.1 Draft 10 requires stateid sequence to be 0 */
-#ifdef CONFIG_NFS_V4_1
-	if (server->nfs_client->cl_minorversion == 1)
-		memset(&arg.stateid, 0, 4);
-#endif /* CONFIG_NFS_V4_1 */
 
 	NFS4_VALIDATE_STATE(server);
 	status = NFS4_RPC_CALL_SYNC(server, server->client,
