@@ -3196,29 +3196,31 @@ nfsd4_encode_write(struct nfsd4_compoundres *resp, __be32 nfserr, struct nfsd4_w
 #if defined(CONFIG_PNFSD)
 static int
 nfsd4_encode_devlist_item(struct nfsd4_compoundres *resp,
-			  struct nfsd4_pnfs_devlist *dlist,
-			  struct export_operations *ex_ops,
-			  int lotype)
+			  struct nfsd4_pnfs_getdevlist *gdevl)
 {
-	int len;
+	int len = 0;
 	ENCODE_HEAD;
 
-	RESERVE_SPACE(24);
-	WRITE32(dlist->dev_id);
+	RESERVE_SPACE(4);
 
-	WRITE32(lotype); /* layout type */
+	WRITE32(gdevl->gd_type); /* layout type */
 
 	ADJUST_ARGS();
-	dprintk("%s: device id %d\n", __FUNCTION__, dlist->dev_id);
+	dprintk("%s: device type %d\n", __FUNCTION__, gdevl->gd_type);
 
-	if (ex_ops->devaddr_encode == NULL && lotype == LAYOUT_NFSV4_FILES) {
-		len = filelayout_encode_devaddr(p, resp->end, dlist->dev_addr);
-		filelayout_free_devaddr(dlist->dev_addr);
+	if (gdevl->gd_ops->devaddr_encode == NULL &&
+	    gdevl->gd_type == LAYOUT_NFSV4_FILES) {
+		len = filelayout_encode_devaddr(p, resp->end,
+				gdevl->gd_devlist_len, gdevl->gd_devlist);
+// FIXME	filelayout_free_devaddr(dlist->dev_addr);
 	} else {
-		len = ex_ops->devaddr_encode(p,  resp->end, dlist->dev_addr);
-		ex_ops->devaddr_free(dlist->dev_addr);
+#if 0 // FIXME???
+		len = gdevl->gd_ops->devaddr_encode(p, resp->end,
+						     dlist->dev_addr);
+		gdevl->gd_ops->devaddr_free(dlist->dev_addr);
+#endif
 	}
-	kfree(dlist->dev_addr);
+// FIXME	kfree(dlist->dev_addr);
 
 	if (len > 0) {
 		p += XDR_QUADLEN(len);
@@ -3241,27 +3243,24 @@ static void
 nfsd4_encode_getdevlist(struct nfsd4_compoundres *resp, int nfserr,
 			struct nfsd4_pnfs_getdevlist *gdevl)
 {
-	int i, len;
-	struct nfsd4_pnfs_devlist *item;
+	int len;
 
 	ENCODE_HEAD;
 
 	dprintk("%s: err %d gdevl %p\n", __FUNCTION__, nfserr, gdevl);
 	if (!nfserr) {
-		RESERVE_SPACE(12 + sizeof(nfs4_verifier));
+		RESERVE_SPACE(20 + sizeof(nfs4_verifier));
 		WRITE64(gdevl->gd_cookie);
 		WRITEMEM(&gdevl->gd_verf, sizeof(nfs4_verifier));
-		WRITE32(gdevl->gd_devlist_len);
+
+		/* num of devlist_item4 */
+		WRITE32(1);
+
+		WRITE32(gdevl->gd_devlist[0].dev_id);
+
 		ADJUST_ARGS();
-		item = gdevl->gd_devlist;
-		for (i = 0; i < gdevl->gd_devlist_len; i++) {
-			dprintk("%s: i %d item %p\n", __FUNCTION__, i, item);
-			len = nfsd4_encode_devlist_item(resp, item,
-						gdevl->gd_ops, gdevl->gd_type);
-			item++;
-			if (len <= 0)
-				break;
-		}
+		len = nfsd4_encode_devlist_item(resp, gdevl);
+
 		RESERVE_SPACE(4);
 		WRITE32(gdevl->gd_eof);
 		ADJUST_ARGS();
@@ -3290,7 +3289,8 @@ nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp, int nfserr,
 
 		if (gdev->gd_ops->devaddr_encode == NULL &&
 					gdev->gd_type == LAYOUT_NFSV4_FILES) {
-			len = filelayout_encode_devaddr(p, resp->end, gdev->gd_devaddr);
+			len = filelayout_encode_devinfo(p, resp->end, 1,
+							gdev->gd_devaddr);
 			filelayout_free_devaddr(gdev->gd_devaddr);
 		} else {
 			len = gdev->gd_ops->devaddr_encode(p, resp->end, gdev->gd_devaddr);
