@@ -759,6 +759,17 @@ void nfs_free_server(struct nfs_server *server)
 	if (!IS_ERR(server->client))
 		rpc_shutdown_client(server->client);
 
+#ifdef CONFIG_NFS_V4_1
+	if (server->session != NULL) {
+		/*
+		 * The session must be destroyed before
+		 * deallocating its structure
+		 */
+		BUG_ON(!server->session->expired);
+		nfs4_put_session(&server->session);
+	}
+#endif /* CONFIG_NFS_V4_1 */
+
 	nfs_put_client(server->nfs_client);
 
 	nfs_free_iostats(server->io_stats);
@@ -973,6 +984,19 @@ struct nfs_server *nfs4_create_server(const struct nfs_parsed_mount_data *data,
 	if (error < 0)
 		goto error;
 
+#if defined(CONFIG_NFS_V4_1)
+	/*
+	 * Create the session and mark it expired.  When a SEQUENCE operation
+	 * encounters the expired session it will do session recovery to
+	 * initialize it.
+	 */
+	server->session = nfs4_alloc_session();
+	if (!server->session) {
+		error = NFSERR_RESOURCE;
+		goto error;
+	}
+#endif /* CONFIG_NFS_V4_1 */
+
 	/* set up the general RPC client */
 	error = nfs4_init_server(server, data);
 	if (error < 0)
@@ -1013,6 +1037,10 @@ struct nfs_server *nfs4_create_server(const struct nfs_parsed_mount_data *data,
 	return server;
 
 error:
+#if defined(CONFIG_NFS_V4_1)
+	if (server->session)
+		nfs4_put_session(&server->session);
+#endif /* CONFIG_NFS_V4_1 */
 	nfs_free_server(server);
 	dprintk("<-- nfs4_create_server() = error %d\n", error);
 	return ERR_PTR(error);

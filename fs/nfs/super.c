@@ -1770,6 +1770,13 @@ static void nfs4_kill_super(struct super_block *sb)
 	nfs_return_all_delegations(sb);
 	kill_anon_super(sb);
 
+#if defined(CONFIG_NFS_V4_1)
+	if (server->session) {
+		dprintk("%s Destroy session %p for superblock server %p\n",
+			__FUNCTION__, server->session, server);
+		nfs4_proc_destroy_session(server);
+	}
+#endif /* CONFIG_NFS_V4_1 */
 	nfs4_renewd_prepare_shutdown(server);
 	nfs_free_server(server);
 }

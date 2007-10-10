@@ -2,6 +2,9 @@
 #define _LINUX_NFS_XDR_H
 
 #include <linux/nfsacl.h>
+#ifdef CONFIG_NFS_V4_1
+#include <linux/nfs4_session.h>
+#endif
 
 /*
  * To change the maximum rsize and wsize supported by the NFS client, adjust
@@ -861,6 +864,22 @@ struct nfs41_exchange_id_res {
 	struct server_scope		server_scope;
 	struct nfs_impl_id4		impl_id;
 };
+
+struct nfs41_create_session_args {
+	struct nfs_client	       *client;
+	struct nfs4_session	       *session;
+	uint32_t			flags;
+	uint32_t			header_padding;
+	uint32_t			cb_program;
+	struct nfs4_channel_attrs	fc_attrs;	/* Fore Channel */
+	struct nfs4_channel_attrs	bc_attrs;	/* Back Channel */
+};
+
+struct nfs41_create_session_res {
+	struct nfs_client	       *client;
+	struct nfs4_session	       *session;
+};
+
 #endif /* CONFIG_NFS_V4_1 */
 
 struct nfs_page;
