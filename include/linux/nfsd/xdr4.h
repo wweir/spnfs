@@ -563,7 +563,8 @@ extern __be32 nfsd4_renew(struct svc_rqst *rqstp,
 #if defined(CONFIG_PNFSD)
 extern void nfsd4_devlist_free(struct nfsd4_pnfs_getdevlist *gdlp);
 
-extern __be32 filelayout_encode_devaddr(u32 *p, u32 *end, void *dev_addr);
+extern int filelayout_encode_devaddr(u32 *p, u32 *end, int, void *dev_addr);
+extern int filelayout_encode_devinfo(u32 *p, u32 *end, int, void *dev_addr);
 extern void filelayout_free_devaddr(void *devaddr);
 extern __be32 filelayout_encode_layout(u32 *p, u32 *end, void *layout);
 extern void filelayout_free_layout(void *layout);
