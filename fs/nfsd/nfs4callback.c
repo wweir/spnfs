@@ -384,9 +384,10 @@ encode_cb_compound41_hdr(struct xdr_stream *xdr,
 {
 	u32 *p;
 
-	RESERVE_SPACE(12);
+	RESERVE_SPACE(16);
 	WRITE32(0);             /* tag length is always 0 */
 	WRITE32(1);             /* minorversion */
+	WRITE32(hdr->ident);   /* callback_ident not used in 4.1 */
 	WRITE32(hdr->nops);
 	return 0;
 }
