@@ -374,6 +374,7 @@ struct nfsd4_exchange_id {
 };
 
 struct nfsd4_channel {
+	u32             headerpadsz;
         u32             maxreq_sz;
         u32             maxresp_sz;
         u32             maxresp_cached;
@@ -388,7 +389,6 @@ struct nfsd4_create_session {
 	nfs41_sessionid         sessionid;
 	u32                     seqid;
 	u32			flags;
-	u32                     header_padding;
 	struct nfsd4_channel    fore_channel;
 	struct nfsd4_channel    back_channel;
 	u32                     callback_prog;

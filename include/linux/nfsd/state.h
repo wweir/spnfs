@@ -118,6 +118,7 @@ struct nfs4_callback {
  * for both forward and back channels
  */
 struct nfs41_channel {
+	u32     ch_headerpad_sz;
 	u32     ch_maxreq_sz;
 	u32     ch_maxresp_sz;
 	u32     ch_maxresp_cached;
@@ -159,6 +160,7 @@ struct nfs41_session {
 	struct nfs41_slot       *se_slots;      /* forward channel slots */
 };
 
+#define se_fheaderpad_sz       se_forward.ch_headerpad_sz
 #define se_fmaxreq_sz          se_forward.ch_maxreq_sz
 #define se_fmaxresp_sz         se_forward.ch_maxresp_sz
 #define se_fmaxresp_cached     se_forward.ch_maxresp_cached

@@ -1036,36 +1036,19 @@ nfsd4_decode_create_session(struct nfsd4_compoundargs *argp, struct nfsd4_create
 {
 	DECODE_HEAD;
 
-	u32 dummy, len;
+	u32 dummy;
 	char *machine_name;
 	int i;
 	int nr_secflavs;
 
-	READ_BUF(20);
+	READ_BUF(16);
 	COPYMEM(&sess->clientid, 8);
 	READ32(sess->seqid);
 	READ32(sess->flags);
-	READ32(sess->header_padding);
-
-	/* conn_binding4args */
-	READ_BUF(4); /* cba_enforce */
-	READ32(dummy);
-	if (dummy) {
-		/* skip sec_oid4s */
-		dprintk("cba_enforce = 1 not supported! Skip OID\n");
-		READ_BUF(4);
-		READ32(dummy); /* number of sec_oid4 */
-		for (i = 0; i < dummy; i++) {
-			READ_BUF(4);
-			READ32(len); /* number of sec_oid4 */
-			dprintk("%s skip oid of len %d\n",__FUNCTION__,len);
-			READ_BUF(len);
-			p += XDR_QUADLEN(len);
-		}
-	}
 
 	/* Fore channel attrs */
-	READ_BUF(20);
+	READ_BUF(24);
+	READ32(sess->fore_channel.headerpadsz);
 	READ32(sess->fore_channel.maxreq_sz);
 	READ32(sess->fore_channel.maxresp_sz);
 	READ32(sess->fore_channel.maxresp_cached);
@@ -1082,7 +1065,8 @@ nfsd4_decode_create_session(struct nfsd4_compoundargs *argp, struct nfsd4_create
 	}
 
 	/* Back channel attrs */
-	READ_BUF(20);
+	READ_BUF(24);
+	READ32(sess->back_channel.headerpadsz);
 	READ32(sess->back_channel.maxreq_sz);
 	READ32(sess->back_channel.maxresp_sz);
 	READ32(sess->back_channel.maxresp_cached);
@@ -2894,15 +2878,14 @@ nfsd4_encode_create_session(struct nfsd4_compoundres *resp, int nfserr, struct n
 	ENCODE_HEAD;
 
 	if (!nfserr) {
-		RESERVE_SPACE(32);
+		RESERVE_SPACE(24);
 		WRITEMEM(sess->sessionid, sizeof(sess->sessionid));
 		WRITE32(sess->seqid);
 		WRITE32(sess->flags);
-		WRITE32(sess->header_padding);
-		WRITE32(0);
 		ADJUST_ARGS();
 
-		RESERVE_SPACE(20);
+		RESERVE_SPACE(24);
+		WRITE32(sess->fore_channel.headerpadsz);
 		WRITE32(sess->fore_channel.maxreq_sz);
 		WRITE32(sess->fore_channel.maxresp_sz);
 		WRITE32(sess->fore_channel.maxresp_cached);
@@ -2920,7 +2903,8 @@ nfsd4_encode_create_session(struct nfsd4_compoundres *resp, int nfserr, struct n
 			ADJUST_ARGS();
 		}
 
-		RESERVE_SPACE(20);
+		RESERVE_SPACE(24);
+		WRITE32(sess->back_channel.headerpadsz);
 		WRITE32(sess->back_channel.maxreq_sz);
 		WRITE32(sess->back_channel.maxresp_sz);
 		WRITE32(sess->back_channel.maxresp_cached);
