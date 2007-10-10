@@ -43,37 +43,87 @@
 #include <linux/nfsd/state.h>
 #include <linux/nfsd/xdr4.h>
 #include <linux/nfsd/nfs4layoutxdr.h>
+#include <linux/nfsd/nfsd4_pnfs.h>
 
 #define NFSDDBG_FACILITY	NFSDDBG_PNFS
 
 /* File layout export_operations->devaddr_encode()  */
-__be32
-filelayout_encode_devaddr(u32 *p, u32 *end, void *dev_addr)
+int
+filelayout_encode_devaddr(u32 *p, u32 *end, int count, void *devl)
 {
+	struct nfsd4_pnfs_devlist *fdev_list = devl;
 	struct pnfs_filelayout_devaddr *fdev;
-	int len;
+	int i, len;
 	u32 *p_in = p;
 
-	fdev = (struct pnfs_filelayout_devaddr *)dev_addr;
-	len = 6 + XDR_QUADLEN(fdev->r_netid.len) +
-	      XDR_QUADLEN(fdev->r_addr.len);
-	len = len << 2;
-	if (p + XDR_QUADLEN(len) > end)
-		return -ENOMEM;
-	WRITE32(len);
+	p++;   /* to be set later */
 
-	WRITE32(1);  /* 1 in indices list */
-	WRITE32(0);  /* index 0 */
-	WRITE32(1);  /* 1 DS per device id */
-	WRITE32(1);  /* 1 in list of multipath */
+	/* encode device list indices */
+	WRITE32(count);
 
-	WRITE32(fdev->r_netid.len);
-	WRITEMEM(fdev->r_netid.data, fdev->r_netid.len);
-	WRITE32(fdev->r_addr.len);
-	WRITEMEM(fdev->r_addr.data, fdev->r_addr.len);
-	return ((p - p_in) << 2);
+	for (i = 0; i < count; i++)
+		WRITE32(i);
+
+	/* encode device list */
+	WRITE32(count);
+
+	for (i = 0; i < count; i++) {
+		fdev = (struct pnfs_filelayout_devaddr *)fdev_list[i].dev_addr;
+
+		WRITE32(1); /* no multi path for now */
+		WRITE32(fdev->r_netid.len);
+		WRITEMEM(fdev->r_netid.data, fdev->r_netid.len);
+		WRITE32(fdev->r_addr.len);
+		WRITEMEM(fdev->r_addr.data, fdev->r_addr.len);
+		filelayout_free_devaddr(fdev);
+		kfree(fdev);
+	}
+
+	/* backfill in length -4 to not include length */
+	len = (p - p_in - 1) << 2;
+	*p_in = htonl(len);
+	len += 4;   /* for blob size */
+	printk("%s: count %d len %d\n", __FUNCTION__, count, len);
+
+	return len;
 }
 EXPORT_SYMBOL(filelayout_encode_devaddr);
+
+int
+filelayout_encode_devinfo(u32 *p, u32 *end, int count, void *fdevl)
+{
+	struct pnfs_filelayout_devaddr *fdev = fdevl;
+	int i, len;
+	u32 *p_in = p;
+
+	p++;   /* to be set later */
+
+	/* encode device list indices */
+	WRITE32(count);
+
+	for (i = 0; i < count; i++)
+		WRITE32(i);
+
+	/* encode device list */
+	WRITE32(count);
+
+	for (i = 0; i < count; i++) {
+		WRITE32(1); /* no multi path for now */
+		WRITE32(fdev[i].r_netid.len);
+		WRITEMEM(fdev[i].r_netid.data, fdev[i].r_netid.len);
+		WRITE32(fdev[i].r_addr.len);
+		WRITEMEM(fdev[i].r_addr.data, fdev[i].r_addr.len);
+	}
+
+	/* backfill in length */
+	len = (p - p_in) << 2;
+	*p_in = htonl(len);
+	len += 4;   /* for blob size */
+	printk("%s: count %d len %d\n", __FUNCTION__, count, len);
+
+	return len;
+}
+EXPORT_SYMBOL(filelayout_encode_devinfo);
 
 /* File layout export_operations->devaddr_free()  */
 void
@@ -101,7 +151,7 @@ filelayout_encode_layoutlist_item(u32 *p, u32 *end,
 		return -ENOMEM;
 	WRITE32(item->dev_id);
 	WRITE32(item->dev_util); /* nfl_util4 */
-	WRITE32(item->dev_index);
+	WRITE32(0); // FIXME:??? fix in the file system
 	WRITE32(1); /* One for now can be an array of FHs */
 	WRITE32(fhlen);
 	WRITEMEM(&item->dev_fh.fh_base, fhlen);
@@ -114,7 +164,7 @@ filelayout_encode_layout(u32 *p, u32 *end, void *layout)
 {
 	struct nfsd4_pnfs_filelayout *flp;
 	struct nfsd4_pnfs_layoutlist *item;
-	int i, full_len, len;
+	int full_len, len;
 	u32 *totlen;
 	u32 nfl_util;
 
@@ -134,18 +184,13 @@ filelayout_encode_layout(u32 *p, u32 *end, void *layout)
 	if (flp->lg_indexlen > 0) {   //??? if>0 must build index list
 		printk("filelayout_encode_layout: XXX add loop for index list\n");
 	}
-	WRITE32(flp->lg_llistlen);
-	for (i = 0; i < flp->lg_llistlen; i++) {
-		item = &flp->lg_llist[i];
-		item->dev_util = nfl_util;
-		len = filelayout_encode_layoutlist_item(p, end, item);
-		if (len > 0) {
-			p += XDR_QUADLEN(len);
-			full_len += len;
-		} else
-			break;
-	}
+	item = &flp->lg_llist[0];
+	item->dev_util = nfl_util;
+	len = filelayout_encode_layoutlist_item(p, end, item);
 	if (len > 0) {
+		p += XDR_QUADLEN(len);
+		full_len += len;
+
 		*totlen = htonl(full_len);
 		full_len += 4;
 	}
