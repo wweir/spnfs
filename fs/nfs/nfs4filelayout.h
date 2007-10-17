@@ -14,6 +14,7 @@
 
 #include <linux/nfs4_pnfs.h>
 #include <linux/nfs4_session.h>
+#include <linux/pnfs_xdr.h>
 
 #define NFS4_PNFS_DEV_HASH_BITS 5
 #define NFS4_PNFS_DEV_HASH (1 << NFS4_PNFS_DEV_HASH_BITS)
