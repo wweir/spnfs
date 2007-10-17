@@ -102,11 +102,13 @@ char *nfsd4_op_names[] = {
         OP(EXCHANGE_ID),
         OP(CREATE_SESSION),
         OP(DESTROY_SESSION),
+#if defined(CONFIG_PNFSD)
         OP(GETDEVICEINFO),
         OP(GETDEVICELIST),
         OP(LAYOUTCOMMIT),
         OP(LAYOUTGET),
         OP(LAYOUTRETURN),
+#endif /* CONFIG_PNFSD */
         OP(SEQUENCE),
 #endif /* CONFIG_NFSD_V4_1 */
 };
