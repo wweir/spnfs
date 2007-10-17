@@ -381,7 +381,7 @@ struct nfs4_file {
 	struct nfs4_fsid	fi_fsid;
 	u32			fi_fhlen;
 	u8			fi_fhval[NFS4_FHSIZE];
-#endif /* CONFIG_PNFS */
+#endif /* CONFIG_PNFSD */
 };
 
 #if defined(CONFIG_PNFSD)
