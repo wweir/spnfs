@@ -131,6 +131,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 	dprintk("nfsd: fh_verify(%s)\n", SVCFH_fmt(fhp));
 
 	if (!fhp->fh_dentry) {
+		int fsid_type;
 		struct fid *fid = NULL, sfid;
 		int fileid_type;
 		int data_left = fh->fh_size/4;
@@ -148,7 +149,13 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 			case 0: break;
 			default: goto out;
 			}
-			len = key_len(fh->fh_fsid_type) / 4;
+#if defined(CONFIG_PNFSD)
+			if  (fh->fh_fsid_type >= max_fsid_type) /* pNFS */
+				fsid_type = fh->fh_fsid_type - max_fsid_type;
+			else
+#endif /* CONFIG_PNFSD */
+				fsid_type = fh->fh_fsid_type;
+			len = key_len(fsid_type) / 4;
 			if (len == 0) goto out;
 			if  (fh->fh_fsid_type == FSID_MAJOR_MINOR) {
 				/* deprecated, convert to type 3 */
@@ -158,8 +165,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 				fh->fh_fsid[1] = fh->fh_fsid[2];
 			}
 			if ((data_left -= len)<0) goto out;
-			exp = rqst_exp_find(rqstp, fh->fh_fsid_type,
-					    fh->fh_auth);
+			exp = rqst_exp_find(rqstp, fsid_type, fh->fh_auth);
 			fid = (struct fid *)(fh->fh_auth + len);
 		} else {
 			__u32 tfh[2];
