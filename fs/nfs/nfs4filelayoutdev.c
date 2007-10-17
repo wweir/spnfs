@@ -34,6 +34,9 @@
  *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  *  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#ifdef CONFIG_PNFS
+
 #include <linux/completion.h>
 #include <linux/module.h>
 #include <linux/sched.h>
@@ -45,8 +48,6 @@
 #include <linux/nfs_xdr.h>
 
 #include <asm/div64.h>
-
-#ifdef CONFIG_PNFS
 
 #include <linux/pnfs_xdr.h>
 #include "nfs4filelayout.h"
@@ -205,7 +206,6 @@ nfs4_pnfs_device_add(struct filelayout_mount_type *mt,
 		     struct nfs4_pnfs_dev_item *dev)
 {
 	struct nfs4_pnfs_dev_item *tmp_dev;
-	int err;
 	struct nfs4_pnfs_dev_hlist *hlist = mt->hlist;
 
 	dprintk("nfs4_pnfs_device_add\n");
