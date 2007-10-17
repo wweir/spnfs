@@ -521,10 +521,7 @@ enum pnfs_iomode {
 	IOMODE_RW = 2,
 	IOMODE_ANY = 3,
 };
-#endif /* defined(CONFIG_PNFS) || defined(CONFIG_PNFSD) */
 
-/* pnfs client and file layout protocol definitions */
-#if defined(CONFIG_PNFS)
 #define NFL4_UFLG_MASK			0x0000003F
 #define NFL4_UFLG_DENSE			0x00000001
 #define NFL4_UFLG_COMMIT_THRU_MDS	0x00000002
@@ -537,7 +534,7 @@ enum filelayout_hint_care4 {
 	NFLH4_CARE_STRIPE_UNIT_SIZE	= 0x00000040,
 	NFLH4_CARE_STRIPE_COUNT		= 0x00000080
 };
-#endif /* CONFIG_PNFS */
+#endif /* defined(CONFIG_PNFS) || defined(CONFIG_PNFSD) */
 
 #endif
 #endif
