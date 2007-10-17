@@ -917,13 +917,41 @@ nfsd4_verify(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 
 #if defined(CONFIG_PNFSD)
 static __be32
+nfsd4_layout_verify(struct super_block *sb, unsigned int layout_type)
+{
+	int status;
+	int type = sb->s_export_op->layout_type();
+
+	/* check to see if pNFS  is supported. */
+	status = nfserr_layoutunavailable;
+	if (!sb->s_export_op->layout_type) {
+		printk(KERN_INFO "pNFS %s: Underlying file system "
+		       "does not support pNFS\n", __FUNCTION__);
+		goto out;
+	}
+
+	/* check to see if requested layout type is supported. */
+	status = nfserr_unknown_layouttype;
+	if (type != layout_type) {
+		printk(KERN_INFO "pNFS %s: requested layout type %d "
+		       "does not match suppored type %d\n",
+			__FUNCTION__, layout_type, type);
+		goto out;
+	}
+
+	status = nfs_ok;
+out:
+	return status;
+}
+
+static __be32
 nfsd4_getdevlist(struct svc_rqst *rqstp,
 		struct nfsd4_compound_state *cstate,
 		struct nfsd4_pnfs_getdevlist *gdlp)
 {
 	struct super_block *sb;
 	struct svc_fh *current_fh = &cstate->current_fh;
-	int status = 0;
+	int status;
 
 	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
 	if (status) {
@@ -936,29 +964,30 @@ nfsd4_getdevlist(struct svc_rqst *rqstp,
 	if (!sb)
 		goto out;
 
-	/* check to see if requested layout type is supported. */
-	status = nfserr_unknown_layouttype;
-	if (!sb->s_export_op->layout_type ||
-	    sb->s_export_op->layout_type() != gdlp->gd_type) {
-		printk("pNFS %s: requested layout type %d "
-		       "does not match suppored type %d\n",
-			__FUNCTION__, gdlp->gd_type,
-			sb->s_export_op->layout_type());
+	/* Ensure underlying file system supports pNFS and,
+	 * if so, the requested layout type
+	 */
+	status = nfsd4_layout_verify(sb, gdlp->gd_type);
+	if (status)
 		goto out;
-	}
+
+	/* Do nothing if underlying file system does not support
+	 * getdevicelist */
+	status = nfs_ok;
+	if (!sb->s_export_op->get_devicelist)
+		goto out;
 
 	/* set the layouttype for encoding the devaddr */
 	gdlp->gd_ops = sb->s_export_op;
 
 	/* device list is allocated by underlying file system, and free'd
 	 * via export_ops callback. */
-	if (sb->s_export_op->get_devicelist) {
-		status = sb->s_export_op->get_devicelist(sb, (void *)gdlp);
+	status = sb->s_export_op->get_devicelist(sb, (void *)gdlp);
 
-		dprintk("%s: status %d type %d maxcount %d len %d\n",
-			__FUNCTION__, status, gdlp->gd_type, gdlp->gd_maxcount,
-			gdlp->gd_devlist_len);
-	}
+	dprintk("%s: status %d type %d maxcount %d len %d\n",
+		__FUNCTION__, status, gdlp->gd_type, gdlp->gd_maxcount,
+		gdlp->gd_devlist_len);
+
 	if (gdlp->gd_devlist_len < 0)
 		status = nfserr_inval;
 out:
@@ -973,7 +1002,7 @@ nfsd4_layoutget(struct svc_rqst *rqstp,
 		struct nfsd4_compound_state *cstate,
 		struct nfsd4_pnfs_layoutget *lgp)
 {
-	int status = 0;
+	int status;
 	struct super_block *sb;
 	struct current_session *current_ses = cstate->current_ses;
 	struct svc_fh *current_fh = &cstate->current_fh;
@@ -989,21 +1018,18 @@ nfsd4_layoutget(struct svc_rqst *rqstp,
 	if (!sb)
 		goto out;
 
-	/* check to see if requested layout type is supported. */
-	status = nfserr_unknown_layouttype;
-	if (!sb->s_export_op->layout_type ||
-	    sb->s_export_op->layout_type() != lgp->lg_seg.layout_type) {
-		printk("pNFS %s: requested layout type %d "
-		       "does not match suppored type %d\n",
-			__FUNCTION__, lgp->lg_seg.layout_type,
-			sb->s_export_op->layout_type());
+	/* Ensure underlying file system supports pNFS and,
+	 * if so, the requested layout type
+	 */
+	status = nfsd4_layout_verify(sb, lgp->lg_seg.layout_type);
+	if (status)
 		goto out;
-	}
 
+	/* check to see if pNFS is supported. */
 	status = nfserr_layoutunavailable;
 	if (!sb->s_export_op->layout_get) {
-		dprintk("pNFS %s: layout_get not implemented for layout "
-			"type %d\n", __FUNCTION__, lgp->lg_seg.layout_type);
+		printk(KERN_INFO "pNFS %s: Underlying file system "
+		       "does not support layout_get\n", __FUNCTION__);
 		goto out;
 	}
 
@@ -1051,7 +1077,22 @@ nfsd4_layoutcommit(struct svc_rqst *rqstp,
 		goto out;
 	}
 
+	status = nfserr_inval;
 	ino = current_fh->fh_dentry->d_inode;
+	if (!ino)
+		goto out;
+
+	status = nfserr_inval;
+	sb = ino->i_sb;
+	if (!sb)
+		goto out;
+
+	/* Ensure underlying file system supports pNFS and,
+	 * if so, the requested layout type
+	 */
+	status = nfsd4_layout_verify(sb, lcp->lc_seg.layout_type);
+	if (status)
+		goto out;
 
 	/* This will only extend the file length.  Do a quick
 	 * check to see if there is any point in waiting for the update
@@ -1076,7 +1117,6 @@ nfsd4_layoutcommit(struct svc_rqst *rqstp,
 	dprintk("%s: Modifying file size\n", __FUNCTION__);
 	ia.ia_valid = ATTR_SIZE;
 	ia.ia_size = lcp->lc_last_wr + 1;
-	sb = current_fh->fh_dentry->d_inode->i_sb;
 	if (sb->s_export_op->layout_commit) {
 		status = sb->s_export_op->layout_commit(ino, lcp);
 		dprintk("%s:layout_commit result %d\n", __FUNCTION__, status);
@@ -1106,7 +1146,7 @@ nfsd4_layoutreturn(struct svc_rqst *rqstp,
 		struct nfsd4_compound_state *cstate,
 		struct nfsd4_pnfs_layoutreturn *lrp)
 {
-	int status = 0;
+	int status;
 	struct super_block *sb;
 	struct current_session *current_ses = cstate->current_ses;
 	struct svc_fh *current_fh = &cstate->current_fh;
@@ -1122,16 +1162,13 @@ nfsd4_layoutreturn(struct svc_rqst *rqstp,
 	if (!sb)
 		goto out;
 
-	/* check to see if requested layout type is supported. */
-	status = nfserr_unknown_layouttype;
-	if (!sb->s_export_op->layout_type ||
-	    sb->s_export_op->layout_type() != lrp->lr_seg.layout_type) {
-		printk("pNFS %s: requested layout type %d "
-		       "does not match suppored type %d\n",
-			__FUNCTION__, lrp->lr_seg.layout_type,
-			sb->s_export_op->layout_type());
+	/* Ensure underlying file system supports pNFS and,
+	 * if so, the requested layout type
+	 */
+	status = nfsd4_layout_verify(sb, lrp->lr_seg.layout_type);
+	if (status)
 		goto out;
-	}
+
 	status = nfserr_inval;
 	if (lrp->lr_return_type != RETURN_FILE &&
 	    lrp->lr_return_type != RETURN_FSID &&
@@ -1182,28 +1219,26 @@ nfsd4_getdevinfo(struct svc_rqst *rqstp,
 	if (!sb)
 		goto out;
 
-	/* check to see if requested layout type is supported. */
-	status = nfserr_unknown_layouttype;
-	if (!sb->s_export_op->layout_type ||
-	    sb->s_export_op->layout_type() != gdp->gd_type) {
-		printk("pNFS %s: requested layout type %d "
-		       "does not match suppored type %d\n",
-			__FUNCTION__, gdp->gd_type,
-			sb->s_export_op->layout_type());
+	/* Ensure underlying file system supports pNFS and,
+	 * if so, the requested layout type
+	 */
+	status = nfsd4_layout_verify(sb, gdp->gd_type);
+	if (status)
 		goto out;
-	}
+
+	/* Do nothing if underlying file system does not support
+	 * getdeviceinfo */
+	status = nfs_ok;
+	if (!sb->s_export_op->get_deviceinfo)
+		goto out;
 
 	/* set the ops for encoding the devaddr */
 	gdp->gd_ops = sb->s_export_op;
 
-	if (sb && sb->s_export_op->get_deviceinfo) {
-		status = sb->s_export_op->get_deviceinfo(sb, (void *)gdp);
+	status = sb->s_export_op->get_deviceinfo(sb, (void *)gdp);
 
-		dprintk("%s: status %d type %d dev_id %d\n",
-			__FUNCTION__, status, gdp->gd_type, gdp->gd_dev_id);
-		goto out;
-	}
-	printk("%s:  failed, no support\n", __FUNCTION__);
+	dprintk("%s: status %d type %d dev_id %d\n",
+		__FUNCTION__, status, gdp->gd_type, gdp->gd_dev_id);
 out:
 	return status;
 }
