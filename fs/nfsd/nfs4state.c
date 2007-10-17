@@ -1510,14 +1510,14 @@ alloc_init_file(struct inode *ino, struct svc_fh *current_fh)
 		fp->fi_inode = igrab(ino);
 		fp->fi_id = current_fileid++;
 		fp->fi_had_conflict = false;
-#ifdef CONFIG_PNFS
+#if defined(CONFIG_PNFSD)
 		fp->fi_fsid.major = current_fh->fh_export->ex_fsid;
 		fp->fi_fsid.minor = 0;
 		fp->fi_fhlen = current_fh->fh_handle.fh_size;
 		BUG_ON(fp->fi_fhlen > sizeof(fp->fi_fhval));
 		memcpy(fp->fi_fhval, &current_fh->fh_handle.fh_base,
 		       fp->fi_fhlen);
-#endif /* CONFIG_PNFS */
+#endif /* CONFIG_PNFSD */
 		return fp;
 	}
 	return NULL;
