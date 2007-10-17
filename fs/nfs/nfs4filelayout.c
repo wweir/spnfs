@@ -35,6 +35,9 @@
  *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  *  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#ifdef CONFIG_PNFS
+
 #include <linux/module.h>
 #include <linux/init.h>
 
@@ -52,8 +55,6 @@
 
 #include "nfs4filelayout.h"
 #include "nfs4_fs.h"
-
-#ifdef CONFIG_PNFS
 
 #define NFSDBG_FACILITY         NFSDBG_FILELAYOUT
 
