@@ -12,7 +12,7 @@
 #ifndef LINUX_NFS4_PNFS_H
 #define LINUX_NFS4_PNFS_H
 
-#if defined(CONFIG_PNFS) || defined(CONFIG_PNFSD)
+#if defined(CONFIG_PNFS)
 
 #define NFS4_PNFS_DEV_MAXCOUNT 16
 #define NFS4_PNFS_DEV_MAXSIZE 128
@@ -172,6 +172,6 @@ extern void pnfs_unregister_layoutdriver(struct pnfs_layoutdriver_type *);
 #define NFS4_PNFS_MAX_LAYOUTS 4
 #define NFS4_PNFS_PRIVATE_LAYOUT 0x80000000
 
-#endif /* defined(CONFIG_PNFS) || defined(CONFIG_PNFSD) */
+#endif /* CONFIG_PNFS */
 
 #endif /* LINUX_NFS4_PNFS_H */
