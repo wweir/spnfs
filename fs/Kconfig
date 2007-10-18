@@ -1637,6 +1637,19 @@ config NFS_V4
 
 	  If unsure, say N.
 
+config NFS_V4_1
+	bool "Provide NFSv4.1 client support (EXPERIMENTAL)"
+	depends on NFS_V4
+	select RPCSEC_GSS_KRB5
+	help
+	  Say Y here if you want your NFS client to be able to speak the newer
+	  version 4.1 of the NFS protocol.
+
+	  Note: Requires auxiliary userspace daemons which may be found on
+		http://www.citi.umich.edu/projects/nfsv4/
+
+	  If unsure, say N.
+
 config NFS_DIRECTIO
 	bool "Allow direct I/O on NFS files"
 	depends on NFS_FS
