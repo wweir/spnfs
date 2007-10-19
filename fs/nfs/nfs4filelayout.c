@@ -179,7 +179,7 @@ filelayout_get_dserver_offset(loff_t offset, struct nfs4_filelayout *layout)
 		loff_t tmp;
 		u32 stripe_unit_idx;
 
-		stripe_size = layout->stripe_unit * layout->num_devs;
+		stripe_size = layout->stripe_unit * layout->num_fh;
 		/* XXX I do this because do_div seems to take a 32 bit dividend */
 		stripe_unit = layout->stripe_unit;
 		tmp = off = offset;
@@ -341,6 +341,7 @@ ssize_t filelayout_write_pagelist(
 	struct nfs4_filelayout *nfslay =
 		(struct nfs4_filelayout *)layoutid->layoutid;
 	struct nfs4_pnfs_dserver dserver;
+	struct nfs4_pnfs_ds *ds;
 	struct nfs_page *req;
 	struct list_head *h;
 	int status;
@@ -351,19 +352,24 @@ ssize_t filelayout_write_pagelist(
 					offset,
 					count,
 					&dserver);
-	/* ANDROS: XXX should fail if no data server */
-	if (!status) {
-		struct nfs4_pnfs_ds *ds = dserver.dev->ds_list[0];
-
+	if (status) {
+		dprintk("NFS_FILELAYOUT: %s failed to get dataserver\n",
+			__func__);
+		return -EIO;
+	} else {
 		/* just try the first data server for the index.. */
+		ds = dserver.dev->ds_list[0];
 		data->pnfs_client = ds->ds_clp->cl_rpcclient;
 		data->session = ds->ds_clp->cl_ds_session;
 		data->args.fh = dserver.fh;
 	}
-	dprintk("%s set wb_devid %d\n", __func__, dserver.dev_id);
+	dprintk("%s set wb_devip: wb_devport %x:%hu\n", __func__,
+		htonl(ds->ds_ip_addr), ntohs(ds->ds_port));
+
 	list_for_each(h, &data->pages) {
 		req = list_entry(h, struct nfs_page, wb_list);
-		req->wb_devid = dserver.dev_id;
+		req->wb_devip = ds->ds_ip_addr;
+		req->wb_devport = ds->ds_port;
 	}
 
 	/* Now get the file offset on the dserver
@@ -449,33 +455,29 @@ filelayout_set_layout(struct pnfs_layout_type *layoutid, struct inode *inode,
 	if (!fl)
 		goto nfserr;
 
-	if (fl->index_len > 0) /* FIXME: ??? if>0 must build index list */
-		printk("filelayout_set_layout: XXX add loop for index list\n");
-	READ32(fl->num_devs);
+	READ32(fl->dev_id);
+	READ32(nfl_util);
+	if (nfl_util & NFL4_UFLG_COMMIT_THRU_MDS)
+		fl->commit_through_mds = 1;
+	if (nfl_util & NFL4_UFLG_DENSE)
+		fl->stripe_type = STRIPE_DENSE;
+	else
+		fl->stripe_type = STRIPE_SPARSE;
+	fl->stripe_unit = nfl_util & ~NFL4_UFLG_MASK;
 
-	dprintk("DEBUG: %s: devs %d\n", __func__, fl->num_devs);
+	READ32(fl->first_stripe_index);
+	READ32(fl->num_fh);
 
-	for (i = 0; i < fl->num_devs; i++) {
-		READ32(fl->devs[i].dev_id);
-		READ32(nfl_util);
-		READ32(fl->devs[i].dev_index);
-		READ32(fl->index_len);
+	dprintk("DEBUG: %s: dev_id %u nfl_util 0x%X num_fh %u\n", __func__,
+				fl->dev_id, nfl_util, fl->num_fh);
 
-		if (nfl_util & NFL4_UFLG_COMMIT_THRU_MDS)
-			fl->commit_through_mds = 1;
-		if (nfl_util & NFL4_UFLG_DENSE)
-			fl->stripe_type = STRIPE_DENSE;
-		else
-			fl->stripe_type = STRIPE_SPARSE;
-		fl->stripe_unit = nfl_util & ~NFL4_UFLG_MASK;
-
-
+	for (i = 0; i < fl->num_fh; i++) {
 		/* fh */
-		memset(&fl->devs[i].fh, 0, sizeof(struct nfs_fh));
-		READ32(fl->devs[i].fh.size);
-		COPYMEM(fl->devs[i].fh.data, fl->devs[i].fh.size);
-		dprintk("DEBUG: %s: dev %d len %d nfl_util 0x%X\n", __func__,
-			fl->devs[i].dev_id, fl->devs[i].fh.size, nfl_util);
+		memset(&fl->fh_array[i], 0, sizeof(struct nfs_fh));
+		READ32(fl->fh_array[i].size);
+		COPYMEM(fl->fh_array[i].data, fl->fh_array[i].size);
+		dprintk("DEBUG: %s: fh len %d\n", __func__,
+					fl->fh_array[i].size);
 	}
 
 	return layoutid;
@@ -495,12 +497,13 @@ filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino,
 	struct nfs_write_data   *dsdata = NULL;
 	struct pnfs_layout_type *laytype;
 	struct nfs4_filelayout *nfslay;
+	struct nfs4_pnfs_dev_item *dev;
+	struct nfs4_pnfs_dev *fdev;
 	struct nfs4_pnfs_dserver dserver;
 	struct nfs4_pnfs_ds *ds;
 	struct nfs_page *first;
 	struct nfs_page *req;
 	struct list_head *pos, *tmp;
-	u32 dev_id;
 	int i;
 
 	laytype = NFS_I(ino)->current_layout;
@@ -513,26 +516,30 @@ filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino,
 		dprintk("%s data %p commit through mds\n", __func__, data);
 		return 1;
 	}
-	for (i = 0; i < nfslay->num_devs; i++) {
-		dev_id = nfslay->devs[i].dev_id;
+	dev = nfs4_pnfs_device_item_get(layoutid, nfslay->dev_id);
+	fdev = &dev->stripe_devs[0];
+
+	for (i = 0; i < nfslay->num_fh; i++) {
+		/* just try the first data server for the index..*/
+		ds = fdev->ds_list[0];
+
 		if (!dsdata) {
 			unsigned int pgcnt = 0;
 
 			list_for_each_safe(pos, tmp, &data->pages) {
 				req = nfs_list_entry(pos);
-				if (req->wb_devid == dev_id)
+				if (req->wb_devip == ds->ds_ip_addr &&
+				    req->wb_devport == ds->ds_port)
 					pgcnt++;
 			}
 			dsdata = nfs_commit_alloc();
 		}
 		if (!dsdata)
 			goto out_bad;
-		dserver.dev = nfs4_pnfs_device_get(ino, dev_id);
-		if (dserver.dev == NULL)
-			return 1;
 		list_for_each_safe(pos, tmp, &data->pages) {
 			req = nfs_list_entry(pos);
-			if (req->wb_devid == dev_id) {
+			if (req->wb_devip == ds->ds_ip_addr &&
+			    req->wb_devport == ds->ds_port) {
 				nfs_list_remove_request(req);
 				nfs_list_add_request(req, &dsdata->pages);
 			}
@@ -540,7 +547,7 @@ filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino,
 		if (list_empty(&dsdata->pages)) {
 			if (list_empty(&data->pages)) {
 				dprintk("%s exit i %d devid %d\n",
-						__func__, i, dev_id);
+					__func__, i, nfslay->dev_id);
 				nfs_commit_free(dsdata);
 				return 0;
 			} else
@@ -549,21 +556,21 @@ filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino,
 		first = nfs_list_entry(dsdata->pages.next);
 
 		dprintk("%s call nfs_commit_rpcsetup i %d devid %d\n",
-						__func__, i, dev_id);
+			__func__, i, nfslay->dev_id);
 
-		/* just try the first data server for the index.. */
-		ds = dserver.dev->ds_list[0];
 		dsdata->pnfs_client = ds->ds_clp->cl_rpcclient;
 		dsdata->session =  ds->ds_clp->cl_ds_session;
+		dserver.dev = fdev;
 
 		/* TODO: Is the FH different from NFS_FH(data->inode)?
 		 * (set in nfs_commit_rpcsetup)
 		 */
-		dserver.fh = &nfslay->devs[i].fh;
+		dserver.fh = &nfslay->fh_array[i];
 		dsdata->args.fh = dserver.fh;
 
 		nfs_initiate_commit(dsdata, dsdata->pnfs_client, sync);
 		dsdata = NULL;
+		fdev++;
 	}
 
 	/* Release original commit data since it is not used */
