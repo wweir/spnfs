@@ -204,6 +204,7 @@ void nfs_put_client(struct nfs_client *clp)
 		nfs_free_client(clp);
 	}
 }
+EXPORT_SYMBOL(nfs_put_client);
 
 /*
  * Find a client by address
@@ -977,14 +978,14 @@ static int nfs4_init_server(struct nfs_server *server,
 /*
  * Allocate and initialize a session if required
  */
-int nfs4_init_session(struct nfs_server *server)
+int nfs4_init_session(struct nfs_client *clp, struct nfs4_session **spp,
+		      struct rpc_clnt *clnt)
 {
 	int error = 0;
 
 #if defined(CONFIG_NFS_V4_1)
-	struct nfs_client *clp;
+	struct nfs4_session *session;
 
-	clp = server->nfs_client;
 	switch (clp->cl_minorversion) {
 	case 1:
 		/*
@@ -992,22 +993,24 @@ int nfs4_init_session(struct nfs_server *server)
 		 * When a SEQUENCE operation encounters the expired session
 		 * it will do session recovery to initialize it.
 		 */
-		server->session = nfs4_alloc_session();
-		if (!server->session)
+		session = nfs4_alloc_session();
+		if (!session)
 			error = NFSERR_RESOURCE;
 		else {
-			server->session->clnt = server->client;
-			rpc_init_wait_queue(&server->session->recovery_waitq,
+			session->clnt = clnt;
+			rpc_init_wait_queue(&session->recovery_waitq,
 				"Session recovery wait queue");
 		}
+		*spp = session;
 		break;
 	case 0:
-		server->session = NULL;
+		session = NULL;
 		break;
 	}
 #endif /* CONFIG_NFS_V4_1 */
 	return error;
 }
+EXPORT_SYMBOL(nfs4_init_session);
 
 /*
  * Create a version 4 volume record
@@ -1046,7 +1049,8 @@ struct nfs_server *nfs4_create_server(const struct nfs_parsed_mount_data *data,
 	BUG_ON(!server->nfs_client->rpc_ops);
 	BUG_ON(!server->nfs_client->rpc_ops->file_inode_ops);
 
-	error = nfs4_init_session(server);
+	error = nfs4_init_session(server->nfs_client, &server->session,
+				  server->client);
 	if (error)
 		goto error;
 
