@@ -6,9 +6,11 @@
 
 #ifdef CONFIG_NFS_V4_1
 #include <linux/nfs4_session.h>
+struct nfs4_session;	/* NFSv4.1 session */
 #endif
 
 struct nfs_iostats;
+
 
 /*
  * The nfs_client identifies our client state to the server.
@@ -77,6 +79,9 @@ struct nfs_client {
 	/* The flags used for obtaining the clientid during EXCHANGE_ID */
 	u32			cl_exchange_flags;
 #endif
+#ifdef CONFIG_PNFS
+	struct nfs4_session *	cl_ds_session; /* pNFS data server session */
+#endif /* CONFIG_PNFS */
 };
 
 /*
