@@ -72,12 +72,6 @@ struct nfs4_pnfs_dserver {
 	u32 dev_id;
 };
 
-struct nfs4_filelayout_devs {
-	u32 dev_id;
-	u32 dev_index;
-	struct nfs_fh fh;
-};
-
 struct nfs4_filelayout {
 	int uncommitted_write;
 	loff_t last_commit_size;
@@ -88,9 +82,10 @@ struct nfs4_filelayout {
 	u32 stripe_type;
 	u32 commit_through_mds;
 	u64 stripe_unit;
-	unsigned int index_len;
-	unsigned int num_devs;
-	struct nfs4_filelayout_devs devs[NFS4_PNFS_MAX_STRIPE_CNT];
+	u32 first_stripe_index;
+	u32 dev_id;
+	unsigned int num_fh;
+	struct nfs_fh fh_array[NFS4_PNFS_MAX_STRIPE_CNT];
 };
 
 struct filelayout_mount_type {
@@ -110,8 +105,11 @@ int nfs4_pnfs_dserver_get(struct inode *inode,
 			  struct nfs4_pnfs_dserver *dserver);
 int decode_and_add_devicelist(struct filelayout_mount_type *mt, struct pnfs_devicelist *devlist);
 
+struct nfs4_pnfs_dev *
+nfs4_pnfs_device_get(struct inode *inode, u32 dev_id, u32 stripe_index);
 struct nfs4_pnfs_dev_item *
-nfs4_pnfs_device_get(struct inode *inode, u32 dev_id);
+nfs4_pnfs_device_item_get(struct pnfs_layout_type *ltype, u32 dev_id);
+
 
 #define READ32(x)         (x) = ntohl(*p++)
 #define READ64(x)         do {			\
