@@ -1795,6 +1795,7 @@ error_splat_super:
 static void nfs4_kill_super(struct super_block *sb)
 {
 	struct nfs_server *server = NFS_SB(sb);
+	struct rpc_clnt *clnt = server->nfs_client->cl_rpcclient;
 
 	dprintk("--> %s\n", __FUNCTION__);
 	nfs_return_all_delegations(sb);
@@ -1806,7 +1807,7 @@ static void nfs4_kill_super(struct super_block *sb)
 		if (server->session) {
 			dprintk("%s Destroy session %p for nfs_server %p\n",
 				__FUNCTION__, server->session, server);
-			nfs4_proc_destroy_session(server);
+			nfs4_proc_destroy_session(server->session, clnt);
 		}
 		break;
 	default:
