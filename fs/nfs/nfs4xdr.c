@@ -1041,6 +1041,14 @@ static int encode_fsinfo(struct xdr_stream *xdr, const u32* bitmask)
 			bitmask[1] & nfs4_fsinfo_bitmap[1]);
 }
 
+#ifdef CONFIG_PNFS
+static int encode_pnfs_fsinfo(struct xdr_stream *xdr, const u32 *bitmask)
+{
+	return encode_getattr_two(xdr, bitmask[0] & nfs4_fsinfo_bitmap[0],
+			bitmask[1] & nfs4_pnfs_fsinfo_bitmap[1]);
+}
+#endif /* CONFIG_PNFS */
+
 static int encode_fs_locations(struct xdr_stream *xdr, const u32* bitmask)
 {
 	return encode_getattr_two(xdr,
@@ -2924,6 +2932,19 @@ static int nfs4_xdr_enc_fsinfo(struct xdr_stream *xdr, struct nfs4_fsinfo_arg *a
 	return status;
 }
 
+#ifdef CONFIG_PNFS
+static int nfs4_xdr_enc_pnfs_fsinfo(struct xdr_stream *xdr,
+				    struct nfs4_fsinfo_arg *args)
+{
+	int status;
+
+	status = encode_putfh(xdr, args->fh);
+	if (!status)
+		status = encode_pnfs_fsinfo(xdr, args->bitmask);
+	return status;
+}
+#endif /* CONFIG_PNFS */
+
 static int nfs40_xdr_enc_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs4_fsinfo_arg *args)
 {
 	struct xdr_stream xdr;
@@ -2950,7 +2971,11 @@ static int nfs41_xdr_enc_fsinfo(struct rpc_rqst *req, __be32 *p,
 	encode_compound_hdr(&xdr, &hdr, 1);
 	encode_sequence(&xdr, &args->seq_args);
 
+#ifdef CONFIG_PNFS
+	return nfs4_xdr_enc_pnfs_fsinfo(&xdr, args);
+#else
 	return nfs4_xdr_enc_fsinfo(&xdr, args);
+#endif /* CONFIG_PNFS */
 }
 #endif /* CONFIG_NFS_V4_1 */
 
