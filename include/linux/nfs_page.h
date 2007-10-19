@@ -45,7 +45,8 @@ struct nfs_page {
 	unsigned long		wb_flags;
 	struct nfs_writeverf	wb_verf;	/* Commit cookie */
 #ifdef CONFIG_PNFS
-	unsigned int		wb_devid;	/* pNFS data server id */
+	unsigned int		wb_devip;	/* pNFS data server IP addr */
+	unsigned int		wb_devport;	/* pNFS data server port */
 #endif
 };
 

@@ -575,29 +575,41 @@ get_device_info(struct filelayout_mount_type *mt, u32 dev_id)
 	return decode_and_add_device(mt, pdev);
 }
 
-/* Lookup and return the device dev_id
- */
 struct nfs4_pnfs_dev_item *
-nfs4_pnfs_device_get(struct inode *inode, u32 dev_id)
+nfs4_pnfs_device_item_get(struct pnfs_layout_type *ltype, u32 dev_id)
+{
+	struct filelayout_mount_type *mt;
+	struct nfs4_pnfs_dev_item *dev;
+
+	mt = (struct filelayout_mount_type *)ltype->mountid->mountid;
+
+	read_lock(&mt->hlist->dev_lock);
+	dev = _device_lookup(mt->hlist, dev_id);
+	read_unlock(&mt->hlist->dev_lock);
+
+	if (dev == NULL)
+		dev = get_device_info(mt, dev_id);
+	return dev;
+}
+
+/* Lookup and return the data server struct
+ */
+struct nfs4_pnfs_dev *
+nfs4_pnfs_device_get(struct inode *inode, u32 dev_id, u32 stripe_idx)
 {
 	struct nfs4_pnfs_dev_item *dev;
 	struct nfs_server *server = NFS_SERVER(inode);
-	struct filelayout_mount_type *mt =
-		(struct filelayout_mount_type *)server->pnfs_mountid->mountid;
-	struct nfs4_pnfs_dev_hlist *hlist = mt->hlist;
+	struct filelayout_mount_type *mt;
 
-	read_lock(&hlist->dev_lock);
-	dev = _device_lookup(hlist, dev_id);
-/*
-	if (dev) {
-		atomic_inc(&dev->count);
-	}
-*/
-	read_unlock(&hlist->dev_lock);
+	mt = (struct filelayout_mount_type *)server->pnfs_mountid->mountid;
+
+	read_lock(&mt->hlist->dev_lock);
+	dev = _device_lookup(mt->hlist, dev_id);
+	read_unlock(&mt->hlist->dev_lock);
 	if (dev == NULL)
 		dev = get_device_info(mt, dev_id);
 
-	return dev;
+	return &dev->stripe_devs[stripe_idx];
 }
 
 /* Retrieve the rpc client for a specified byte range
@@ -610,7 +622,6 @@ nfs4_pnfs_dserver_get(struct inode *inode,
 		      u32 count,
 		      struct nfs4_pnfs_dserver *dserver)
 {
-	u32 dev_id;
 	u64 tmp;
 	u32 stripe_idx, dbg_stripe_idx;
 
@@ -620,32 +631,29 @@ nfs4_pnfs_dserver_get(struct inode *inode,
 	tmp = offset;
 	/* Want ((offset / layout->stripe_unit) % layout->num_devs) */
 	do_div(tmp, layout->stripe_unit);
-	stripe_idx = do_div(tmp, layout->num_devs);
+	stripe_idx = do_div(tmp, layout->num_fh) + layout->first_stripe_index;
 
 	/* For debugging */
 	tmp = offset + count - 1;
 	do_div(tmp, layout->stripe_unit);
-	dbg_stripe_idx = do_div(tmp, layout->num_devs);
+	dbg_stripe_idx = do_div(tmp, layout->num_fh) +
+				layout->first_stripe_index;
 
 	dprintk("%s: offset=%Lu, count=%u, si=%u, dsi=%u, "
 		   "num_devs=%u, stripe_unit=%Lu\n",
 		   __func__,
-		   offset, count, stripe_idx, dbg_stripe_idx, layout->num_devs,
+		   offset, count, stripe_idx, dbg_stripe_idx, layout->num_fh,
 		   layout->stripe_unit);
 
 	BUG_ON(dbg_stripe_idx != stripe_idx);
 
-	dev_id = layout->devs[stripe_idx].dev_id;
-
-	/* NOTE: resolved in following patch.
-	 *dserver->dev = nfs4_pnfs_device_get(inode, dev_id); */
-
+	dserver->dev = nfs4_pnfs_device_get(inode, layout->dev_id, stripe_idx);
 	if (dserver->dev == NULL)
 		return 1;
-	dserver->fh = &layout->devs[stripe_idx].fh;
+	dserver->fh = &layout->fh_array[stripe_idx];
 
 	dprintk("%s: dev_id=%u, idx=%u, offset=%Lu, count=%u\n",
-		__func__, dev_id, stripe_idx, offset, count);
+		__func__, layout->dev_id, stripe_idx, offset, count);
 
 	return 0;
 }
