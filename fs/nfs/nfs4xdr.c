@@ -241,7 +241,8 @@ static int nr_sequence_quads;
 				(encode_getattr_maxsz)
 #define decode_fs_locations_maxsz \
 				(0)
-#ifdef CONFIG_NFS_V4_1
+
+#if defined(CONFIG_NFS_V4_1)
 #define encode_exchange_id_maxsz (op_encode_hdr_maxsz + \
 				4 /*server->ip_addr*/ + \
 				1 /*netid*/ + \
@@ -260,8 +261,10 @@ static int nr_sequence_quads;
 					3 + 7 + 7)
 #define encode_destroy_session_maxsz    (op_encode_hdr_maxsz + 4)
 #define decode_destroy_session_maxsz    (op_decode_hdr_maxsz)
-#define encode_sequence_maxsz	(op_encode_hdr_maxsz + 4 + 1 + 1 + 1 + 1)
-#define decode_sequence_maxsz	(op_decode_hdr_maxsz + 4 + 1 + 1 + 1 + 1 + 1)
+#define encode_sequence_maxsz	(op_encode_hdr_maxsz + \
+				XDR_QUADLEN(SESSIONID_SIZE) + 4)
+#define decode_sequence_maxsz	(op_decode_hdr_maxsz + \
+				XDR_QUADLEN(SESSIONID_SIZE) + 5)
 #endif /* CONFIG_NFS_V4_1 */
 
 #define NFS40_enc_compound_sz	(1024)  /* XXX: large enough? */
@@ -545,7 +548,7 @@ static int nr_sequence_quads;
 				 decode_putfh_maxsz + \
 				 decode_lookup_maxsz + \
 				 decode_fs_locations_maxsz)
-#ifdef CONFIG_NFS_V4_1
+#if defined(CONFIG_NFS_V4_1)
 #define NFS41_enc_exchange_id_sz \
 				(compound_encode_hdr_maxsz + \
 				 encode_exchange_id_maxsz)
@@ -562,6 +565,10 @@ static int nr_sequence_quads;
 					encode_destroy_session_maxsz)
 #define NFS41_dec_destroy_session_sz    (compound_decode_hdr_maxsz + \
 					decode_destroy_session_maxsz)
+#define NFS41_enc_access_sz	(NFS40_enc_access_sz + \
+				 encode_sequence_maxsz)
+#define NFS41_dec_access_sz	(NFS40_dec_access_sz + \
+				 decode_sequence_maxsz)
 #endif /* CONFIG_NFS_V4_1 */
 
 static struct {
@@ -1561,6 +1568,22 @@ static int nfs40_xdr_enc_access(struct rpc_rqst *req, __be32 *p, const struct nf
 	encode_compound_hdr(&xdr, &hdr, 0);
 	return nfs4_xdr_enc_access(&xdr, args); 
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_enc_access(struct rpc_rqst *req, __be32 *p,
+				const struct nfs4_accessargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 4,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 0);
+	encode_sequence(&xdr, &args->seq_args);
+	return nfs4_xdr_enc_access(&xdr, args);
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Encode LOOKUP request
@@ -4320,6 +4343,30 @@ static int decode_delegreturn(struct xdr_stream *xdr)
 	return decode_op_hdr(xdr, OP_DELEGRETURN);
 }
 
+#if defined(CONFIG_NFS_V4_1)
+
+static int decode_sequence(struct xdr_stream *xdr,
+			   struct nfs41_sequence_res *res)
+{
+	__be32 *p;
+	int status;
+
+	status = decode_op_hdr(xdr, OP_WRITE);
+	if (status)
+		return status;
+
+	READ_BUF(SESSIONID_SIZE + 20);
+	COPYMEM(res->sr_sessionid, SESSIONID_SIZE);
+	READ32(res->sr_seqid);
+	READ32(res->sr_slotid);
+	READ32(res->sr_max_slotid);
+	READ32(res->sr_target_max_slotid);
+	READ32(res->sr_flags);
+
+	return 0;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Decode OPEN_DOWNGRADE response
  */
@@ -4389,6 +4436,28 @@ static int nfs40_xdr_dec_access(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_a
 out:
 	return status;
 }
+
+#if defined(CONFIG_NFS_V4_1)
+static int nfs41_xdr_dec_access(struct rpc_rqst *rqstp, __be32 *p,
+				struct nfs4_accessres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+
+	status = nfs4_xdr_dec_access(&xdr, res);
+out:
+	return status;
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Decode LOOKUP response
@@ -5651,6 +5720,46 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(CREATE_SESSION,	enc_create_session,	dec_create_session, 1),
   PROC(DESTROY_SESSION,	enc_destroy_session,	dec_destroy_session, 1),
 };
+
+#if defined(CONFIG_NFS_V4_1)
+struct rpc_procinfo	nfs41_procedures[] = {
+  PROC(READ,		enc_read,	dec_read, 0),
+  PROC(WRITE,		enc_write,	dec_write, 0),
+  PROC(COMMIT,		enc_commit,	dec_commit, 0),
+  PROC(OPEN,		enc_open,	dec_open, 0),
+  PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm, 0),
+  PROC(OPEN_NOATTR,	enc_open_noattr,	dec_open_noattr, 0),
+  PROC(OPEN_DOWNGRADE,	enc_open_downgrade,	dec_open_downgrade, 0),
+  PROC(CLOSE,		enc_close,	dec_close, 0),
+  PROC(SETATTR,		enc_setattr,	dec_setattr, 0),
+  PROC(FSINFO,		enc_fsinfo,	dec_fsinfo, 0),
+  PROC(RENEW,		enc_renew,	dec_renew, 0),
+  PROC(SETCLIENTID,	enc_setclientid,	dec_setclientid, 0),
+  PROC(SETCLIENTID_CONFIRM,
+			enc_setclientid_confirm, dec_setclientid_confirm, 0),
+  PROC(LOCK,		enc_lock,	dec_lock, 0),
+  PROC(LOCKT,		enc_lockt,	dec_lockt, 0),
+  PROC(LOCKU,		enc_locku,	dec_locku, 0),
+  PROC(ACCESS,		enc_access,	dec_access, 1),
+  PROC(GETATTR,		enc_getattr,	dec_getattr, 0),
+  PROC(LOOKUP,		enc_lookup,	dec_lookup, 0),
+  PROC(LOOKUP_ROOT,	enc_lookup_root,	dec_lookup_root, 0),
+  PROC(REMOVE,		enc_remove,	dec_remove, 0),
+  PROC(RENAME,		enc_rename,	dec_rename, 0),
+  PROC(LINK,		enc_link,	dec_link, 0),
+  PROC(SYMLINK,		enc_symlink,	dec_symlink, 0),
+  PROC(CREATE,		enc_create,	dec_create, 0),
+  PROC(PATHCONF,	enc_pathconf,	dec_pathconf, 0),
+  PROC(STATFS,		enc_statfs,	dec_statfs, 0),
+  PROC(READLINK,	enc_readlink,	dec_readlink, 0),
+  PROC(READDIR,		enc_readdir,	dec_readdir, 0),
+  PROC(SERVER_CAPS,	enc_server_caps, dec_server_caps, 0),
+  PROC(DELEGRETURN,	enc_delegreturn, dec_delegreturn, 0),
+  PROC(GETACL,		enc_getacl,	dec_getacl, 0),
+  PROC(SETACL,		enc_setacl,	dec_setacl, 0),
+  PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations, 0),
+};
+#endif /* CONFIG_NFS_V4_1 */
 
 struct rpc_version		nfs_version4 = {
 	.number			= 4,

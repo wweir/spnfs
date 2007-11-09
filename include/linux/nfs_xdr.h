@@ -627,7 +627,9 @@ struct nfs4_accessargs {
 	const struct nfs_fh *		fh;
 	const u32 *			bitmask;
 	u32				access;
-	void *				minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_args	seq_args;
+#endif
 };
 
 struct nfs4_accessres {
@@ -635,7 +637,9 @@ struct nfs4_accessres {
 	struct nfs_fattr *		fattr;
 	u32				supported;
 	u32				access;
-        void *                          minorversion_info;
+#if defined(CONFIG_NFS_V4_1)
+	struct nfs41_sequence_res	seq_res;
+#endif
 };
 
 struct nfs4_create_arg {
