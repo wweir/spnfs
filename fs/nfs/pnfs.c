@@ -55,8 +55,10 @@
 #define MIN_POOL_LC		(4)
 
 extern int nfs_fsync(struct file *file, struct dentry *dentry, int datasync);
-extern int nfs4_pnfs_getdevicelist(struct nfs_server *server, struct pnfs_devicelist *devlist);
-extern int nfs4_pnfs_getdeviceinfo(struct nfs_server *server, u32 dev_id, struct pnfs_device *res);
+extern int nfs4_pnfs_getdevicelist(struct nfs_fh *fh, struct nfs_server *server,
+				   struct pnfs_devicelist *devlist);
+extern int nfs4_pnfs_getdeviceinfo(struct nfs_server *server, u32 dev_id,
+				   struct pnfs_device *res);
 extern void nfs_execute_write(struct nfs_write_data *data);
 extern void nfs_commit_rpcsetup(struct nfs_write_data *data, int sync);
 
@@ -1262,7 +1264,9 @@ int
 pnfs_getdevicelist(struct super_block *sb, struct pnfs_devicelist *devlist)
 {
 	struct nfs_server *server = NFS_SB(sb);
-	return nfs4_pnfs_getdevicelist(server, devlist);
+	struct nfs_fh *fh = NFS_FH(sb->s_root->d_inode);
+
+	return nfs4_pnfs_getdevicelist(fh, server, devlist);
 }
 
 /* Retrieve the device information for a device.
