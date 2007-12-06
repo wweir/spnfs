@@ -51,6 +51,7 @@
 #include <linux/module.h>
 #ifdef CONFIG_PNFS
 #include <linux/pnfs_xdr.h>
+#include <linux/nfs4_pnfs.h>
 #endif /* CONFIG_PNFS */
 
 #include "nfs4_fs.h"
@@ -5010,11 +5011,49 @@ static int nfs4_proc_pnfs_layoutreturn(struct nfs4_pnfs_layoutreturn *layout)
 	return -1;
 }
 
-int nfs4_pnfs_getdevicelist(struct nfs_server *server,
+/*
+ * Retrieve the list of Data Server devices from the MDS.
+ */
+static int _nfs4_pnfs_getdevicelist(struct nfs_fh *fh,
+				    struct nfs_server *server,
+				    struct pnfs_devicelist *devlist)
+{
+	struct nfs4_pnfs_getdevicelist_arg arg = {
+		.fh = fh,
+		.layoutclass = server->pnfs_curr_ld->id,
+	};
+	struct nfs4_pnfs_getdevicelist_res res = {
+		.devlist = devlist,
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_PNFS_GETDEVICELIST],
+		.rpc_argp = &arg,
+		.rpc_resp = &res,
+	};
+	int status;
+
+	NFS4_VALIDATE_STATE(server);
+	status = NFS4_RPC_CALL_SYNC(server, server->client,
+					&msg, &arg, &res, 0);
+	return status;
+}
+
+int nfs4_pnfs_getdevicelist(struct nfs_fh *fh,
+			    struct nfs_server *server,
 			    struct pnfs_devicelist *devlist)
 {
-	/* XXX Need to implement */
-	return -1;
+	struct nfs4_exception exception = { };
+	int err;
+	do {
+		err = nfs4_handle_exception(server,
+				_nfs4_pnfs_getdevicelist(fh, server, devlist),
+				&exception);
+	} while (exception.retry);
+
+	dprintk("nfs4_pnfs_getdevlist: err=%d, num_devs=%u\n",
+		err, devlist->num_devs);
+
+	return err;
 }
 
 int nfs4_pnfs_getdeviceinfo(struct nfs_server *server,
