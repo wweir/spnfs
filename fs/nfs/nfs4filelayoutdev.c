@@ -339,8 +339,13 @@ decode_and_add_device(struct filelayout_mount_type *mt, struct pnfs_device *dev)
 		return NULL;
 	}
 
+	/*
+	 * XXX Need to add the device to the list of devices!
+	 */
+/*
 	if (nfs4_pnfs_device_add(mt, file_dev))
 		return NULL;
+*/
 	return file_dev;
 }
 
@@ -354,7 +359,7 @@ decode_and_add_devicelist(struct filelayout_mount_type *mt, struct pnfs_deviceli
 {
 	int i, cnt;
 
-	dprintk("%s ricardo invoked.  num_devs=%d\n", __FUNCTION__, devlist->num_devs);
+	dprintk("%s invoked.  num_devs=%d\n", __FUNCTION__, devlist->num_devs);
 
 	for (i = 0, cnt = 0;
 	     i < devlist->num_devs && cnt < NFS4_PNFS_DEV_MAXCOUNT;
@@ -365,7 +370,7 @@ decode_and_add_devicelist(struct filelayout_mount_type *mt, struct pnfs_deviceli
 		}
 		cnt++;
 	}
-	dprintk("%s ricardo success\n", __FUNCTION__);
+	dprintk("%s success\n", __FUNCTION__);
 	return 0;
 }
 
