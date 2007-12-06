@@ -51,6 +51,8 @@
 #include <linux/nfs4.h>
 #include <linux/nfs_fs.h>
 #include <linux/nfs_idmap.h>
+#include <linux/pnfs_xdr.h>
+#include <linux/nfs4_pnfs.h>
 #include "nfs4_fs.h"
 
 #define NFSDBG_FACILITY		NFSDBG_XDR
@@ -266,6 +268,12 @@ static int nr_sequence_quads;
 #define decode_sequence_maxsz	(op_decode_hdr_maxsz + \
 				XDR_QUADLEN(SESSIONID_SIZE) + 5)
 #endif /* CONFIG_NFS_V4_1 */
+#if defined(CONFIG_PNFS)
+#define encode_getdevicelist_maxsz (op_encode_hdr_maxsz + 4 +  \
+				   (NFS4_VERIFIER_SIZE >> 2))
+#define decode_getdevicelist_maxsz (op_decode_hdr_maxsz + 5 + 2 +      \
+				   NFS4_PNFS_DEV_MAXCOUNT*NFS4_PNFS_DEV_MAXSIZE)
+#endif /* CONFIG_PNFS */
 
 #define NFS40_enc_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS40_dec_compound_sz	(1024)  /* XXX: large enough? */
@@ -702,6 +710,16 @@ static int nr_sequence_quads;
 #define NFS41_enc_error_sz		(0)
 #define NFS41_dec_error_sz		(0)
 #endif /* CONFIG_NFS_V4_1 */
+#if defined(CONFIG_PNFS)
+#define NFS41_enc_pnfs_getdevicelist_sz (compound_encode_hdr_maxsz + \
+					encode_sequence_maxsz + \
+					encode_putfh_maxsz + \
+					encode_getdevicelist_maxsz)
+#define NFS41_dec_pnfs_getdevicelist_sz (compound_decode_hdr_maxsz + \
+					decode_sequence_maxsz + \
+					decode_putfh_maxsz + \
+					decode_getdevicelist_maxsz)
+#endif /* CONFIG_PNFS */
 
 static struct {
 	unsigned int	mode;
@@ -1672,6 +1690,27 @@ static int encode_destroy_session(struct xdr_stream *xdr,
 }
 #endif /* CONFIG_NFS_V4_1 */
 
+#if defined(CONFIG_PNFS)
+/*
+ * Encode request to get information for the list of Data Server devices
+ */
+static int encode_getdevicelist(struct xdr_stream *xdr, const struct nfs4_pnfs_getdevicelist_arg *args)
+{
+	uint32_t *p;
+	nfs4_verifier dummy = {
+		.data = "dummmmmy",
+	};
+
+	RESERVE_SPACE(20);
+	WRITE32(OP_GETDEVICELIST);
+	WRITE32(args->layoutclass);             /* layout type */
+	WRITE32(NFS4_PNFS_DEV_MAXCOUNT);        /* maxcount */
+	WRITE64(0ULL);                          /* cookie */
+	encode_nfs4_verifier(xdr, &dummy);
+
+	return 0;
+}
+#endif /* CONFIG_PNFS */
 /*
  * END OF "GENERIC" ENCODE ROUTINES.
  */
@@ -3213,6 +3252,31 @@ static int nfs41_xdr_enc_delegreturn(struct rpc_rqst *req, __be32 *p,
 	return nfs4_xdr_enc_delegreturn(&xdr, args);
 }
 #endif /* CONFIG_NFS_V4_1 */
+
+#if defined(CONFIG_PNFS)
+/*
+ * Encode GETDEVICELIST request
+ */
+static int nfs41_xdr_enc_pnfs_getdevicelist(struct rpc_rqst *req, uint32_t *p,
+				struct nfs4_pnfs_getdevicelist_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+	encode_sequence(&xdr, &args->seq_args);
+	status = encode_putfh(&xdr, args->fh);
+	if (status != 0)
+		goto out;
+	status = encode_getdevicelist(&xdr, args);
+out:
+	return status;
+}
+#endif /* CONFIG_PNFS */
 
 /*
  * Encode FS_LOCATIONS request
@@ -5049,6 +5113,73 @@ static int decode_sequence(struct xdr_stream *xdr,
 	return 0;
 }
 #endif /* CONFIG_NFS_V4_1 */
+
+#ifdef CONFIG_PNFS
+/*
+ * Decode getdevicelist results for pNFS.
+ * TODO: Need to match this xdr with the server.
+ */
+static int decode_getdevicelist(struct xdr_stream *xdr, struct pnfs_devicelist *res)
+{
+	uint32_t *p;
+	int status, i, cnt;
+	uint32_t len = 0, total_len = 0;
+	struct nfs_writeverf verftemp;
+
+	status = decode_op_hdr(xdr, OP_GETDEVICELIST);
+	if (status)
+		return status;
+
+	/* TODO: Skip cookie for now */
+	READ_BUF(8);
+	(*p) += 2;
+
+	/* Read verifier */
+	READ_BUF(8);
+	COPYMEM(verftemp.verifier, 8);
+
+	READ_BUF(4);
+	READ32(res->num_devs);
+
+	for (i = 0, cnt = 0;
+	     i < res->num_devs && cnt < NFS4_PNFS_DEV_MAXCOUNT;
+	     i++) {
+		READ_BUF(4);
+		READ32(res->devs[cnt].dev_id);	/* device id */
+
+		READ_BUF(4);
+		READ32(len); /* 1 in list of device_addr */
+		if (len > 1)
+			printk(KERN_EMERG "%s: list of %d device addr\n",
+				__FUNCTION__, len);
+		READ_BUF(4);
+		READ32(res->layout_type);
+
+		READ_BUF(4);
+		READ32(len);
+		dprintk("%s: num_dev %d i %d cnt %d id %d len %d\n",
+			__FUNCTION__, res->num_devs, i, cnt,
+			res->devs[cnt].dev_id, len);
+
+		READ_BUF(len);
+
+		/* DH-TODO: Can I decode this inline?  Is the xdr_stream
+		 * memory valid after the completion of this function?
+		 */
+		/* decode_opaque_inline(xdr, &len, &r_addr); */
+		COPYMEM(&res->devs[cnt].dev_addr_buf, len);
+		res->devs[cnt].dev_addr_len = len;
+
+		total_len += len;
+		cnt++;
+	}
+	READ_BUF(4);
+	READ32(res->eof);
+
+	res->devs_len = total_len;
+	return 0;
+}
+#endif /* CONFIG_PNFS */
 
 /*
  * Decode OPEN_DOWNGRADE response
@@ -6897,6 +7028,35 @@ out:
 }
 #endif /* CONFIG_NFS_V4_1 */
 
+#if defined(CONFIG_PNFS)
+/*
+ * Decode GETDEVICELIST response
+ */
+static int nfs41_xdr_dec_pnfs_getdevicelist(struct rpc_rqst *rqstp, uint32_t *p, struct nfs4_pnfs_getdevicelist_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	dprintk("encoding getdevicelist!\n");
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status != 0)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status != 0)
+		goto out;
+	status = decode_putfh(&xdr);
+	if (status != 0)
+		goto out;
+	status = decode_getdevicelist(&xdr, res->devlist);
+out:
+	return status;
+}
+
+#endif /* CONFIG_PNFS */
+
 __be32 *nfs4_decode_dirent(__be32 *p, struct nfs_entry *entry, int plus)
 {
 	uint32_t bitmap[2] = {0};
@@ -7109,6 +7269,9 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(SEQUENCE,	enc_sequence,	dec_sequence, 1),
   PROC(DESTROY_SESSION,	enc_destroy_session,	dec_destroy_session, 1),
   PROC(GET_LEASE_TIME,	enc_get_lease_time,	dec_get_lease_time, 1),
+#if defined(CONFIG_PNFS)
+  PROC(PNFS_GETDEVICELIST, enc_pnfs_getdevicelist, dec_pnfs_getdevicelist, 1),
+#endif /* CONFIG_PNFS */
 };
 #endif /* CONFIG_NFS_V4_1 */
 
