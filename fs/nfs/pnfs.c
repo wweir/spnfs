@@ -84,31 +84,12 @@ static inline struct pnfs_layoutcommit_data *pnfs_layoutcommit_alloc(void)
 			mempool_alloc(pnfs_layoutcommit_mempool, GFP_NOFS);
 	if (p)
 		memset(p, 0, sizeof(*p));
-	else
-		goto out;
-
-	p->args.minorversion_info = kzalloc(sizeof(struct nfs41_sequence_args), GFP_KERNEL);
-	if (!p->args.minorversion_info)
-		goto out_free1;
-
-	p->res.minorversion_info = kzalloc(sizeof(struct nfs41_sequence_res), GFP_KERNEL);
-	if (!p->res.minorversion_info)
-		goto out_free2;
 
 	return p;
-
-out_free2:
-	kfree(p->args.minorversion_info);
-out_free1:
-	mempool_free(p, pnfs_layoutcommit_mempool);
-out:
-	return NULL;
 }
 
 static inline void pnfs_layoutcommit_free(struct pnfs_layoutcommit_data *p)
 {
-	kfree(p->args.minorversion_info);
-	kfree(p->res.minorversion_info);
 	mempool_free(p, pnfs_layoutcommit_mempool);
 }
 
@@ -391,16 +372,11 @@ pnfs_return_layout_rpc(struct nfs_server *server,
 {
 	int status;
 	struct nfs4_pnfs_layoutreturn_res res;
-	struct nfs41_sequence_args seqarg;
-	struct nfs41_sequence_res seqres;
 	struct nfs4_pnfs_layoutreturn gdata = {
 		.args = argp,
 		.res = &res,
 	};
 	dprintk("%s:Begin\n", __FUNCTION__);
-
-	argp->minorversion_info = &seqarg;
-	res.minorversion_info = &seqres;
 
 	/* XXX Need to setup the sequence */
 /*
