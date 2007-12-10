@@ -249,7 +249,6 @@ nfsd4_open(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	} else
 		open->op_minorversion = 0;
 #endif /* CONFIG_NFSD_V4_1 */
-		
 	nfs4_lock_state();
 
 	/* check seqid for replay. set nfs4_owner */
@@ -582,7 +581,7 @@ nfsd4_read(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	   struct nfsd4_read *read)
 {
 	__be32 status;
-        int flags = 0;
+	int flags = 0;
 
 	/* no need to check permission - this will be done in nfsd_read() */
 
@@ -590,9 +589,9 @@ nfsd4_read(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	if (read->rd_offset >= OFFSET_MAX)
 		return nfserr_inval;
 
-        flags = CHECK_FH | RD_STATE;
-        if (read->rd_minorversion == 1)
-                flags |= NFS_4_1;
+	flags = CHECK_FH | RD_STATE;
+	if (read->rd_minorversion == 1)
+		flags |= NFS_4_1;
 	nfs4_lock_state();
 	/* check stateid */
 	if ((status = nfs4_preprocess_stateid_op(&cstate->current_fh,
@@ -727,9 +726,9 @@ nfsd4_setattr(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	__be32 status = nfs_ok, flags = 0;
 
 	if (setattr->sa_iattr.ia_valid & ATTR_SIZE) {
-                flags = CHECK_FH | WR_STATE;
-                if (setattr->sa_minorversion == 1)
-                        flags |= NFS_4_1;
+		flags = CHECK_FH | WR_STATE;
+		if (setattr->sa_minorversion == 1)
+			flags |= NFS_4_1;
 		nfs4_lock_state();
 		status = nfs4_preprocess_stateid_op(&cstate->current_fh,
 			&setattr->sa_stateid, flags, NULL);
@@ -764,9 +763,9 @@ nfsd4_write(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	if (write->wr_offset >= OFFSET_MAX)
 		return nfserr_inval;
 
-        flags = CHECK_FH | WR_STATE;
-        if (write->wr_minorversion == 1)
-                flags |= NFS_4_1;
+	flags = CHECK_FH | WR_STATE;
+	if (write->wr_minorversion == 1)
+		flags |= NFS_4_1;
 	nfs4_lock_state();
 	status = nfs4_preprocess_stateid_op(&cstate->current_fh, stateid,
 					flags, &filp);
@@ -1018,19 +1017,19 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 		}
 
 #if defined(CONFIG_NFSD_V4_1)
-                if ((args->minorversion == 1) &&
-                    ((op->opnum == OP_SETCLIENTID) ||
-                    (op->opnum == OP_SETCLIENTID_CONFIRM) ||
-                    (op->opnum == OP_OPEN_CONFIRM) ||
-                    (op->opnum == OP_RELEASE_LOCKOWNER) ||
-                    (op->opnum == OP_RENEW))) {
-                        op->status = nfserr_notsupp;
-                        goto encode_op;
-                }
+		if ((args->minorversion == 1) &&
+		    ((op->opnum == OP_SETCLIENTID) ||
+		    (op->opnum == OP_SETCLIENTID_CONFIRM) ||
+		    (op->opnum == OP_OPEN_CONFIRM) ||
+		    (op->opnum == OP_RELEASE_LOCKOWNER) ||
+		    (op->opnum == OP_RENEW))) {
+			op->status = nfserr_notsupp;
+			goto encode_op;
+		}
 #endif /* CONFIG_NFSD_V4_1 */
-                dprintk("xxx server proc %2d %s\n", op->opnum,
-                        op->opnum < ARRAY_SIZE(nfsd4_op_names) &&
-                        nfsd4_op_names[op->opnum] ? nfsd4_op_names[op->opnum] : "");
+		dprintk("xxx server proc %2d %s\n", op->opnum,
+			op->opnum < ARRAY_SIZE(nfsd4_op_names) &&
+			nfsd4_op_names[op->opnum] ? nfsd4_op_names[op->opnum] : "");
 
 		if (opdesc->op_func)
 			op->status = opdesc->op_func(rqstp, cstate, &op->u);
@@ -1059,18 +1058,18 @@ encode_op:
 
 out:
 #if defined(CONFIG_NFSD_V4_1)
-        if (cstate->current_ses) {
-                if (cstate->current_ses->cs_slot) {
-                        if (op && op->status != nfserr_dropit) {
-                                dprintk("%s SET SLOT STATE TO AVAILABLE\n",
-                                                                __FUNCTION__);
-                                nfs41_set_slot_state(current_ses->cs_slot,
-                                                        NFS4_SLOT_AVAILABLE);
-                        }
-                        nfs41_put_session(cstate->current_ses->cs_slot->sl_session);
-                }
-                kfree(cstate->current_ses);
-        }
+	if (cstate->current_ses) {
+		if (cstate->current_ses->cs_slot) {
+			if (op && op->status != nfserr_dropit) {
+				dprintk("%s SET SLOT STATE TO AVAILABLE\n",
+								__FUNCTION__);
+				nfs41_set_slot_state(current_ses->cs_slot,
+							NFS4_SLOT_AVAILABLE);
+			}
+			nfs41_put_session(cstate->current_ses->cs_slot->sl_session);
+		}
+		kfree(cstate->current_ses);
+	}
 #endif
 	cstate_free(cstate);
 	return status;

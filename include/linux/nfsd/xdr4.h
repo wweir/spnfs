@@ -365,49 +365,49 @@ struct impl_id4 {
 
 #if defined(CONFIG_NFSD_V4_1)
 struct nfsd4_exchange_id {
-        nfs4_verifier   verifier;
-        u32             id_len;
-        char *          id;
+	nfs4_verifier	verifier;
+	u32		id_len;
+	char		*id;
 	u32		flags;
-        clientid_t      clientid;
-        u32             seqid;
+	clientid_t	clientid;
+	u32		seqid;
 };
 
 struct nfsd4_channel {
-	u32             headerpadsz;
-        u32             maxreq_sz;
-        u32             maxresp_sz;
-        u32             maxresp_cached;
-        u32             maxops;
-        u32             maxreqs;
-        u32             nr_rdma_attrs;
-        u32             rdma_attrs;
+	u32		headerpadsz;
+	u32		maxreq_sz;
+	u32		maxresp_sz;
+	u32		maxresp_cached;
+	u32		maxops;
+	u32		maxreqs;
+	u32		nr_rdma_attrs;
+	u32		rdma_attrs;
 };
 
 struct nfsd4_create_session {
-	clientid_t              clientid;
-	nfs41_sessionid         sessionid;
-	u32                     seqid;
+	clientid_t		clientid;
+	nfs41_sessionid		sessionid;
+	u32			seqid;
 	u32			flags;
-	struct nfsd4_channel    fore_channel;
-	struct nfsd4_channel    back_channel;
-	u32                     callback_prog;
-	u32                     uid;
-	u32                     gid;
+	struct nfsd4_channel	fore_channel;
+	struct nfsd4_channel	back_channel;
+	u32			callback_prog;
+	u32			uid;
+	u32			gid;
 };
 
 struct nfsd4_sequence {
-	nfs41_sessionid         sessionid;
-	u32                     seqid;
-	u32                     slotid;
-	u32                     maxslots;
-	u32                     target_maxslots;
-	u32                     catchthis;
-	u32                     status_flags;
+	nfs41_sessionid		sessionid;
+	u32			seqid;
+	u32			slotid;
+	u32			maxslots;
+	u32			target_maxslots;
+	u32			catchthis;
+	u32			status_flags;
 };
 
 struct nfsd4_destroy_session {
-	nfs41_sessionid         sessionid;
+	nfs41_sessionid		sessionid;
 };
 #endif /* CONFIG_NFSD_V4_1 */
 
@@ -524,7 +524,7 @@ extern __be32 nfsd4_setclientid_confirm(struct svc_rqst *rqstp,
 #if defined(CONFIG_NFSD_V4_1)
 extern __be32 nfsd4_exchange_id(struct svc_rqst *rqstp,
 		struct nfsd4_compound_state *,
-                struct nfsd4_exchange_id *clid);
+		struct nfsd4_exchange_id *clid);
 extern __be32 nfsd4_create_session(struct svc_rqst *,
 		struct nfsd4_compound_state *,
 		struct nfsd4_create_session *);

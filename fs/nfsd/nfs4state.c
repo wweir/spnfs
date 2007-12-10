@@ -334,7 +334,7 @@ static struct list_head close_lru;
 
 #if defined(CONFIG_NFSD_V4_1)
 /* Use a prime for hash table size */
-#define SESSION_HASH_SIZE       1031
+#define SESSION_HASH_SIZE	1031
 static struct list_head sessionid_hashtbl[SESSION_HASH_SIZE];
 
 int
@@ -352,23 +352,23 @@ nfs41_set_slot_state(struct nfs41_slot *slot, int state)
 static int
 hash_sessionid(nfs41_sessionid *sessionid)
 {
-        u32 csum = 0;
-        int idx;
+	u32 csum = 0;
+	int idx;
 
 	csum = crc32(0, sessionid, sizeof(*sessionid));
-        idx = csum % SESSION_HASH_SIZE;
-        dprintk("%s IDX: %u csum %u\n", __FUNCTION__, idx, csum);
-        return idx;
+	idx = csum % SESSION_HASH_SIZE;
+	dprintk("%s IDX: %u csum %u\n", __FUNCTION__, idx, csum);
+	return idx;
 }
 
 void
 dump_sessionid(const char *fn, nfs41_sessionid *sessionid)
 {
-        u32 *ptr;
+	u32 *ptr;
 
-        ptr = (u32 *)(*sessionid);
+	ptr = (u32 *)(*sessionid);
 
-        dprintk("%s: %u:%u:%u:%u\n", fn, ptr[0], ptr[1], ptr[2], ptr[3]);
+	dprintk("%s: %u:%u:%u:%u\n", fn, ptr[0], ptr[1], ptr[2], ptr[3]);
 }
 
 static void
@@ -387,11 +387,11 @@ gen_sessionid(struct nfs41_session *ses)
 static int
 alloc_init_session(struct nfs4_client *clp, struct nfsd4_create_session *cses)
 {
-        struct nfs41_session *new;
+	struct nfs41_session *new;
 	int idx, status, slotsize, i;
 
-        new = kzalloc(sizeof(*new), GFP_KERNEL);
-        if (!new)
+	new = kzalloc(sizeof(*new), GFP_KERNEL);
+	if (!new)
 		goto out;
 
 	if (cses->fore_channel.maxreqs >= NFS41_MAX_SLOTS)
@@ -439,37 +439,37 @@ out_free:
 struct nfs41_session *
 find_in_sessionid_hashtbl(nfs41_sessionid *sessionid)
 {
-        struct nfs41_session *elem;
-        int idx;
-        int found = 0;
+	struct nfs41_session *elem;
+	int idx;
+	int found = 0;
 
-        dump_sessionid(__FUNCTION__, sessionid);
-        idx = hash_sessionid(sessionid);
-        dprintk("%s: idx is %d\n", __FUNCTION__, idx);
-        /* Search in the appropriate list */
-        list_for_each_entry(elem, &sessionid_hashtbl[idx], se_hash) {
-                dump_sessionid("list traversal", &elem->se_sessionid);
+	dump_sessionid((char *)__FUNCTION__, sessionid);
+	idx = hash_sessionid(sessionid);
+	dprintk("%s: idx is %d\n", __FUNCTION__, idx);
+	/* Search in the appropriate list */
+	list_for_each_entry(elem, &sessionid_hashtbl[idx], se_hash) {
+		dump_sessionid("list traversal", &elem->se_sessionid);
 		if (!memcmp(elem->se_sessionid, sessionid,
-		            sizeof(nfs41_sessionid))) {
-                        found = 1;
-                        break;
-                }
-        }
+			    sizeof(nfs41_sessionid))) {
+			found = 1;
+			break;
+		}
+	}
 
-        /* Check if we found the element */
+	/* Check if we found the element */
 	dprintk("%s: found %d elem %p\n", __FUNCTION__, found, elem);
-        if (!found)
-                return NULL;
+	if (!found)
+	return NULL;
 
-        return elem;
+	return elem;
 }
 
 static void
 destroy_session(struct nfs41_session *ses)
 {
-        list_del(&ses->se_hash);
-        list_del(&ses->se_perclnt);
-        nfs41_put_session(ses);
+	list_del(&ses->se_hash);
+	list_del(&ses->se_perclnt);
+	nfs41_put_session(ses);
 }
 
 void
@@ -613,7 +613,7 @@ expire_client(struct nfs4_client *clp)
 		ses = list_entry(clp->cl_sessions.next, struct nfs41_session, se_perclnt);
 		destroy_session(ses);
 	}
-#endif
+#endif /* CONFIG_NFSD_V4_1 */
 	put_nfs4_client(clp);
 }
 
@@ -643,8 +643,8 @@ copy_verf(struct nfs4_client *target, nfs4_verifier *source) {
 
 static void
 copy_clid(struct nfs4_client *target, struct nfs4_client *source) {
-	target->cl_clientid.cl_boot = source->cl_clientid.cl_boot; 
-	target->cl_clientid.cl_id = source->cl_clientid.cl_id; 
+	target->cl_clientid.cl_boot = source->cl_clientid.cl_boot;
+	target->cl_clientid.cl_id = source->cl_clientid.cl_id;
 }
 
 static void
@@ -684,7 +684,7 @@ same_creds(struct svc_cred *cr1, struct svc_cred *cr2)
 static void
 gen_clid(struct nfs4_client *clp) {
 	clp->cl_clientid.cl_boot = boot_time;
-	clp->cl_clientid.cl_id = current_clientid++; 
+	clp->cl_clientid.cl_id = current_clientid++;
 }
 
 static void
@@ -1081,16 +1081,16 @@ __be32 nfsd4_exchange_id(struct svc_rqst *rqstp,
 			struct nfsd4_compound_state *cstate,
 			struct nfsd4_exchange_id *clid)
 {
-        struct nfs4_client *unconf, *conf, *new;
-        int status;
-        unsigned int            strhashval;
-        char                    dname[HEXDIR_LEN];
+	struct nfs4_client *unconf, *conf, *new;
+	int status;
+	unsigned int		strhashval;
+	char			dname[HEXDIR_LEN];
 	nfs4_verifier		verf = clid->verifier;
 	u32			ip_addr = svc_addr_in(rqstp)->sin_addr.s_addr;
-        struct xdr_netobj clname = {
-                .len = clid->id_len,
-                .data = clid->id,
-        };
+	struct xdr_netobj clname = {
+		.len = clid->id_len,
+		.data = clid->id,
+	};
 
 	dprintk("%s rqstp=%p clid=%p\n", __FUNCTION__, rqstp, clid);
 	dprintk("%s clname.len=%u clname.data=%p\n", __FUNCTION__, clname.len, clname.data);
@@ -1098,88 +1098,88 @@ __be32 nfsd4_exchange_id(struct svc_rqst *rqstp,
 	dprintk("nfsd4_exchange_id flags %x\n", clid->flags);
 
 	if (!check_name(clname) || (clid->flags & EXCHGID4_INVAL_FLAG_MASK))
-                return nfserr_inval;
+		return nfserr_inval;
 	dprintk("%s check_name returned okay\n", __FUNCTION__);
 
-        status = nfs4_make_rec_clidname(dname, &clname);
+	status = nfs4_make_rec_clidname(dname, &clname);
 
-        if (status)
-                return status;
+	if (status)
+		return status;
 	dprintk("%s nfs4_make_rec_clidname returned okay\n", __FUNCTION__);
 
-        strhashval = clientstr_hashval(dname);
+	strhashval = clientstr_hashval(dname);
 
-        nfs4_lock_state();
-        status = nfserr_clid_inuse;
+	nfs4_lock_state();
+	status = nfserr_clid_inuse;
 
-        conf = find_confirmed_client_by_str(dname, strhashval);
-        if (conf) {
-                if (!same_creds(&conf->cl_cred, &rqstp->rq_cred) || (ip_addr != conf->cl_addr)) {
-                        /* Client collision: send nfserr_clid_inuse */
-                        goto out;
-                }
+	conf = find_confirmed_client_by_str(dname, strhashval);
+	if (conf) {
+		if (!same_creds(&conf->cl_cred, &rqstp->rq_cred) || (ip_addr != conf->cl_addr)) {
+			/* Client collision: send nfserr_clid_inuse */
+			goto out;
+		}
 
-                if (!same_verf(&verf, &conf->cl_verifier)) {
-                        /* Client reboot: destroy old state */
-                        expire_client(conf);
+		if (!same_verf(&verf, &conf->cl_verifier)) {
+			/* Client reboot: destroy old state */
+			expire_client(conf);
 			goto out_new;
-                }
+		}
 		/* router replay */
 		goto out;
-        }
+	}
 
-        unconf  = find_unconfirmed_client_by_str(dname, strhashval);
-        if (unconf) {
-                status = nfs_ok;
-                /* Found an unconfirmed record */
-                if (!same_creds(&unconf->cl_cred, &rqstp->rq_cred)) {
-                        /* Principal changed: update to the new principal and send
-                         * nfs_ok */
-                        copy_cred(&unconf->cl_cred, &rqstp->rq_cred);
-                }
+	unconf  = find_unconfirmed_client_by_str(dname, strhashval);
+	if (unconf) {
+		status = nfs_ok;
+		/* Found an unconfirmed record */
+		if (!same_creds(&unconf->cl_cred, &rqstp->rq_cred)) {
+			/* Principal changed: update to the new principal and send
+			 * nfs_ok */
+			copy_cred(&unconf->cl_cred, &rqstp->rq_cred);
+		}
 
-                if (!same_verf(&unconf->cl_verifier, &verf)) {
-                        /* Reboot before confirmation: update the verifier and
-                         * send nfs_ok */
-                        copy_verf(unconf, &verf);
+		if (!same_verf(&unconf->cl_verifier, &verf)) {
+			/* Reboot before confirmation: update the verifier and
+			 * send nfs_ok */
+			copy_verf(unconf, &verf);
 			new = unconf;
 			goto out_copy;
-                }
-                goto out;
-        }
+		}
+		goto out;
+	}
 
 out_new:
-        /* Normal case */
-        status = nfserr_resource;
-        new = create_client(clname, dname);
+	/* Normal case */
+	status = nfserr_resource;
+	new = create_client(clname, dname);
 
-        if (new == NULL)
-                goto out;
+	if (new == NULL)
+		goto out;
 
-        copy_verf(new, &verf);
-        copy_cred(&new->cl_cred,&rqstp->rq_cred);
-        new->cl_addr = ip_addr;
-        gen_clid(new);
-        gen_confirm(new);
-        add_to_unconfirmed(new, strhashval);
+	copy_verf(new, &verf);
+	copy_cred(&new->cl_cred,&rqstp->rq_cred);
+	new->cl_addr = ip_addr;
+	gen_clid(new);
+	gen_confirm(new);
+	add_to_unconfirmed(new, strhashval);
 
-        nfsd4_setup_callback_channel();
+	nfsd4_setup_callback_channel();
 out_copy:
-        clid->clientid.cl_boot = new->cl_clientid.cl_boot;
-        clid->clientid.cl_id = new->cl_clientid.cl_id;
+	clid->clientid.cl_boot = new->cl_clientid.cl_boot;
+	clid->clientid.cl_id = new->cl_clientid.cl_id;
 
 	new->cl_seqid = clid->seqid = 1;
 	nfsd4_set_ex_flags(new, clid);
 
 	dprintk("nfsd4_exchange_id seqid %d flags %x\n",
 				new->cl_seqid, new->cl_exchange_flags);
-        status = nfs_ok;
+	status = nfs_ok;
 
 out:
-        nfs4_unlock_state();
+	nfs4_unlock_state();
 
-        dprintk("nfsd4_exchange_id returns %d\n", status);
-        return status;
+	dprintk("nfsd4_exchange_id returns %d\n", status);
+	return status;
 }
 #endif /* CONFIG_NFSD_V4_1 */
 
@@ -1323,7 +1323,7 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 			struct nfsd4_create_session *session)
 {
 	//u32 ip_addr = rqstp->rq_addr.sin_addr.s_addr;
-        u32 ip_addr = svc_addr_in(rqstp)->sin_addr.s_addr;
+	u32 ip_addr = svc_addr_in(rqstp)->sin_addr.s_addr;
 	struct nfs4_client *conf, *unconf;
 	__u32   max_blocksize = svc_max_payload(rqstp);
 	int status = 0;
@@ -2343,13 +2343,13 @@ nfsd4_sequence(struct svc_rqst *r,
 		struct nfsd4_compound_state *cstate,
 		struct nfsd4_sequence *seq)
 {
-        struct nfs41_session *elem;
+	struct nfs41_session *elem;
 	struct nfs41_slot *slot;
 	struct current_session *c_ses = cstate->current_ses;
 	int status;
 
 	if (STALE_CLIENTID((clientid_t *)seq->sessionid))
-                return nfserr_stale_clientid;
+		return nfserr_stale_clientid;
 
 	nfs4_lock_state();
 	status = nfserr_badsession;
@@ -2440,7 +2440,7 @@ nfsd4_destroy_session(struct svc_rqst *r,
 out:
 	nfs4_unlock_state();
 	dprintk("%s returns %d\n",__FUNCTION__, ntohl(status));
-        return status;
+	return status;
 }
 #endif /* CONFIG_NFSD_V4_1 */
 
@@ -2634,8 +2634,8 @@ nfs4_preprocess_stateid_op(struct svc_fh *current_fh, stateid_t *stateid, int fl
 	__be32 status;
 
 	dprintk("NFSD: preprocess_stateid_op: stateid = (%08x/%08x/%08x/%08x)\n",
-		stateid->si_boot, stateid->si_stateownerid, 
-		stateid->si_fileid, stateid->si_generation); 
+		stateid->si_boot, stateid->si_stateownerid,
+		stateid->si_fileid, stateid->si_generation);
 	if (filpp)
 		*filpp = NULL;
 
@@ -3773,7 +3773,7 @@ nfs4_state_init(void)
 	for (i = 0; i < SESSION_HASH_SIZE; i++) {
 		INIT_LIST_HEAD(&sessionid_hashtbl[i]);
 	}
-#endif
+#endif /* CONFIG_NFSD_V4_1 */
 	for (i = 0; i < FILE_HASH_SIZE; i++) {
 		INIT_LIST_HEAD(&file_hashtbl[i]);
 	}

@@ -1299,9 +1299,9 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 		if (!calldir || !req)
 			vec[0] = rqstp->rq_arg.head[0];
 
-#else
+#else /* CONFIG_NFSD_V4_1 */
 		vec[0] = rqstp->rq_arg.head[0];
-#endif
+#endif /* CONFIG_NFSD_V4_1 */
 		vec[0].iov_base += 8;
 		vec[0].iov_len -= 8;
 		len = svsk->sk_reclen - 8;
@@ -1314,9 +1314,9 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 		vec[pnum].iov_base = (req) ?
 			page_address(req->rq_private_buf.pages[pnum - 1]):
 			page_address(rqstp->rq_pages[pnum]);
-#else
+#else /* CONFIG_NFSD_V4_1 */
 		vec[pnum].iov_base = page_address(rqstp->rq_pages[pnum]);
-#endif
+#endif /* CONFIG_NFSD_V4_1 */
 		vec[pnum].iov_len = PAGE_SIZE;
 		pnum++;
 		vlen += PAGE_SIZE;
@@ -1339,7 +1339,7 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 		len = 0;
 		goto out;
 	}
-#endif
+#endif /* CONFIG_NFSD_V4_1 */
 	dprintk("svc: TCP complete record (%d bytes)\n", len);
 	rqstp->rq_arg.len = len;
 	rqstp->rq_arg.page_base = 0;

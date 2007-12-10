@@ -301,7 +301,7 @@ nfs4_xdr_enc_cb_null(struct rpc_rqst *req, __be32 *p)
 	struct xdr_stream xdrs, *xdr = &xdrs;
 
 	xdr_init_encode(&xdrs, &req->rq_snd_buf, p);
-        RESERVE_SPACE(0);
+	RESERVE_SPACE(0);
 	return 0;
 }
 
@@ -353,17 +353,18 @@ nfs41_xdr_enc_cb_recall(struct rpc_rqst *req, u32 *p,
 #endif /* defined(CONFIG_NFSD_V4_1) */
 
 static int
-decode_cb_compound_hdr(struct xdr_stream *xdr, struct nfs4_cb_compound_hdr *hdr){
-        __be32 *p;
+decode_cb_compound_hdr(struct xdr_stream *xdr, struct nfs4_cb_compound_hdr *hdr)
+{
+	__be32 *p;
 
-        READ_BUF(8);
-        READ32(hdr->status);
-        READ32(hdr->taglen);
-        READ_BUF(hdr->taglen + 4);
-        hdr->tag = (char *)p;
-        p += XDR_QUADLEN(hdr->taglen);
-        READ32(hdr->nops);
-        return 0;
+	READ_BUF(8);
+	READ32(hdr->status);
+	READ32(hdr->taglen);
+	READ_BUF(hdr->taglen + 4);
+	hdr->tag = (char *)p;
+	p += XDR_QUADLEN(hdr->taglen);
+	READ32(hdr->nops);
+	return 0;
 }
 
 static int
