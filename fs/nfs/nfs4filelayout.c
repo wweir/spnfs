@@ -516,7 +516,7 @@ filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino,
 		dprintk("%s data %p commit through mds\n", __func__, data);
 		return 1;
 	}
-	dev = nfs4_pnfs_device_item_get(layoutid, nfslay->dev_id);
+	dev = nfs4_pnfs_device_item_get(ino, nfslay->dev_id);
 	fdev = &dev->stripe_devs[0];
 
 	for (i = 0; i < nfslay->num_fh; i++) {
