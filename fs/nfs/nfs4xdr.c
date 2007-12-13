@@ -273,6 +273,9 @@ static int nfs4_stat_to_errno(int);
 				   (NFS4_VERIFIER_SIZE >> 2))
 #define decode_getdevicelist_maxsz (op_decode_hdr_maxsz + 5 + 2 +      \
 				   NFS4_PNFS_DEV_MAXCOUNT*NFS4_PNFS_DEV_MAXSIZE)
+#define encode_getdeviceinfo_maxsz (op_encode_hdr_maxsz + 2)
+#define decode_getdeviceinfo_maxsz (op_decode_hdr_maxsz + 3 + \
+				   NFS4_PNFS_DEV_MAXSIZE)
 #define encode_pnfs_layoutget_sz (op_encode_hdr_maxsz + 13)
 #define decode_pnfs_layoutget_maxsz (op_decode_hdr_maxsz + 8)
 #endif /* CONFIG_PNFS */
@@ -721,6 +724,14 @@ static int nfs4_stat_to_errno(int);
 					decode_sequence_maxsz + \
 					decode_putfh_maxsz + \
 					decode_getdevicelist_maxsz)
+#define NFS41_enc_pnfs_getdeviceinfo_sz	(compound_encode_hdr_maxsz +    \
+					encode_sequence_maxsz +\
+					encode_putfh_maxsz +            \
+					encode_getdeviceinfo_maxsz)
+#define NFS41_dec_pnfs_getdeviceinfo_sz	(compound_decode_hdr_maxsz +    \
+					decode_sequence_maxsz + \
+					decode_putfh_maxsz +            \
+					decode_getdeviceinfo_maxsz)
 #define NFS41_enc_pnfs_layoutget_sz (compound_encode_hdr_maxsz + \
 				     encode_sequence_maxsz + \
 				     encode_putfh_maxsz +        \
@@ -1724,6 +1735,21 @@ static int encode_getdevicelist(struct xdr_stream *xdr,
 	WRITE64(0ULL);                          /* cookie */
 	encode_nfs4_verifier(xdr, &dummy);
 
+	return 0;
+}
+
+/*
+ * Encode request to get information for a specific device.
+ */
+static int encode_getdeviceinfo(struct xdr_stream *xdr,
+				const struct nfs4_pnfs_getdeviceinfo_arg *args)
+{
+	uint32_t *p;
+	RESERVE_SPACE(16);
+	WRITE32(OP_GETDEVICEINFO);
+	WRITE32(args->dev_id);
+	WRITE32(args->layoutclass);
+	WRITE32(NFS4_PNFS_DEV_MAXSIZE);
 	return 0;
 }
 
@@ -3217,6 +3243,30 @@ static int nfs41_xdr_enc_pnfs_getdevicelist(struct rpc_rqst *req, uint32_t *p,
 	if (status != 0)
 		goto out;
 	status = encode_getdevicelist(&xdr, args);
+out:
+	return status;
+}
+
+/*
+ * Encode GETDEVICEINFO request
+ */
+static int nfs41_xdr_enc_pnfs_getdeviceinfo(struct rpc_rqst *req,
+				uint32_t *p,
+				struct nfs4_pnfs_getdeviceinfo_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+	encode_sequence(&xdr, &args->seq_args);
+	status = encode_putfh(&xdr, args->fh);
+	if (status != 0)
+		goto out;
+	status = encode_getdeviceinfo(&xdr, args);
 out:
 	return status;
 }
@@ -5252,6 +5302,32 @@ static int decode_getdevicelist(struct xdr_stream *xdr,
 }
 
 /*
+ * Decode GETDEVICEINFO reply
+ */
+static int decode_getdeviceinfo(struct xdr_stream *xdr,
+struct pnfs_device *res)
+{
+	uint32_t *p;
+	uint32_t len, type;
+	int status;
+
+	status = decode_op_hdr(xdr, OP_GETDEVICEINFO);
+	if (status)
+		return status;
+
+	READ_BUF(4);	/* TODO: confirm layout type */
+	READ32(type);
+	READ_BUF(4);
+	READ32(len);
+	READ_BUF(len);
+
+	COPYMEM(&res->dev_addr_buf, len);
+	res->dev_addr_len = len;
+
+	return 0;
+}
+
+/*
  * Decode LAYOUT_GET reply
  */
 static int decode_pnfs_layoutget(struct xdr_stream *xdr, struct rpc_rqst *req,
@@ -7158,6 +7234,32 @@ out:
 }
 
 /*
+ * Decode GETDEVINFO response
+ */
+static int nfs41_xdr_dec_pnfs_getdeviceinfo(struct rpc_rqst *rqstp,
+					uint32_t *p,
+					struct nfs4_pnfs_getdeviceinfo_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status != 0)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status != 0)
+		goto out;
+	status = decode_putfh(&xdr);
+	if (status != 0)
+		goto out;
+	status = decode_getdeviceinfo(&xdr, res->dev);
+out:
+	return status;
+}
+
+/*
  * Decode LAYOUTGET response
  */
 static int nfs41_xdr_dec_pnfs_layoutget(struct rpc_rqst *rqstp, uint32_t *p,
@@ -7399,6 +7501,7 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(GET_LEASE_TIME,	enc_get_lease_time,	dec_get_lease_time, 1),
 #if defined(CONFIG_PNFS)
   PROC(PNFS_GETDEVICELIST, enc_pnfs_getdevicelist, dec_pnfs_getdevicelist, 1),
+  PROC(PNFS_GETDEVICEINFO, enc_pnfs_getdeviceinfo, dec_pnfs_getdeviceinfo, 1),
   PROC(PNFS_LAYOUTGET,	enc_pnfs_layoutget,	dec_pnfs_layoutget, 1),
 #endif /* CONFIG_PNFS */
 };
