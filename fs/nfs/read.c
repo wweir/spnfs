@@ -22,6 +22,10 @@
 
 #include <asm/system.h>
 #include <linux/module.h>
+#ifdef CONFIG_PNFS
+#include <linux/pnfs_xdr.h>
+#include "pnfs.h"
+#endif /* CONFIG_PNFS */
 
 #include "nfs4_fs.h"
 #include "internal.h"
@@ -636,6 +640,9 @@ int nfs_readpages(struct file *filp, struct address_space *mapping,
 			return -EBADF;
 	} else
 		desc.ctx = get_nfs_open_context(nfs_file_open_context(filp));
+#ifdef CONFIG_PNFS
+	pnfs_set_ds_size(inode, desc.ctx, pages, filp->f_pos, &rsize);
+#endif /* CONFIG_PNFS */
 	if (rsize < PAGE_CACHE_SIZE)
 		nfs_pageio_init(&pgio, inode, nfs_pagein_multi, rsize, 0);
 	else
