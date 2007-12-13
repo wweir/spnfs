@@ -605,18 +605,21 @@ decode_and_add_devicelist(struct filelayout_mount_type *mt,
  * of available devices, and return it.
  */
 static struct nfs4_pnfs_dev_item *
-get_device_info(struct filelayout_mount_type *mt, u32 dev_id)
+get_device_info(struct inode *inode, u32 dev_id)
 {
-	int rc;
+	struct filelayout_mount_type *mt = FILE_MT(inode);
 	struct pnfs_device *pdev = NULL;
+	int rc;
 
+	dprintk("%s mt %p\n", __func__, mt);
 	pdev = kmalloc(sizeof(struct pnfs_device), GFP_KERNEL);
 	if (pdev == NULL)
 		return NULL;
 
 	pdev->dev_id = dev_id;
 
-	rc = pnfs_callback_ops->nfs_getdeviceinfo(mt->fl_sb, dev_id, pdev);
+	rc = pnfs_callback_ops->nfs_getdeviceinfo(inode, dev_id, pdev);
+	dprintk("%s getdevice info returns %d\n", __func__, rc);
 	if (rc) {
 		kfree(pdev);
 		return NULL;
@@ -629,40 +632,18 @@ get_device_info(struct filelayout_mount_type *mt, u32 dev_id)
 }
 
 struct nfs4_pnfs_dev_item *
-nfs4_pnfs_device_item_get(struct pnfs_layout_type *ltype, u32 dev_id)
+nfs4_pnfs_device_item_get(struct inode *inode, u32 dev_id)
 {
-	struct filelayout_mount_type *mt;
+	struct filelayout_mount_type *mt = FILE_MT(inode);
 	struct nfs4_pnfs_dev_item *dev;
-
-	mt = (struct filelayout_mount_type *)ltype->mountid->mountid;
 
 	read_lock(&mt->hlist->dev_lock);
 	dev = _device_lookup(mt->hlist, dev_id);
 	read_unlock(&mt->hlist->dev_lock);
 
 	if (dev == NULL)
-		dev = get_device_info(mt, dev_id);
+		dev = get_device_info(inode, dev_id);
 	return dev;
-}
-
-/* Lookup and return the data server struct
- */
-struct nfs4_pnfs_dev *
-nfs4_pnfs_device_get(struct inode *inode, u32 dev_id, u32 stripe_idx)
-{
-	struct nfs4_pnfs_dev_item *dev;
-	struct nfs_server *server = NFS_SERVER(inode);
-	struct filelayout_mount_type *mt;
-
-	mt = (struct filelayout_mount_type *)server->pnfs_mountid->mountid;
-
-	read_lock(&mt->hlist->dev_lock);
-	dev = _device_lookup(mt->hlist, dev_id);
-	read_unlock(&mt->hlist->dev_lock);
-	if (dev == NULL)
-		dev = get_device_info(mt, dev_id);
-
-	return &dev->stripe_devs[stripe_idx];
 }
 
 /* Retrieve the rpc client for a specified byte range
@@ -700,9 +681,11 @@ nfs4_pnfs_dserver_get(struct inode *inode,
 
 	BUG_ON(dbg_stripe_idx != stripe_idx);
 
+	/* TODO: rewrite this function!
 	dserver->dev = nfs4_pnfs_device_get(inode, layout->dev_id, stripe_idx);
 	if (dserver->dev == NULL)
 		return 1;
+	*/
 	dserver->fh = &layout->fh_array[stripe_idx];
 
 	dprintk("%s: dev_id=%u, idx=%u, offset=%Lu, count=%u\n",
