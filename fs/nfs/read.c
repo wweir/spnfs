@@ -403,12 +403,13 @@ void nfs_read_validate(struct rpc_task *task, void *calldata)
 {
 	struct nfs_read_data *data = calldata;
 	struct nfs_server *server = data->args.server;
-	int (*setup_sequence)(struct nfs_server *,
+	struct nfs4_session *session = server->session;
+	int (*setup_sequence)(struct nfs4_session *,
 				void *, void *, int, struct rpc_task *);
 
 	setup_sequence = server->nfs_client->rpc_ops->validate_sequence_args;
 
-	if (!setup_sequence || !setup_sequence(server,
+	if (!setup_sequence || !setup_sequence(session,
 						&data->args.seq_args,
 						&data->res.seq_res,
 						0, task))

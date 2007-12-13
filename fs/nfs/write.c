@@ -993,12 +993,13 @@ void nfs_write_validate(struct rpc_task *task, void *calldata)
 {
 	struct nfs_write_data *data = calldata;
 	struct nfs_server *server = NFS_SERVER(data->inode);
-	int (*setup_sequence)(struct nfs_server *,
+	struct nfs4_session *session = server->session;
+	int (*setup_sequence)(struct nfs4_session *,
 				void *, void *, int, struct rpc_task *);
 
 	setup_sequence = NFS_PROTO(data->inode)->validate_sequence_args;
 
-	if (!setup_sequence || !setup_sequence(server,
+	if (!setup_sequence || !setup_sequence(session,
 						&data->args.seq_args,
 						&data->res.seq_res,
 						1, task))

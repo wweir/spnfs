@@ -121,12 +121,12 @@ void nfs_unlink_validate(struct rpc_task *task, void *calldata)
 {
 	struct nfs_unlinkdata *data = calldata;
 	struct nfs_server *server = NFS_SERVER(data->dir);
-	int (*setup_sequence)(struct nfs_server *,
+	int (*setup_sequence)(struct nfs4_session *,
 				void *, void *, int, struct rpc_task *);
 
 	setup_sequence = NFS_PROTO(data->dir)->validate_sequence_args;
 
-	if (!setup_sequence || !setup_sequence(server,
+	if (!setup_sequence || !setup_sequence(server->session,
 						&data->args.seq_args,
 						&data->res.seq_res,
 						1, task))
