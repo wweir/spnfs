@@ -54,8 +54,6 @@
 
 #define MIN_POOL_LC		(4)
 
-struct pnfs_client_operations pnfs_ops;
-
 static int pnfs_initialized;
 
 /* Locking:
@@ -1069,12 +1067,11 @@ pnfs_getdevicelist(struct super_block *sb, struct nfs_fh *fh,
 /* Retrieve the device information for a device.
  */
 int
-pnfs_getdeviceinfo(struct super_block *sb, u32 dev_id, struct pnfs_device *dev)
+pnfs_getdeviceinfo(struct inode *inode, u32 dev_id, struct pnfs_device *dev)
 {
-	struct nfs_server *server = NFS_SB(sb);
 	int rc;
 
-	rc = nfs4_pnfs_getdeviceinfo(server, dev_id, dev);
+	rc = nfs4_pnfs_getdeviceinfo(inode, dev_id, dev);
 
 	return rc;
 }
