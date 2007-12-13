@@ -1021,7 +1021,6 @@ int pnfs_try_to_read_data(struct nfs_read_data *data,
 	} else {
 		dprintk("%s Utilizing pNFS I/O\n", __FUNCTION__);
 		data->call_ops = call_ops;
-		data->pnfsflags |= PNFS_USE_DS;
 		return pnfs_readpages(data);
 	}
 }
@@ -1098,7 +1097,6 @@ int pnfs_try_to_write_data(struct nfs_write_data *data,
 	} else {
 		dprintk("%s Utilizing pNFS I/O\n", __FUNCTION__);
 		data->call_ops = call_ops;
-		data->pnfsflags |= PNFS_USE_DS;
 		data->how = how;
 		return pnfs_writepages(data, how);
 	}
@@ -1532,7 +1530,6 @@ pnfs_wsize(struct inode *inode, unsigned int count, struct nfs_write_data *wdata
 	if (count >= 0 && below_threshold(inode, count, 1))
 		return NFS_SERVER(inode)->wsize;
 
-	wdata->pnfsflags |= PNFS_USE_DS;
 	return NFS_SERVER(inode)->ds_wsize;
 }
 
