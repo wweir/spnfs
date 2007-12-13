@@ -5054,12 +5054,32 @@ int nfs4_pnfs_getdevicelist(struct nfs_fh *fh,
 	return err;
 }
 
-int nfs4_pnfs_getdeviceinfo(struct nfs_server *server,
+int nfs4_pnfs_getdeviceinfo(struct inode *inode,
 			    u32 dev_id,
-			    struct pnfs_device *res)
+			    struct pnfs_device *dev)
 {
-	/* XXX Need to implement */
-	return -1;
+	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs4_pnfs_getdeviceinfo_arg args = {
+		.fh = NFS_FH(inode),
+		.dev_id = dev_id,
+		.layoutclass = server->pnfs_curr_ld->id,
+	};
+	struct nfs4_pnfs_getdeviceinfo_res res = {
+		.dev = dev,
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_PNFS_GETDEVICEINFO],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+	};
+
+	int status;
+
+	dprintk("--> %s\n", __func__);
+	status = nfs4_call_sync(server, server->client, &msg, &args, &res, 0);
+	dprintk("<-- %s status=%d\n", __func__, status);
+
+	return status;
 }
 
 #endif /* CONFIG_PNFS */
