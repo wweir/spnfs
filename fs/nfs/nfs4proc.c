@@ -4539,6 +4539,30 @@ int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
 		else if (++clp->cl_id_uniquifier == 0)
 			break;
 	}
+	if (status == 0) {
+		struct rpc_clnt *clnt = clp->cl_rpcclient;
+
+		/* NFSv4.1 will use machine creds acquired at mount, and will
+		 * need to remember which creds were used for the EXCHANGE_ID.
+		 * Add an rpc cred pointer to struct nfs_client to hold
+		 * the EXCHANGE_ID cred, and enable AUTH_UNIX mounts.
+		 */
+		if (clnt->cl_auth->au_flavor == RPC_AUTH_UNIX &&
+						current->fsuid == 0) {
+
+			dprintk("%s cl_ex_cred %p [NULL]\n", __func__,
+						clp->cl_ex_cred);
+
+			clp->cl_ex_cred = rpcauth_lookupcred(clnt->cl_auth, 0);
+			atomic_inc(&clp->cl_ex_cred->cr_count);
+
+			dprintk("%s set cl_ex_cred %p\n",
+						__func__, clp->cl_ex_cred);
+		} else {
+			dprintk("%s not AUTH_SYS don't save EXCHANGE_ID cred\n",
+				__func__);
+		}
+	}
 
 	dprintk("<-- %s status= %d\n", __FUNCTION__, status);
 	return status;
@@ -5205,11 +5229,13 @@ struct nfs4_state_recovery_ops nfs41_network_partition_recovery_ops = {
 
 struct nfs4_state_maintenance_ops nfs40_state_renewal_ops = {
 	.sched_state_renewal = nfs4_proc_async_renew,
+	.get_state_renewal_cred = nfs41_get_state_renewal_cred,
 };
 
 #if defined(CONFIG_NFS_V4_1)
 struct nfs4_state_maintenance_ops nfs41_state_renewal_ops = {
 	.sched_state_renewal = nfs41_proc_async_sequence,
+	.get_state_renewal_cred = nfs4_get_renew_cred,
 };
 #endif
 
