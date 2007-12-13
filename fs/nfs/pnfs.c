@@ -899,6 +899,8 @@ out:
 
 /* Post-read completion function.  Invoked by non RPC layout drivers
  * to clean up read pages.
+ *
+ * NOTE: called must set data->pnfsflags PNFS_NO_RPC
  */
 static void
 pnfs_read_done(struct nfs_read_data *data, ssize_t status, int eof)
@@ -910,12 +912,17 @@ pnfs_read_done(struct nfs_read_data *data, ssize_t status, int eof)
 	    pnfs_use_nfsv4_rproto(data->inode, data->args.count))
 		return;
 
-	/* Status is the number of bytes written or an error code */
+	/* Status is the number of bytes written or an error code
+	 * the rpc_task is uninitialized, and tk_status is all that
+	 * is used in the call done routines.
+	 */
 	data->task.tk_status = status;
 	data->res.eof = eof;
 	data->res.count = status;
-	pnfs_readpage_result_norpc(&data->task, data);
-	nfs_readdata_release(data);
+
+	/* call the NFS cleanup routines. */
+	data->call_ops->rpc_call_done(&data->task, data);
+	data->call_ops->rpc_release(data);
 }
 
 /*
