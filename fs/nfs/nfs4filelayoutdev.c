@@ -261,10 +261,12 @@ unhash_ds(struct nfs4_pnfs_ds *ds)
 static void
 destroy_ds(struct nfs4_pnfs_ds *ds)
 {
-	nfs4_proc_destroy_session(ds->ds_clp->cl_ds_session,
+	if (ds->ds_clp) {
+		nfs4_proc_destroy_session(ds->ds_clp->cl_ds_session,
 					  ds->ds_clp->cl_rpcclient);
-	rpc_shutdown_client(ds->ds_clp->cl_rpcclient);
-	ds->ds_clp->cl_rpcclient = NULL;
+		rpc_shutdown_client(ds->ds_clp->cl_rpcclient);
+		ds->ds_clp->cl_rpcclient = NULL;
+	}
 	kfree(ds);
 }
 
@@ -652,43 +654,49 @@ nfs4_pnfs_device_item_get(struct inode *inode, u32 dev_id)
 int
 nfs4_pnfs_dserver_get(struct inode *inode,
 		      struct nfs4_filelayout *layout,
-		      u64 offset,
-		      u32 count,
+		      loff_t offset,
+		      size_t count,
 		      struct nfs4_pnfs_dserver *dserver)
 {
+	struct nfs4_pnfs_dev_item *di;
 	u64 tmp;
-	u32 stripe_idx, dbg_stripe_idx;
+	u32 stripe_idx, end_idx;
 
 	if (!layout)
 		return 1;
 
-	tmp = offset;
-	/* Want ((offset / layout->stripe_unit) % layout->num_devs) */
-	do_div(tmp, layout->stripe_unit);
-	stripe_idx = do_div(tmp, layout->num_fh) + layout->first_stripe_index;
+	di = nfs4_pnfs_device_item_get(inode, layout->dev_id);
+	if (di == NULL)
+		return 1;
 
-	/* For debugging */
+	/* Want ((offset / layout->stripe_unit) % di->stripe_count)
+	* n_str = stripe for offset */
+
+	tmp = offset;
+	do_div(tmp, layout->stripe_unit);
+	stripe_idx = do_div(tmp, di->stripe_count) + layout->first_stripe_index;
+
 	tmp = offset + count - 1;
 	do_div(tmp, layout->stripe_unit);
-	dbg_stripe_idx = do_div(tmp, layout->num_fh) +
-				layout->first_stripe_index;
+	end_idx = do_div(tmp, di->stripe_count) + layout->first_stripe_index;
 
-	dprintk("%s: offset=%Lu, count=%u, si=%u, dsi=%u, "
-		   "num_devs=%u, stripe_unit=%Lu\n",
-		   __func__,
-		   offset, count, stripe_idx, dbg_stripe_idx, layout->num_fh,
-		   layout->stripe_unit);
+	dprintk("%s: offset=%Lu, count=%Zu, si=%u, dsi=%u, "
+		"stripe_count=%u, stripe_unit=%Lu first_stripe_index %d\n",
+		__func__,
+		offset, count, stripe_idx, end_idx, di->stripe_count,
+		layout->stripe_unit, layout->first_stripe_index);
 
-	BUG_ON(dbg_stripe_idx != stripe_idx);
+	BUG_ON(end_idx != stripe_idx);
 
-	/* TODO: rewrite this function!
-	dserver->dev = nfs4_pnfs_device_get(inode, layout->dev_id, stripe_idx);
+	dserver->dev = &di->stripe_devs[stripe_idx];
 	if (dserver->dev == NULL)
 		return 1;
-	*/
-	dserver->fh = &layout->fh_array[stripe_idx];
+	if (layout->num_fh == 1)
+		dserver->fh = &layout->fh_array[0];
+	else
+		dserver->fh = &layout->fh_array[stripe_idx];
 
-	dprintk("%s: dev_id=%u, idx=%u, offset=%Lu, count=%u\n",
+	dprintk("%s: dev_id=%u, idx=%u, offset=%Lu, count=%Zu\n",
 		__func__, layout->dev_id, stripe_idx, offset, count);
 
 	return 0;
