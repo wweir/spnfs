@@ -248,7 +248,6 @@ void nfs_initiate_read(struct nfs_read_data *data, struct rpc_clnt *clnt,
 
 	nfs_execute_read(data);
 }
-EXPORT_SYMBOL(nfs_initiate_read);
 
 /*
  * Generate multiple requests to fill a single page.
@@ -669,3 +668,9 @@ void nfs_destroy_readpagecache(void)
 	mempool_destroy(nfs_rdata_mempool);
 	kmem_cache_destroy(nfs_rdata_cachep);
 }
+
+#ifdef CONFIG_PNFS
+EXPORT_SYMBOL(nfs_initiate_read);
+EXPORT_SYMBOL(nfs_readdata_release);
+EXPORT_SYMBOL(nfs_read_validate);
+#endif /* CONFIG_PNFS */
