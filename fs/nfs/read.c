@@ -418,8 +418,14 @@ int nfs_read_validate(struct rpc_task *task, void *calldata)
 {
 	struct nfs_read_data *data = calldata;
 	struct nfs_server *server = data->args.server;
+	struct nfs4_session *session = server->session;
 
-	return nfs4_setup_sequence(server->nfs_client, server->session,
+#ifdef CONFIG_PNFS
+	if (data->ds_nfs_client)
+		session = data->ds_nfs_client->cl_ds_session;
+#endif /* CONFIG_PNFS */
+
+	return nfs4_setup_sequence(server->nfs_client, session,
 				   &data->args.seq_args, &data->res.seq_res,
 				   0, task);
 }
