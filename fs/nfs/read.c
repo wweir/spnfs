@@ -375,6 +375,10 @@ static int nfs_readpage_retry(struct rpc_task *task, struct nfs_read_data *data)
 	struct nfs_readargs *argp = &data->args;
 	struct nfs_readres *resp = &data->res;
 
+#ifdef CONFIG_PNFS
+	if (data->pnfsflags & PNFS_NO_RPC)
+		return 0;
+#endif /* CONFIG_PNFS */
 	if (resp->eof || resp->count == argp->count)
 		return 0;
 
