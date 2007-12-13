@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 24
-EXTRAVERSION = -rc5-nfs41
+EXTRAVERSION = -rc5-pnfs
 NAME = Arr Matey! A Hairy Bilge Rat!
 
 # *DOCUMENTATION*
