@@ -12,6 +12,8 @@
 #ifndef FS_NFS_PNFS_H
 #define FS_NFS_PNFS_H
 
+#include <linux/nfs4_pnfs.h>
+
 #ifdef CONFIG_PNFS
 /* nfs4proc.c */
 extern int nfs4_pnfs_getdevicelist(struct nfs_fh *fh,
@@ -33,7 +35,7 @@ int pnfs_use_ds_io(struct list_head *, struct inode *, int);
 
 int pnfs_use_write(struct inode *inode, ssize_t count);
 int pnfs_try_to_write_data(struct nfs_write_data *, const struct rpc_call_ops *, int);
-int pnfs_try_to_read_data(struct nfs_read_data *data, const struct rpc_call_ops *call_ops);
+int _pnfs_try_to_read_data(struct nfs_read_data *data, const struct rpc_call_ops *call_ops);
 int pnfs_initialize(void);
 void pnfs_uninitialize(void);
 void pnfs_layoutcommit_done(struct pnfs_layoutcommit_data *data, int status);
@@ -81,6 +83,27 @@ unsigned int pnfs_page_length(struct page *page, struct inode *inode)
 #define PNFS_EXISTS_LDPOLICY_OP(opname) (nfss->pnfs_curr_ld && \
 				     nfss->pnfs_curr_ld->ld_policy_ops && \
 				     nfss->pnfs_curr_ld->ld_policy_ops->opname)
+
+static inline int pnfs_try_to_read_data(struct nfs_read_data *data,
+					const struct rpc_call_ops *call_ops)
+{
+	struct inode *inode = data->inode;
+	struct nfs_server *nfss = NFS_SERVER(inode);
+
+	/* FIXME: read_pagelist should probably be mandated */
+	if (PNFS_EXISTS_LDIO_OP(read_pagelist))
+		return _pnfs_try_to_read_data(data, call_ops);
+
+	return 1;
+}
+
+#else  /* CONFIG_PNFS */
+
+static inline int pnfs_try_to_read_data(struct nfs_read_data *data,
+					const struct rpc_call_ops *call_ops)
+{
+	return 1;
+}
 
 #endif /* CONFIG_PNFS */
 
