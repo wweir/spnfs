@@ -226,7 +226,8 @@ static void nfs_read_rpcsetup(struct nfs_page *req, struct nfs_read_data *data,
 	nfs_fattr_init(&data->fattr);
 
 #ifdef CONFIG_PNFS
-	if ((pnfs_try_to_read_data(data, call_ops)) <= 0)
+	data->error = pnfs_try_to_read_data(data, call_ops);
+	if (data->error <= 0)
 		return;
 #endif /* CONFIG_PNFS*/
 
@@ -299,6 +300,10 @@ static int nfs_pagein_multi(struct inode *inode, struct list_head *head, unsigne
 			rsize = nbytes;
 		nfs_read_rpcsetup(req, data, &nfs_read_partial_ops,
 				  rsize, offset);
+#ifdef CONFIG_PNFS
+		if (data->error < 0)
+			return data->error;
+#endif /* CONFIG_PNFS */
 		offset += rsize;
 		nbytes -= rsize;
 	} while (nbytes != 0);
@@ -339,6 +344,10 @@ static int nfs_pagein_one(struct inode *inode, struct list_head *head, unsigned 
 	req = nfs_list_entry(data->pages.next);
 
 	nfs_read_rpcsetup(req, data, &nfs_read_full_ops, count, 0);
+#ifdef CONFIG_PNFS
+	if (data->error < 0)
+		return data->error;
+#endif /* CONFIG_PNFS */
 
 	return 0;
 out_bad:
