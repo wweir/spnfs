@@ -13,6 +13,8 @@
 #define FS_NFS_PNFS_H
 
 #ifdef CONFIG_PNFS
+#include <linux/nfs_page.h>
+
 int virtual_update_layout(struct inode *ino, struct nfs_open_context *ctx,
 	size_t count, loff_t pos, enum pnfs_iomode access_type);
 
@@ -52,7 +54,7 @@ int pnfs_wpages(struct inode *);
 void pnfs_readpage_result_norpc(struct rpc_task *task, void *calldata);
 void pnfs_writeback_done_norpc(struct rpc_task *, void *);
 void pnfs_commit_done_norpc(struct rpc_task *, void *);
-void pnfs_set_ds_size(struct inode *, struct nfs_open_context *, struct list_head *, loff_t, size_t *);
+void pnfs_set_ds_rsize(struct inode *, struct nfs_open_context *, struct list_head *, loff_t, size_t *, struct nfs_pageio_descriptor *);
 
 
 /*
