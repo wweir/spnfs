@@ -1056,9 +1056,8 @@ struct nfs_read_data {
 
 #if defined(CONFIG_PNFS)
 /* pnfsflag values */
-#define PNFS_ISSYNC            0x0001   /* sync I/O request */
-#define PNFS_USE_DS            0x0002   /* use data server I/O */
-#define PNFS_USE_FULL_CB       0x0004   /* non rpc result callback switch */
+#define PNFS_ISSYNC		0x0001   /* sync I/O request */
+#define PNFS_USE_FULL_CB	0x0002   /* non rpc result callback switch */
 #endif /* CONFIG_PNFS */
 
 struct nfs_write_data {
