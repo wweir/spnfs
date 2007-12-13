@@ -53,6 +53,11 @@
 #include "callback.h"
 #include "delegation.h"
 #include "internal.h"
+#ifdef CONFIG_PNFS
+#include <linux/pnfs_xdr.h>
+#include <linux/nfs4_pnfs.h>
+#include "pnfs.h"
+#endif /* CONFIG_PNFS */
 
 #define OPENOWNER_POOL_SIZE	8
 
@@ -481,8 +486,21 @@ static void __nfs4_close(struct path *path, struct nfs4_state *state, mode_t mod
 	if (!call_close) {
 		nfs4_put_open_state(state);
 		nfs4_put_state_owner(owner);
-	} else
+	} else {
+#ifdef CONFIG_PNFS
+	struct nfs_inode *nfsi = NFS_I(state->inode);
+
+	if (nfsi->current_layout && nfsi->current_layout->roc_iomode) {
+		struct nfs4_pnfs_layout_segment range;
+
+		range.iomode = nfsi->current_layout->roc_iomode;
+		range.offset = 0;
+		range.length = NFS4_LENGTH_EOF;
+		pnfs_return_layout(state->inode, &range);
+	}
+#endif /* CONFIG_PNFS */
 		nfs4_do_close(path, state, wait);
+	}
 }
 
 void nfs4_close_state(struct path *path, struct nfs4_state *state, mode_t mode)
