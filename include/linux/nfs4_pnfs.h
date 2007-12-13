@@ -130,7 +130,7 @@ struct pnfs_devicelist {
  */
 struct pnfs_client_operations {
 	int (*nfs_getdevicelist) (struct super_block *sb, struct nfs_fh *fh, struct pnfs_devicelist *devlist);
-	int (*nfs_getdeviceinfo) (struct super_block *sb, u32 dev_id, struct pnfs_device *dev);
+	int (*nfs_getdeviceinfo) (struct inode *inode, u32 dev_id, struct pnfs_device *dev);
 
 	/* Post read callback.  Layout driver calls this function if unstable data was
 	 * written and requires a commit call
