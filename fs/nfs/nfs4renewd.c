@@ -64,7 +64,7 @@ nfs4_renew_state(struct work_struct *work)
 	struct nfs4_state_maintenance_ops *ops;
 	struct nfs_client *clp =
 		container_of(work, struct nfs_client, cl_renewd.work);
-	struct rpc_cred *cred;
+	struct rpc_cred *cred = NULL;
 	long lease, timeout;
 	unsigned long last, now;
 
@@ -81,13 +81,7 @@ nfs4_renew_state(struct work_struct *work)
 	timeout = (2 * lease) / 3 + (long)last - (long)now;
 	/* Are we close to a lease timeout? */
 	if (time_after(now, last + lease/3)) {
-#if defined(CONFIG_NFS_V4_1)
-		dprintk("%s NO STATE RENEWAL: ops->sched_state_renewal() "
-			"not implemented\n", __func__);
-		cred = NULL;
-#else /* CONFIG_NFS_V4_1 */
-		cred = nfs4_get_renew_cred(clp);
-#endif /* CONFIG_NFS_V4_1 */
+		cred = ops->get_state_renewal_cred(clp);
 		if (cred == NULL) {
 			set_bit(NFS4CLNT_LEASE_EXPIRED, &clp->cl_state);
 			spin_unlock(&clp->cl_lock);
