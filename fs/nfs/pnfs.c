@@ -951,13 +951,6 @@ pnfs_readpages(struct nfs_read_data *rdata)
 		status = 1;
 		goto out;
 	}
-	if (!nfss->pnfs_curr_ld->ld_io_ops ||
-	    !nfss->pnfs_curr_ld->ld_io_ops->read_pagelist) {
-		printk(KERN_ERR "%s: ERROR, no layout driver read operation\n",
-		       __func__);
-		status = 1;
-		goto out;
-	}
 
 	/* Determine number of pages. */
 	pgcount = args->pgbase + args->count;
@@ -985,7 +978,7 @@ pnfs_readpages(struct nfs_read_data *rdata)
 	return status;
 }
 
-int pnfs_try_to_read_data(struct nfs_read_data *data,
+int _pnfs_try_to_read_data(struct nfs_read_data *data,
 			   const struct rpc_call_ops *call_ops)
 {
 	struct inode *ino = data->inode;
