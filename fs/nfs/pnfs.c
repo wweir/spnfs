@@ -640,15 +640,36 @@ check:
 		return 0;
 }
 
+void
+pnfs_set_pg_test(struct inode *inode, struct nfs_pageio_descriptor *pgio)
+{
+	struct pnfs_layout_type *laytype;
+	struct layoutdriver_policy_operations *policy_ops;
+	struct pnfs_layoutdriver_type *ld;
+
+	laytype = NFS_I(inode)->current_layout;
+	ld = NFS_SERVER(inode)->pnfs_curr_ld;
+	if (!pnfs_enabled_sb(NFS_SERVER(inode)) || !laytype)
+		return;
+	policy_ops = ld->ld_policy_ops;
+
+	if (policy_ops && policy_ops->pg_test) {
+		pgio->pg_test = policy_ops->pg_test;
+	} else {
+		pgio->pg_test = NULL;
+	}
+}
+
 /*
  * rsize is already set by caller to MDS rsize.
  */
 void
-pnfs_set_ds_size(struct inode *inode,
+pnfs_set_ds_rsize(struct inode *inode,
 		 struct nfs_open_context *ctx,
 		 struct list_head *pages,
 		 loff_t offset,
-		 size_t *rsize)
+		 size_t *rsize,
+		 struct nfs_pageio_descriptor *pgio)
 {
 	struct nfs_server *nfss = NFS_SERVER(inode);
 	struct page *page;
@@ -657,6 +678,9 @@ pnfs_set_ds_size(struct inode *inode,
 
 	dprintk("--> %s inode %p ctx %p pages %p offset %lu\n",
 		__func__, inode, ctx, pages, (unsigned long)offset);
+
+	pgio->pg_boundary = 0;
+	pgio->pg_test = 0;
 
 	if (!pnfs_enabled_sb(nfss))
 		return;
@@ -675,6 +699,14 @@ pnfs_set_ds_size(struct inode *inode,
 
 	if (status == 0 && count > 0 && !below_threshold(inode, count, 0))
 		*rsize = NFS_SERVER(inode)->ds_rsize;
+
+	/* boundary set => gather pages by stripe => need pg_test */
+	pgio->pg_boundary = pnfs_getboundary(inode);
+	if (pgio->pg_boundary)
+		pnfs_set_pg_test(inode, pgio);
+
+	dprintk("<-- %s pg_boundary %d, pg_test %p\n", __func__,
+			pgio->pg_boundary, pgio->pg_test);
 }
 
 
