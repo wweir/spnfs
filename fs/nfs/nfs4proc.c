@@ -2970,6 +2970,10 @@ static int pnfs4_read_done(struct rpc_task *task, struct nfs_read_data *data)
 	int status;
 
 	dprintk("--> %s\n", __func__);
+
+	if (data->pnfsflags & PNFS_NO_RPC)
+		return 0;
+
 	status = task->tk_status >= 0 ? 0 : task->tk_status;
 
 	/* Is this a DS session */
