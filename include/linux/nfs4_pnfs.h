@@ -78,6 +78,9 @@ struct layoutdriver_policy_operations {
 	/* Should the NFS req. gather algorithm cross stripe boundaries? */
 	int (*gather_across_stripes) (struct pnfs_mount_type *mountid);
 
+	/* test for nfs page cache coalescing */
+	int (*pg_test)(int, struct nfs_page *, struct nfs_page *);
+
 	/* Retreive the block size of the file system.  If gather_across_stripes == 1,
 	 * then the file system will gather requests into the block size.
 	 * TODO: Where will the layout driver get this info?  It is hard coded in PVFS2.
