@@ -479,7 +479,7 @@ void nfs41_call_sync_validate_args(struct rpc_task *task, void *calldata)
 	int ret;
 	struct nfs41_call_sync_data *data = calldata;
 
-	printk(KERN_INFO "--> %s data->server->session %p\n", __func__,
+	dprintk("--> %s data->server->session %p\n", __func__,
 		data->server->session);
 	ret = nfs4_setup_sequence(data->server->nfs_client,
 				data->server->session, data->seq_args,

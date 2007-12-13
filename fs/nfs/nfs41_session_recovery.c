@@ -186,7 +186,6 @@ int nfs41_recover_session(struct nfs_client *clp, struct nfs4_session *session)
 	struct reclaimer_arg *rec;
 	int ret;
 
-	printk(KERN_INFO "--> %s clp %p session %p\n", __func__, clp, session);
 	/* freed in nfs41_end_session_recovery */
 	rec = kmalloc(sizeof(*rec), GFP_KERNEL);
 	if (!rec)
@@ -194,7 +193,6 @@ int nfs41_recover_session(struct nfs_client *clp, struct nfs4_session *session)
 	rec->clp = clp;
 	rec->session = session;
 
-	printk(KERN_INFO "%s rec %p\n", __func__, rec);
 	ret = nfs41_start_session_recovery(session);
 
 	/*
