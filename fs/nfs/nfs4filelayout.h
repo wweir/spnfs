@@ -22,6 +22,10 @@
 #define NFS4_PNFS_MAX_STRIPE_CNT 16
 #define NFS4_PNFS_MAX_MULTI_DS   2
 
+
+#define FILE_MT(inode) ((struct filelayout_mount_type *) \
+			(NFS_SERVER(inode)->pnfs_mountid->mountid))
+
 struct nfs4_session *nfs41_alloc_session(void);
 int _nfs4_proc_create_session(struct nfs_client *clp, struct nfs4_session *session,
 				struct rpc_clnt *clnt);
@@ -107,10 +111,8 @@ int nfs4_pnfs_dserver_get(struct inode *inode,
 			  struct nfs4_pnfs_dserver *dserver);
 int decode_and_add_devicelist(struct filelayout_mount_type *mt, struct pnfs_devicelist *devlist);
 
-struct nfs4_pnfs_dev *
-nfs4_pnfs_device_get(struct inode *inode, u32 dev_id, u32 stripe_index);
 struct nfs4_pnfs_dev_item *
-nfs4_pnfs_device_item_get(struct pnfs_layout_type *ltype, u32 dev_id);
+nfs4_pnfs_device_item_get(struct inode *inode, u32 dev_id);
 
 
 #define READ32(x)         (x) = ntohl(*p++)
