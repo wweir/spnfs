@@ -1156,7 +1156,7 @@ struct nfs_rpc_ops {
 	int	(*file_release) (struct inode *, struct file *);
 	int	(*lock)(struct file *, int, struct file_lock *);
 	void	(*clear_acl_cache)(struct inode *);
-	int 	(*validate_sequence_args)(struct nfs_server *,
+	int	(*validate_sequence_args)(struct nfs4_session *,
 						void *args,
 						void *res,
 						int,

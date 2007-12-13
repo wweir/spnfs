@@ -391,13 +391,13 @@ static int nfs41_setup_sequence(struct nfs4_session *session,
 	return 0;
 }
 
-static int nfs41_validate_seq_args(struct nfs_server *server,
+static int nfs41_validate_seq_args(struct nfs4_session *session,
 					void *args,
 					void *res,
 					int cache_this,
 					struct rpc_task *task)
 {
-	return nfs41_setup_sequence(server->session,
+	return nfs41_setup_sequence(session,
 					args, res,
 					cache_this, task);
 }
