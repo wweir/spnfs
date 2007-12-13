@@ -603,6 +603,26 @@ filelayout_gather_across_stripes(struct pnfs_mount_type *mountid)
 	return 0;
 }
 
+/*
+ * filelayout_pg_test(). Called by nfs_can_coalesce_requests()
+ * return 1 :  prev and req on same stripe.
+ * return 0 :  pref and req on different stripe.
+ */
+int
+filelayout_pg_test(int boundary, struct nfs_page *prev, struct nfs_page *req)
+{
+	u32 p_stripe, r_stripe;
+
+	if (boundary == 0)
+		return 1;
+	p_stripe = prev->wb_index << PAGE_CACHE_SHIFT;
+	do_div(p_stripe, boundary);
+	r_stripe = req->wb_index << PAGE_CACHE_SHIFT;
+	do_div(r_stripe, boundary);
+
+	return (p_stripe == r_stripe);
+}
+
 /* Issue a layoutget in the same compound as OPEN
  */
 int
@@ -632,6 +652,7 @@ struct layoutdriver_io_operations filelayout_io_operations = {
 struct layoutdriver_policy_operations filelayout_policy_operations = {
 	.get_stripesize        = filelayout_get_stripesize,
 	.gather_across_stripes = filelayout_gather_across_stripes,
+	.pg_test               = filelayout_pg_test,
 	.layoutget_on_open     = filelayout_layoutget_on_open,
 	.get_read_threshold    = filelayout_get_io_threshold,
 	.get_write_threshold   = filelayout_get_io_threshold,
