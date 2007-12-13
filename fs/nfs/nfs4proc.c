@@ -3353,14 +3353,22 @@ nfs4_async_handle_error(struct rpc_task *task, const struct nfs_server *server,
 		case -NFS4ERR_RETRY_UNCACHED_REP:
 		case -NFS4ERR_TOO_MANY_OPS:
 		case -NFS4ERR_OP_NOT_IN_SESSION:
+		{
+			struct nfs4_session *session = server->session;
+
+#ifdef CONFIG_PNFS
+			if (clp->cl_ds_session)
+				session = clp->cl_ds_session;
+#endif /* CONFIG_PNFS */
 			/* FIXME:
 			ret = nfs41_recover_session_async(task, server);
 			if (ret)
 				return ret;
 			*/
-			nfs41_set_session_expired(server->session);
+			nfs41_set_session_expired(session);
 			task->tk_status = 0;
 			return -EAGAIN;
+		}
 #endif /* CONFIG_NFS_V4_1 */
 		case -NFS4ERR_DELAY:
 			nfs_inc_server_stats((struct nfs_server *) server,
