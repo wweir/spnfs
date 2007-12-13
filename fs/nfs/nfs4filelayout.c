@@ -239,7 +239,9 @@ static void filelayout_write_call_done(struct rpc_task *task, void *data)
 }
 
 struct rpc_call_ops filelayout_read_call_ops = {
+	.rpc_call_validate_args = nfs_read_validate,
 	.rpc_call_done = filelayout_read_call_done,
+	.rpc_release = nfs_readdata_release,
 };
 
 struct rpc_call_ops filelayout_write_call_ops = {
@@ -274,7 +276,6 @@ ssize_t filelayout_read_pagelist(
 	struct nfs4_filelayout *nfslay = NULL;
 	struct nfs4_pnfs_dserver dserver;
 	int status;
-	struct nfs_server *server = NFS_SERVER(inode);
 
 	if (layoutid) {
 		nfslay = (struct nfs4_filelayout *)layoutid->layoutid;
@@ -288,7 +289,7 @@ ssize_t filelayout_read_pagelist(
 			printk(KERN_ERR "%s: dserver get failed status %d use MDS\n",
 							__FUNCTION__, status);
 			data->pnfs_client = NFS_CLIENT(inode);
-			data->session = server->session;
+			data->ds_nfs_client = NULL;
 			data->args.fh = NFS_FH(inode);
 			status = 0;
 		} else {
@@ -296,7 +297,7 @@ ssize_t filelayout_read_pagelist(
 
 			/* just try the first data server for the index..*/
 			data->pnfs_client = ds->ds_clp->cl_rpcclient;
-			data->session = ds->ds_clp->cl_ds_session;
+			data->ds_nfs_client = ds->ds_clp;
 			data->args.fh = dserver.fh;
 
 			/* Now get the file offset on the dserver
@@ -309,7 +310,7 @@ ssize_t filelayout_read_pagelist(
 	} else { /* If no layout use MDS */
 		dprintk("%s: no layout, use MDS\n", __FUNCTION__);
 		data->pnfs_client = NFS_CLIENT(inode);
-		data->session = server->session;
+		data->ds_nfs_client = NULL;
 		data->args.fh = NFS_FH(inode);
 	}
 
