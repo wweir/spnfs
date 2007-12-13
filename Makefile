@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 25
-EXTRAVERSION = -rc7-nfs41
+EXTRAVERSION = -rc7-pnfs
 NAME = Funky Weasel is Jiggy wit it
 
 # *DOCUMENTATION*
