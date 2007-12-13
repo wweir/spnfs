@@ -420,6 +420,11 @@ int nfs_read_validate(struct rpc_task *task, void *calldata)
 	struct nfs_server *server = data->args.server;
 	struct nfs4_session *session = server->session;
 
+#ifdef CONFIG_PNFS
+	if (data->ds_nfs_client)
+		session = data->ds_nfs_client->cl_ds_session;
+#endif /* CONFIG_PNFS */
+
 	return nfs41_call_validate_seq_args(server, session,
 					    &data->args.seq_args,
 					    &data->res.seq_res,
