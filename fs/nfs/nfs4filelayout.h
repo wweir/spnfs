@@ -103,8 +103,8 @@ void nfs4_pnfs_devlist_destroy(struct nfs4_pnfs_dev_hlist *hlist);
 
 int nfs4_pnfs_dserver_get(struct inode *inode,
 			  struct nfs4_filelayout *layout,
-			  u64 offset,
-			  u32 count,
+			  loff_t offset,
+			  size_t count,
 			  struct nfs4_pnfs_dserver *dserver);
 int decode_and_add_devicelist(struct filelayout_mount_type *mt, struct pnfs_devicelist *devlist);
 
