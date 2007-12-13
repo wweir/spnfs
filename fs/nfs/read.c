@@ -78,6 +78,7 @@ void nfs_readdata_release(void *data)
 {
         nfs_readdata_free(data);
 }
+EXPORT_SYMBOL(nfs_readdata_release);
 
 static
 int nfs_return_empty_page(struct page *page)
@@ -420,6 +421,7 @@ int nfs_read_validate(struct rpc_task *task, void *calldata)
 				   &data->args.seq_args, &data->res.seq_res,
 				   0, task);
 }
+EXPORT_SYMBOL(nfs_read_validate);
 #endif /* CONFIG_NFS_V4_1 */
 
 static const struct rpc_call_ops nfs_read_partial_ops = {
