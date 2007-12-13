@@ -1049,7 +1049,7 @@ struct nfs_read_data {
 	struct rpc_clnt		*pnfs_client;	/* Holds pNFS device across async calls */
 	int			pnfsflags;
 	__u64			orig_offset;
-	struct nfs4_session	*session;
+	struct nfs_client	*ds_nfs_client;
 #endif /* CONFIG_PNFS */
 	struct page		*page_array[NFS_PAGEVEC_SIZE];
 };
