@@ -3169,6 +3169,9 @@ static void nfs4_renew_done(struct rpc_task *task, void *data)
 	if (time_before(clp->cl_last_renewal,timestamp))
 		clp->cl_last_renewal = timestamp;
 	spin_unlock(&clp->cl_lock);
+	dprintk("%s calling put_rpccred on rpc_cred %p\n", __func__,
+				task->tk_msg.rpc_cred);
+	put_rpccred(task->tk_msg.rpc_cred);
 }
 
 static const struct rpc_call_ops nfs4_renew_ops = {
@@ -5019,6 +5022,13 @@ void nfs41_sequence_call_done(struct rpc_task *task, void *data)
 			nfs41_recover_session(clp, session);
 		}
 	}
+	dprintk("%s rpc_cred %p\n", __func__, task->tk_msg.rpc_cred);
+
+	put_rpccred(task->tk_msg.rpc_cred);
+	kfree(task->tk_msg.rpc_argp);
+	kfree(task->tk_msg.rpc_resp);
+
+	dprintk("<-- %s\n", __func__);
 }
 
 static void nfs41_sequence_validate(struct rpc_task *task, void *data)
@@ -5046,16 +5056,24 @@ static const struct rpc_call_ops nfs41_sequence_ops = {
 
 int nfs41_proc_async_sequence(struct nfs_client *clp, struct rpc_cred *cred)
 {
-	struct nfs41_sequence_args args;
-	struct nfs41_sequence_res res;
+	struct nfs41_sequence_args *args;
+	struct nfs41_sequence_res *res;
 	struct nfs_server *server;
-
 	struct rpc_message msg = {
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_SEQUENCE],
-		.rpc_argp	= &args,
-		.rpc_resp	= &res,
 		.rpc_cred	= cred,
 	};
+
+	args = kzalloc(sizeof(*args), GFP_KERNEL);
+	if (!args)
+		return -ENOMEM;
+	res = kzalloc(sizeof(*res), GFP_KERNEL);
+	if (!res) {
+		kfree(args);
+		return -ENOMEM;
+	}
+	msg.rpc_argp = args;
+	msg.rpc_resp = res;
 
 	/*
 	 * We need to renew the lease on the server. For this, we use any
@@ -5229,13 +5247,13 @@ struct nfs4_state_recovery_ops nfs41_network_partition_recovery_ops = {
 
 struct nfs4_state_maintenance_ops nfs40_state_renewal_ops = {
 	.sched_state_renewal = nfs4_proc_async_renew,
-	.get_state_renewal_cred = nfs41_get_state_renewal_cred,
+	.get_state_renewal_cred = nfs4_get_renew_cred,
 };
 
 #if defined(CONFIG_NFS_V4_1)
 struct nfs4_state_maintenance_ops nfs41_state_renewal_ops = {
 	.sched_state_renewal = nfs41_proc_async_sequence,
-	.get_state_renewal_cred = nfs4_get_renew_cred,
+	.get_state_renewal_cred = nfs41_get_state_renewal_cred,
 };
 #endif
 
