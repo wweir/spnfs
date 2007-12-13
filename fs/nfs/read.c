@@ -438,6 +438,11 @@ void nfs_read_validate(struct rpc_task *task, void *calldata)
 
 	setup_sequence = server->nfs_client->rpc_ops->validate_sequence_args;
 
+#ifdef CONFIG_PNFS
+	if (data->ds_nfs_client)
+		session = data->ds_nfs_client->cl_ds_session;
+#endif /* CONFIG_PNFS */
+
 	if (!setup_sequence || !setup_sequence(session,
 						&data->args.seq_args,
 						&data->res.seq_res,
