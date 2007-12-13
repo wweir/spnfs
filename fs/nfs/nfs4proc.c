@@ -5346,7 +5346,6 @@ const struct nfs_rpc_ops pnfs_v41_clientops = {
 	.wsize		= pnfs_wsize,
 	.rpages		= pnfs_rpages,
 	.wpages		= pnfs_wpages,
-	.boundary	= pnfs_getboundary,
 	.clear_acl_cache = nfs4_zap_acl_attr,
 	.pnfs_layoutget      = nfs4_proc_pnfs_layoutget,
 	.pnfs_layoutcommit       = pnfs_proc_layoutcommit,
