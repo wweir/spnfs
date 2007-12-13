@@ -35,6 +35,10 @@
 #include "delegation.h"
 #include "internal.h"
 #include "iostat.h"
+#ifdef CONFIG_PNFS
+#include <linux/pnfs_xdr.h>
+#include "pnfs.h"
+#endif /* CONFIG_PNFS */
 
 #define NFSDBG_FACILITY		NFSDBG_FILE
 
@@ -81,6 +85,26 @@ const struct inode_operations nfs_file_inode_operations = {
 	.getattr	= nfs_getattr,
 	.setattr	= nfs_setattr,
 };
+
+#ifdef CONFIG_PNFS
+const struct file_operations pnfs_file_operations = {
+	.llseek		= nfs_file_llseek,
+	.read		= pnfs_file_read,
+	.write		= pnfs_file_write,
+	.aio_read	= nfs_file_read,
+	.aio_write	= nfs_file_write,
+	.mmap		= nfs_file_mmap,
+	.open		= nfs_file_open,
+	.flush		= nfs_file_flush,
+	.release	= nfs_file_release,
+	.fsync		= pnfs_fsync,
+	.lock		= nfs_lock,
+	.flock		= nfs_flock,
+	.splice_read	= nfs_file_splice_read,
+	.check_flags	= nfs_check_flags,
+	.setlease	= nfs_setlease,
+};
+#endif /* CONFIG_PNFS */
 
 #ifdef CONFIG_NFS_V3
 const struct inode_operations nfs3_file_inode_operations = {
