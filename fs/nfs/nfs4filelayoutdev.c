@@ -213,6 +213,10 @@ nfs4_pnfs_ds_create(struct nfs_server *mds_srv, struct nfs4_pnfs_ds *ds)
 		goto out;
 
 	clp = tmp.nfs_client;
+
+	/* data servers don't renew state */
+	cancel_delayed_work(&clp->cl_renewd);
+
 	err = nfs4_init_session(clp, &clp->cl_ds_session, clp->cl_rpcclient);
 	if (err)
 		goto out_put;
