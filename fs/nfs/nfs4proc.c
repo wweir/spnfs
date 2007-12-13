@@ -4950,6 +4950,8 @@ void nfs41_sequence_call_done(struct rpc_task *task, void *data)
 		case -NFS4ERR_RETRY_UNCACHED_REP:
 		case -NFS4ERR_TOO_MANY_OPS:
 		case -NFS4ERR_OP_NOT_IN_SESSION:
+			dprintk("%s calling recover_session clp %p "
+				"session %p\n", __func__, clp, session);
 			nfs41_recover_session(clp, session);
 		}
 	}
