@@ -2026,6 +2026,9 @@ static void nfs4_kill_super(struct super_block *sb)
 	kill_anon_super(sb);
 
 #if defined(CONFIG_NFS_V4_1)
+#ifdef CONFIG_PNFS
+	unmount_pnfs_layoutdriver(sb);
+#endif
 	switch (server->nfs_client->cl_minorversion) {
 	case 1:
 		if (server->session) {
