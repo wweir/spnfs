@@ -1169,7 +1169,6 @@ struct nfs_rpc_ops {
 	int	(*wsize) (struct inode *, unsigned int, struct nfs_write_data *);
 	int	(*rpages) (struct inode *);
 	int	(*wpages) (struct inode *);
-	u32	(*boundary) (struct inode *);
 	int	(*pnfs_layoutget)(struct nfs4_pnfs_layoutget *layout);
 	void	(*pnfs_layoutcommit_setup)(struct pnfs_layoutcommit_data *);
 	int	(*pnfs_layoutcommit)  (struct pnfs_layoutcommit_data *);
