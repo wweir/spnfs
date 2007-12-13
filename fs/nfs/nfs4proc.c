@@ -233,6 +233,10 @@ int nfs4_wait_bit_interruptible(void *word)
 }
 
 #if defined(CONFIG_NFS_V4_1)
+/* For pNFS filelayout data servers:
+ * the nfs_client is NULL - to signal no lease update.
+ * session is the data server.
+ */
 static int nfs41_sequence_done(struct nfs_client *clp,
 	struct nfs4_session *session,
 	struct nfs41_sequence_res *res, int status)
@@ -245,7 +249,9 @@ static int nfs41_sequence_done(struct nfs_client *clp,
 		dprintk("%s: no session: status %d\n", __func__, status);
 		goto ret;
 	}
+#if !defined(CONFIG_PNFS)
 	BUG_ON(clp == NULL);
+#endif /* !CONFIG_PNFS */
 	BUG_ON(res == NULL);
 
 	tbl = &session->fore_channel.slot_table;
@@ -274,6 +280,8 @@ static int nfs41_sequence_done(struct nfs_client *clp,
 		 * The sequence call was successful,
 		 * Update our lease renewal timers
 		 */
+		if (!clp)
+			goto no_update;
 		timestamp = res->sr_renewal_time;
 
 		spin_lock(&clp->cl_lock);
@@ -281,7 +289,7 @@ static int nfs41_sequence_done(struct nfs_client *clp,
 			clp->cl_last_renewal = timestamp;
 		spin_unlock(&clp->cl_lock);
 	}
-
+no_update:
 	/* Clear the 'busy' bit on the slot that was used */
 	smp_mb__before_clear_bit();
 	clear_bit(NFS4_SLOT_BUSY, &slot->flags);
