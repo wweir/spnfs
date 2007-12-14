@@ -831,6 +831,7 @@ void nfs4_schedule_state_recovery(struct nfs_client *clp)
 	if (test_and_set_bit(NFS4CLNT_STATE_RECOVER, &clp->cl_state) == 0)
 		nfs4_recover_state(clp);
 }
+EXPORT_SYMBOL(nfs4_schedule_state_recovery);
 
 static int nfs4_reclaim_locks(struct nfs4_state_recovery_ops *ops, struct nfs4_state *state)
 {

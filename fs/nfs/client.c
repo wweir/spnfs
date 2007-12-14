@@ -1051,7 +1051,7 @@ error:
 /*
  * Set up an NFS4 client
  */
-static int nfs4_set_client(struct nfs_server *server,
+int nfs4_set_client(struct nfs_server *server,
 		const char *hostname,
 		const struct sockaddr *addr,
 		const size_t addrlen,
@@ -1090,6 +1090,7 @@ error:
 	dprintk("<-- nfs4_set_client() = xerror %d\n", error);
 	return error;
 }
+EXPORT_SYMBOL(nfs4_set_client);
 
 /*
  * Create a version 4 volume record
@@ -1143,8 +1144,8 @@ error:
 /*
  * Allocate and initialize a session if required, including its backchannel.
  */
-static int nfs4_init_session(struct nfs_client *clp, struct nfs4_session **spp,
-			     struct rpc_clnt *clnt)
+int nfs4_init_session(struct nfs_client *clp, struct nfs4_session **spp,
+		      struct rpc_clnt *clnt)
 {
 	int error = 0;
 	struct nfs4_session *session;
@@ -1175,6 +1176,7 @@ static int nfs4_init_session(struct nfs_client *clp, struct nfs4_session **spp,
 	}
 	return error;
 }
+EXPORT_SYMBOL(nfs4_init_session);
 #endif /* CONFIG_NFS_V4_1 */
 
 /*

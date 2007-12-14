@@ -49,18 +49,14 @@
 
 #include <asm/div64.h>
 
+#include <linux/utsname.h>
 #include <linux/pnfs_xdr.h>
+#include <linux/nfs41_session_recovery.h>
 #include "nfs4filelayout.h"
+#include "internal.h"
 #include "nfs4_fs.h"
 
 #define NFSDBG_FACILITY		NFSDBG_FILELAYOUT
-
-struct rpc_clnt*
-create_nfs_rpcclient(struct rpc_xprt *xprt,
-				char *server_name,
-				u32 version,
-				rpc_authflavor_t authflavor,
-				int *err);
 
 void
 print_ds_list(struct nfs4_pnfs_dev *fdev)
@@ -166,44 +162,88 @@ _data_server_add(struct nfs4_pnfs_dev_hlist *hlist, struct nfs4_pnfs_ds *ds)
 
 /* Create an rpc to the data server defined in 'dev_list' */
 static int
-device_create(struct rpc_clnt *mds_rpc, struct nfs4_pnfs_dev *dev)
+nfs4_pnfs_ds_create(struct nfs_server *mds_srv, struct nfs4_pnfs_ds *ds)
 {
-	struct nfs4_pnfs_ds *ds;
+	struct nfs_server	tmp = {
+		.nfs_client = NULL,
+	};
 	struct sockaddr_in	sin;
+	struct rpc_clnt 	*mds_clnt = mds_srv->client;
+	struct nfs_client 	*clp;
+	struct rpc_cred		*cred = NULL;
+	char			ip_addr[16];
+	int			addrlen;
 	int err = 0;
 
-	/* just use the first ds in ds list...*/
-	ds = dev->ds_list[0];
-
+	dprintk("--> %s\n", __func__);
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = ds->ds_ip_addr;
 	sin.sin_port = ds->ds_port;
 
-	dprintk("device_create: ip=%x, port=%hu, rpcclient %p\n",
-			ntohl(ds->ds_ip_addr), ntohs(ds->ds_port), mds_rpc);
+	/* Set timeout to the mds rpc clnt value.
+	 * XXX - find the correct authflavor....
+	 *
+	 * Fake a client ipaddr (used for sessionid) with hostname
+	 * Use hostname since it might be more unique than ipaddr (which
+	 * could be set to the loopback 127.0.0/1.1
+	 *
+	 * XXX: Should sessions continue to use the cl_ipaddr field?
+	 */
+	addrlen = strnlen(utsname()->nodename, sizeof(utsname()->nodename));
+	if (addrlen > sizeof(ip_addr))
+		addrlen = sizeof(ip_addr);
+	memcpy(ip_addr, utsname()->nodename, addrlen);
 
-	/*
-	 * XXX Need to implement.
-	 * XXXX Need to port. See fs/nfs/client.c:nfs_create_rpc_client()
-	xprt = xprt_create_proto(IPPROTO_TCP, &sin,
-					 &mds_rpc->cl_xprt->timeout);
-		if (IS_ERR(xprt)) {
-			err = PTR_ERR(xprt);
-			goto out;
-		}
+	/* XXX need a non-nfs_client struct interface to set up
+	 * data server sessions
+	 *
+	 * tmp: nfs4_set_client sets the nfs_server->nfs_client.
+	 *
+	 * We specify a retrans and timeout interval equual to MDS. ??
+	 */
+	err = nfs4_set_client(&tmp,
+			      mds_srv->nfs_client->cl_hostname,
+			      (struct sockaddr *)&sin,
+			      addrlen,
+			      ip_addr,
+			      RPC_AUTH_UNIX,
+			      IPPROTO_TCP,
+			      mds_clnt->cl_xprt->timeout);
+	if (err < 0)
+		goto out;
 
-		clp->cl_rpcclient = create_nfs_rpcclient(xprt, "nfs4_pnfs_dserver", mds_rpc->cl_vers, mds_rpc->cl_auth->au_flavor, &err);
-		if (clp->cl_rpcclient == NULL) {
-			printk(KERN_ERR "%s: Can't create nfs rpc client!\n",
-								__FUNCTION__);
-			goto out;
-		}
-	}
+	clp = tmp.nfs_client;
+	err = nfs4_init_session(clp, &clp->cl_ds_session, clp->cl_rpcclient);
+	if (err)
+		goto out_put;
 
-	dev->clp = clp;
+	/* Set exchange id and create session flags
+	 *
+	 * XXX Need to find the proper credential...
+	 */
+	dprintk("%s EXCHANGE_ID for clp %p\n", __func__, clp);
+	clp->cl_exchange_flags = EXCHGID4_FLAG_USE_PNFS_DS;
+
+	err = _nfs4_proc_exchange_id(clp, cred);
+	if (err)
+		goto out_put;
+
+	dprintk("%s CREATE_SESSION for clp %p\n", __func__, clp);
+	err = nfs41_recover_session_sync(clp->cl_rpcclient, clp,
+					 clp->cl_ds_session);
+	if (err)
+		goto out_put;
+	ds->ds_clp = clp;
+
+	dprintk("%s: ip=%x, port=%hu, rpcclient %p\n", __func__,
+				ntohl(ds->ds_ip_addr), ntohs(ds->ds_port),
+				clp->cl_rpcclient);
 out:
-*/
+	dprintk("%s Returns %d\n", __func__, err);
 	return err;
+out_put:
+	nfs_put_client(clp);
+	goto out;
 }
 
 /* Assumes lock is held */
@@ -371,9 +411,10 @@ nfs4_pnfs_ds_add(struct filelayout_mount_type *mt, struct nfs4_pnfs_ds **dsp,
 static struct nfs4_pnfs_ds *
 decode_and_add_ds(uint32_t **pp, struct filelayout_mount_type *mt)
 {
+	struct nfs_server *mds_srv = NFS_SB(mt->fl_sb);
 	struct nfs4_pnfs_ds *ds = NULL;
 	char r_addr[29]; /* max size of ip/port string */
-	int len;
+	int len, err;
 	u32 ip_addr, port;
 	int tmp[6];
 	uint32_t *p = *pp;
@@ -388,7 +429,7 @@ decode_and_add_ds(uint32_t **pp, struct filelayout_mount_type *mt)
 		goto out_err;
 	}
 	/* Read the bytes into a temporary buffer */
-	/* TODO: should probably sanity check them */
+	/* XXX: should probably sanity check them */
 	READ32(tmp[0]);
 
 	READ32(len);
@@ -406,6 +447,18 @@ decode_and_add_ds(uint32_t **pp, struct filelayout_mount_type *mt)
 	port = htons((tmp[4] << 8) | (tmp[5]));
 
 	nfs4_pnfs_ds_add(mt, &ds, ip_addr, port);
+
+	/* XXX: Do we connect to data servers here?
+	 * Don't want a lot of un-used (never used!) connections....
+	 * Do we wait until LAYOUTGET which will be called on OPEN?
+	 */
+	if (!ds->ds_clp) {
+		err = nfs4_pnfs_ds_create(mds_srv, ds);
+		printk(KERN_ERR
+		       "%s nfs4_pnfs_ds_create returned %d\n", __func__, err);
+		if (err)
+			goto out_err;
+	}
 
 	/* adding ds to stripe */
 	atomic_inc(&ds->ds_count);
