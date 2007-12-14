@@ -80,6 +80,17 @@ extern void nfs_free_server(struct nfs_server *server);
 extern struct nfs_server *nfs_clone_server(struct nfs_server *,
 					   struct nfs_fh *,
 					   struct nfs_fattr *);
+extern int nfs4_set_client(struct nfs_server *server,
+		const char *hostname,
+		const struct sockaddr *addr,
+		const size_t addrlen,
+		const char *ip_addr,
+		rpc_authflavor_t authflavour,
+		int proto, const struct rpc_timeout *timeparms);
+#if defined(CONFIG_NFS_V4_1)
+extern int nfs4_init_session(struct nfs_client *clp, struct nfs4_session **spp,
+			     struct rpc_clnt *clnt);
+#endif /* CONFIG_NFS_V4_1 */
 #ifdef CONFIG_PROC_FS
 extern int __init nfs_fs_proc_init(void);
 extern void nfs_fs_proc_exit(void);
@@ -141,6 +152,13 @@ extern __be32 *nfs4_decode_dirent(__be32 *p, struct nfs_entry *entry, int plus);
 #ifdef CONFIG_NFS_V4
 extern struct rpc_procinfo *nfs4_procedures;
 #endif
+#ifdef CONFIG_NFS_V4_1
+extern int _nfs4_proc_exchange_id(struct nfs_client *clp,
+				  struct rpc_cred *cred);
+extern int _nfs4_proc_create_session(struct nfs_client *clp,
+				     struct nfs4_session *session,
+				     struct rpc_clnt *clnt);
+#endif /* CONFIG_NFS_V4_1 */
 
 /* dir.c */
 extern int nfs_access_cache_shrinker(int nr_to_scan, gfp_t gfp_mask);
