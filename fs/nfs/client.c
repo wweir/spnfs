@@ -946,7 +946,7 @@ error:
 /*
  * Set up an NFS4 client
  */
-static int nfs4_set_client(struct nfs_server *server,
+int nfs4_set_client(struct nfs_server *server,
 		const char *hostname, const struct sockaddr_in *addr,
 		const char *ip_addr,
 		rpc_authflavor_t authflavour,
@@ -977,6 +977,7 @@ error:
 	dprintk("<-- nfs4_set_client() = xerror %d\n", error);
 	return error;
 }
+EXPORT_SYMBOL(nfs4_set_client);
 
 /*
  * Create a version 4 volume record
