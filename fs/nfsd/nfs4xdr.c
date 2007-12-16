@@ -1417,6 +1417,13 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 		case OP_DESTROY_SESSION:
 			op->status = nfsd4_decode_destroy_session(argp, &op->u.destroy_session);
 			break;
+		case OP_GETDEVICELIST:
+		case OP_GETDEVICEINFO:
+		case OP_LAYOUTGET:
+		case OP_LAYOUTCOMMIT:
+		case OP_LAYOUTRETURN:
+			op->status = nfserr_notsupp;
+			break;
 #endif /* CONFIG_NFSD_V4_1 */
 		default:
 			op->opnum = OP_ILLEGAL;
