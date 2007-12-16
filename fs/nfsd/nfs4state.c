@@ -104,7 +104,7 @@ static struct kmem_cache *pnfs_layoutrecall_slab;
 
 static int expire_layout(struct nfs4_layout *lp);
 static void destroy_layout(struct nfs4_layout *lp);
-static inline void layoutrecall_done(struct nfs4_layoutrecall *clr);
+static void layoutrecall_done(struct nfs4_layoutrecall *clr);
 static void release_pnfs_ds_dev_list(struct nfs4_stateid *stp);
 #endif /* CONFIG_PNFSD */
 
@@ -4268,7 +4268,7 @@ put_layoutrecall(struct nfs4_layoutrecall *clr)
 	kref_put(&clr->clr_ref, destroy_layoutrecall);
 }
 
-static inline void
+static void
 layoutrecall_done(struct nfs4_layoutrecall *clr)
 {
 	dprintk("pNFS %s: clr %p clr_ref %d\n", __FUNCTION__, clr,
