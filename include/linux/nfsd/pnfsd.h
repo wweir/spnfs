@@ -83,7 +83,7 @@ struct pnfs_mds_id {
 	time_t			di_mdsboot;	/* mds boot time */
 };
 
-void nfsd_layout_recall_cb(struct nfs4_cb_layout *);
+int nfsd_layout_recall_cb(struct inode *inode, struct nfsd4_pnfs_cb_layout *);
 int nfs4_pnfs_cb_get_state(struct pnfs_get_state *);
 void nfs4_pnfs_state_init(void);
 int nfs4_pnfs_get_layout(struct super_block *, struct svc_fh *,
