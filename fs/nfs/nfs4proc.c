@@ -4668,10 +4668,104 @@ void nfs4_adjust_channel_attrs(struct nfs4_channel_attrs *req_attrs,
 	/* We ignore the rdma channel attributes  */
 }
 
+int _nfs4_proc_create_session(struct nfs_client *clp, struct nfs4_session *session,
+			      struct rpc_clnt *clnt)
+{
+	struct nfs41_create_session_args args = {
+		.client = clp,
+		.session = session,
+		.cb_program = NFS4_CALLBACK,
+	};
+
+	struct nfs41_create_session_res res = {
+		.client = clp,
+		.session = session,
+	};
+
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_CREATE_SESSION],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+	};
+	int status;
+
+	nfs4_init_channel_attrs(clp, &args.fc_attrs, &args.bc_attrs);
+	args.flags = (SESSION4_PERSIST);
+
+	status = rpc_call_sync(clnt, &msg, 0);
+
+	/* Set the negotiated values in the session's channel_attrs struct */
+
+	if (!status) {
+		nfs4_adjust_channel_attrs(&args.fc_attrs,
+					&session->fore_channel.chan_attrs);
+		nfs4_adjust_channel_attrs(&args.bc_attrs,
+					&session->back_channel.chan_attrs);
+	}
+
+	return status;
+}
+
+/*
+ * Issues a CREATE_SESSION operation to the server.
+ * It is the responsibility of the caller to verify the session is
+ * expired before calling this routine.
+ */
 int nfs4_proc_create_session(struct nfs_client *clp,
 			     struct nfs4_session *session)
 {
-	return -1;	/* stub */
+	int status;
+	u32 *ptr;
+	struct nfs_fsinfo fsinfo;
+
+	dprintk("--> %s()\n", __FUNCTION__);
+	BUG_ON(session == NULL);
+
+	status = _nfs4_proc_create_session(clp, session, clp->cl_rpcclient);
+	if (status)
+		goto out;
+
+	session->clnt = clp->cl_rpcclient;
+
+	/* Init the fore channel */
+	status = nfs4_init_slot_table(&session->fore_channel);
+	dprintk("fore channel initialization returned %d\n", status);
+	if (status)
+		goto out;
+
+	/* Init the back channel */
+/*
+	status = nfs4_init_slot_table(&session->back_channel);
+	dprintk("back channel initialization returned %d\n", status);
+	if (status) {
+		nfs4_destroy_slot_table(&session->fore_channel);
+		return status;
+	}
+*/
+
+	dprintk("%s client>seqid %d\n", __FUNCTION__, clp->cl_seqid);
+	ptr = (int *)session->sess_id;
+	dprintk("sessionid is: %d:%d:%d:%d\n", ptr[0], ptr[1], ptr[2], ptr[3]);
+
+	/* Get the lease time */
+	status = nfs4_proc_get_lease_time(clp, session, &fsinfo);
+	if (status == 0) {
+		/* Update lease time and schedule renewal */
+		spin_lock(&clp->cl_lock);
+		clp->cl_lease_time = fsinfo.lease_time * HZ;
+		clp->cl_last_renewal = jiffies;
+		clear_bit(NFS4CLNT_LEASE_EXPIRED, &clp->cl_state);
+		spin_unlock(&clp->cl_lock);
+		nfs41_set_session_valid(session);	/* Activate session */
+
+		nfs4_schedule_state_renewal(clp);
+	} /*else {
+		nfs4_put_session(&session);
+	}*/
+
+out:
+	dprintk("<-- %s()\n", __FUNCTION__);
+	return status;
 }
 
 int nfs4_proc_destroy_session(struct nfs_server *sp)
