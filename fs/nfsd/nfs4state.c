@@ -393,7 +393,7 @@ static int
 alloc_init_session(struct nfs4_client *clp, struct nfsd4_create_session *cses)
 {
 	struct nfs41_session *new;
-	int idx, status, slotsize, i;
+	int idx, status = nfserr_resource, slotsize, i;
 
 	new = kzalloc(sizeof(*new), GFP_KERNEL);
 	if (!new)
