@@ -1,5 +1,5 @@
 /*
- *  fs/nfs/nfs4xdr.c
+ *  fs/nfsd/nfs4xdr.c
  *
  *  Server-side XDR for NFSv4
  *
@@ -147,6 +147,11 @@ xdr_error:					\
 		goto xdr_error;			\
 	}					\
 } while (0)
+
+static int zero_clientid(clientid_t *clid)
+{
+	return ((clid->cl_boot == 0) && (clid->cl_id == 0));
+}
 
 static __be32 *read_buf(struct nfsd4_compoundargs *argp, u32 nbytes)
 {
@@ -592,6 +597,8 @@ nfsd4_decode_lockt(struct nfsd4_compoundargs *argp, struct nfsd4_lockt *lockt)
 	READ_BUF(lockt->lt_owner.len);
 	READMEM(lockt->lt_owner.data, lockt->lt_owner.len);
 
+	if (argp->minorversion == 1 && !zero_clientid(&lockt->lt_clientid))
+		return nfserr_inval;
 	DECODE_TAIL;
 }
 
@@ -757,6 +764,7 @@ nfsd4_decode_read(struct nfsd4_compoundargs *argp, struct nfsd4_read *read)
 {
 	DECODE_HEAD;
 
+	read->rd_minorversion = argp->minorversion;
 	READ_BUF(sizeof(stateid_t) + 12);
 	READ32(read->rd_stateid.si_generation);
 	COPYMEM(&read->rd_stateid.si_opaque, sizeof(stateid_opaque_t));
@@ -828,6 +836,20 @@ nfsd4_decode_renew(struct nfsd4_compoundargs *argp, clientid_t *clientid)
 	DECODE_TAIL;
 }
 
+#if defined(CONFIG_NFSD_V4_1)
+static __be32 nfsd4_decode_sequence(struct nfsd4_compoundargs *argp,
+				    struct nfsd4_sequence *seq)
+{
+	return -1;	/* stub */
+}
+
+static __be32 nfsd4_decode_destroy_session(struct nfsd4_compoundargs *argp,
+			struct nfsd4_destroy_session *destroy_session)
+{
+	return -1;	/* stub */
+}
+#endif /* CONFIG_NFSD_V4_1 */
+
 static __be32
 nfsd4_decode_secinfo(struct nfsd4_compoundargs *argp,
 		     struct nfsd4_secinfo *secinfo)
@@ -850,6 +872,7 @@ nfsd4_decode_setattr(struct nfsd4_compoundargs *argp, struct nfsd4_setattr *seta
 {
 	DECODE_HEAD;
 
+	setattr->sa_minorversion = argp->minorversion;
 	READ_BUF(sizeof(stateid_t));
 	READ32(setattr->sa_stateid.si_generation);
 	COPYMEM(&setattr->sa_stateid.si_opaque, sizeof(stateid_opaque_t));
@@ -896,6 +919,22 @@ nfsd4_decode_setclientid_confirm(struct nfsd4_compoundargs *argp, struct nfsd4_s
 	DECODE_TAIL;
 }
 
+#if defined(CONFIG_NFSD_V4_1)
+static __be32
+nfsd4_decode_exchange_id(struct nfsd4_compoundargs *argp,
+			 struct nfsd4_exchange_id *clid)
+{
+	return -1;	/* stub */
+}
+
+static int
+nfsd4_decode_create_session(struct nfsd4_compoundargs *argp,
+			    struct nfsd4_create_session *sess)
+{
+	return -1;	/* stub */
+}
+#endif /* CONFIG_NFSD_V4_1 */
+
 /* Also used for NVERIFY */
 static __be32
 nfsd4_decode_verify(struct nfsd4_compoundargs *argp, struct nfsd4_verify *verify)
@@ -941,6 +980,7 @@ nfsd4_decode_write(struct nfsd4_compoundargs *argp, struct nfsd4_write *write)
 	int len;
 	DECODE_HEAD;
 
+	write->wr_minorversion = argp->minorversion;
 	READ_BUF(sizeof(stateid_opaque_t) + 20);
 	READ32(write->wr_stateid.si_generation);
 	COPYMEM(&write->wr_stateid.si_opaque, sizeof(stateid_opaque_t));
@@ -995,6 +1035,9 @@ nfsd4_decode_release_lockowner(struct nfsd4_compoundargs *argp, struct nfsd4_rel
 	READ32(rlockowner->rl_owner.len);
 	READ_BUF(rlockowner->rl_owner.len);
 	READMEM(rlockowner->rl_owner.data, rlockowner->rl_owner.len);
+
+	if (argp->minorversion == 1 && !zero_clientid(&rlockowner->rl_clientid))
+		return nfserr_inval;
 
 	DECODE_TAIL;
 }
@@ -1180,6 +1223,24 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 		case OP_RELEASE_LOCKOWNER:
 			op->status = nfsd4_decode_release_lockowner(argp, &op->u.release_lockowner);
 			break;
+#if defined(CONFIG_NFSD_V4_1)
+		case OP_EXCHANGE_ID:
+			op->status = nfsd4_decode_exchange_id(argp,
+							&op->u.exchange_id);
+			break;
+		case OP_CREATE_SESSION:
+			op->status = nfsd4_decode_create_session(argp,
+							&op->u.create_session);
+			break;
+		case OP_SEQUENCE:
+			op->status = nfsd4_decode_sequence(argp,
+							&op->u.sequence);
+			break;
+		case OP_DESTROY_SESSION:
+			op->status = nfsd4_decode_destroy_session(argp,
+							&op->u.destroy_session);
+			break;
+#endif /* CONFIG_NFSD_V4_1 */
 		default:
 			op->opnum = OP_ILLEGAL;
 			op->status = nfserr_op_illegal;
@@ -2583,6 +2644,35 @@ nfsd4_encode_setclientid(struct nfsd4_compoundres *resp, __be32 nfserr, struct n
 	}
 }
 
+#if defined(CONFIG_NFSD_V4_1)
+static void
+nfsd4_encode_exchange_id(struct nfsd4_compoundres *resp, int nfserr,
+			 struct nfsd4_exchange_id *exid)
+{
+	return;	/* stub */
+}
+
+static void
+nfsd4_encode_create_session(struct nfsd4_compoundres *resp, int nfserr,
+			    struct nfsd4_create_session *sess)
+{
+	return;	/* stub */
+}
+
+static void nfsd4_encode_sequence(struct nfsd4_compoundres *resp, int nfserr,
+				  struct nfsd4_sequence *seq)
+{
+	return;	/* stub */
+}
+
+static void nfsd4_encode_destroy_session(struct nfsd4_compoundres *resp,
+					int nfserr, struct nfsd4_destroy_session
+					*destroy_session)
+{
+	return;
+}
+#endif /* CONFIG_NFSD_V4_1 */
+
 static void
 nfsd4_encode_write(struct nfsd4_compoundres *resp, __be32 nfserr, struct nfsd4_write *write)
 {
@@ -2699,6 +2789,22 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 		break;
 	case OP_RELEASE_LOCKOWNER:
 		break;
+#if defined(CONFIG_NFSD_V4_1)
+	case OP_EXCHANGE_ID:
+		nfsd4_encode_exchange_id(resp, op->status, &op->u.exchange_id);
+		break;
+	case OP_CREATE_SESSION:
+		nfsd4_encode_create_session(resp, op->status,
+					    &op->u.create_session);
+		break;
+	case OP_SEQUENCE:
+		nfsd4_encode_sequence(resp, op->status, &op->u.sequence);
+		break;
+	case OP_DESTROY_SESSION:
+		nfsd4_encode_destroy_session(resp, op->status,
+					     &op->u.destroy_session);
+		break;
+#endif /* CONFIG_NFSD_V4_1 */
 	default:
 		break;
 	}
