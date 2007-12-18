@@ -576,7 +576,8 @@ static void encode_string(struct xdr_stream *xdr, unsigned int len, const char *
 	xdr_encode_opaque(p, str, len);
 }
 
-static int encode_compound_hdr(struct xdr_stream *xdr, struct compound_hdr *hdr)
+static int encode_compound_hdr(struct xdr_stream *xdr, struct compound_hdr *hdr,
+			       int minorversion)
 {
 	__be32 *p;
 
@@ -585,7 +586,7 @@ static int encode_compound_hdr(struct xdr_stream *xdr, struct compound_hdr *hdr)
 	RESERVE_SPACE(12+(XDR_QUADLEN(hdr->taglen)<<2));
 	WRITE32(hdr->taglen);
 	WRITEMEM(hdr->tag, hdr->taglen);
-	WRITE32(NFS4_MINOR_VERSION);
+	WRITE32(minorversion);
 	WRITE32(hdr->nops);
 	return 0;
 }
@@ -1396,7 +1397,7 @@ static int nfs40_xdr_enc_access(struct rpc_rqst *req, __be32 *p, const struct nf
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 	return nfs4_xdr_enc_access(&xdr, args);
 }
 
@@ -1426,7 +1427,7 @@ static int nfs40_xdr_enc_lookup(struct rpc_rqst *req, __be32 *p, const struct nf
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_lookup(&xdr, args);
 }
@@ -1454,7 +1455,7 @@ static int nfs40_xdr_enc_lookup_root(struct rpc_rqst *req, __be32 *p, const stru
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_lookup_root(&xdr, args);
 }
@@ -1483,7 +1484,7 @@ static int nfs40_xdr_enc_remove(struct rpc_rqst *req, __be32 *p, const struct nf
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_remove(&xdr, args);
 }
@@ -1520,7 +1521,7 @@ static int nfs40_xdr_enc_rename(struct rpc_rqst *req, __be32 *p, const struct nf
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_rename(&xdr, args);
 }
@@ -1557,7 +1558,7 @@ static int nfs40_xdr_enc_link(struct rpc_rqst *req, __be32 *p, const struct nfs4
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_link(&xdr, args);
 }
@@ -1594,7 +1595,7 @@ static int nfs40_xdr_enc_create(struct rpc_rqst *req, __be32 *p, const struct nf
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_create(&xdr, args);
 }
@@ -1627,7 +1628,7 @@ static int nfs40_xdr_enc_getattr(struct rpc_rqst *req, __be32 *p, const struct n
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_getattr(&xdr, args);
 }
@@ -1658,7 +1659,7 @@ static int nfs40_xdr_enc_close(struct rpc_rqst *req, __be32 *p, struct nfs_close
         };
 
         xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-        encode_compound_hdr(&xdr, &hdr);
+        encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_close(&xdr, args);
 }
@@ -1701,7 +1702,7 @@ static int nfs40_xdr_enc_open(struct rpc_rqst *req, __be32 *p, struct nfs_openar
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_open(&xdr, args);
 }
@@ -1729,7 +1730,7 @@ static int nfs40_xdr_enc_open_confirm(struct rpc_rqst *req, __be32 *p, struct nf
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_open_confirm(&xdr, args);
 }
@@ -1760,7 +1761,7 @@ static int nfs40_xdr_enc_open_noattr(struct rpc_rqst *req, __be32 *p, struct nfs
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_open_noattr(&xdr, args);
 }
@@ -1791,7 +1792,7 @@ static int nfs40_xdr_enc_open_downgrade(struct rpc_rqst *req, __be32 *p, struct 
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_open_downgrade(&xdr, args);
 }
@@ -1819,7 +1820,7 @@ static int nfs40_xdr_enc_lock(struct rpc_rqst *req, __be32 *p, struct nfs_lock_a
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_lock(&xdr, args);
 }
@@ -1847,7 +1848,7 @@ static int nfs40_xdr_enc_lockt(struct rpc_rqst *req, __be32 *p, struct nfs_lockt
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_lockt(&xdr, args);
 }
@@ -1875,7 +1876,7 @@ static int nfs40_xdr_enc_locku(struct rpc_rqst *req, __be32 *p, struct nfs_locku
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_locku(&xdr, args);
 }
@@ -1914,7 +1915,7 @@ static int nfs40_xdr_enc_readlink(struct rpc_rqst *req, __be32 *p, const struct 
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_readlink(req, &xdr, args);
 }
@@ -1956,7 +1957,7 @@ static int nfs40_xdr_enc_readdir(struct rpc_rqst *req, __be32 *p, const struct n
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_readdir(req, &xdr, args);
 }
@@ -1996,7 +1997,7 @@ static int nfs40_xdr_enc_read(struct rpc_rqst *req, __be32 *p, struct nfs_readar
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_read(req, &xdr, args);
 }
@@ -2027,7 +2028,7 @@ static int nfs40_xdr_enc_setattr(struct rpc_rqst *req, __be32 *p, struct nfs_set
         };
 
         xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-        encode_compound_hdr(&xdr, &hdr);
+        encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_setattr(&xdr, args);
 }
@@ -2064,7 +2065,7 @@ nfs40_xdr_enc_getacl(struct rpc_rqst *req, __be32 *p,
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_getacl(req, &xdr, args, NFS40_dec_getacl_sz);
 }
@@ -2095,7 +2096,7 @@ static int nfs40_xdr_enc_write(struct rpc_rqst *req, __be32 *p, struct nfs_write
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_write(&xdr, args);
 }
@@ -2126,7 +2127,7 @@ static int nfs40_xdr_enc_commit(struct rpc_rqst *req, __be32 *p, struct nfs_writ
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_commit(&xdr, args);
 }
@@ -2152,7 +2153,7 @@ static int nfs40_xdr_enc_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs4_fsi
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_fsinfo(&xdr, args);
 }
@@ -2179,7 +2180,7 @@ static int nfs40_xdr_enc_pathconf(struct rpc_rqst *req, __be32 *p, const struct 
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_pathconf(&xdr, args);
 }
@@ -2207,7 +2208,7 @@ static int nfs40_xdr_enc_statfs(struct rpc_rqst *req, __be32 *p, const struct nf
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_statfs(&xdr, args);
 }
@@ -2236,7 +2237,7 @@ static int nfs40_xdr_enc_server_caps(struct rpc_rqst *req, __be32 *p, const stru
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_server_caps(&xdr, fhandle);
 }
@@ -2252,7 +2253,7 @@ static int nfs40_xdr_enc_renew(struct rpc_rqst *req, __be32 *p, struct nfs_clien
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 	return encode_renew(&xdr, clp);
 }
 
@@ -2267,7 +2268,7 @@ static int nfs40_xdr_enc_setclientid(struct rpc_rqst *req, __be32 *p, struct nfs
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 	return encode_setclientid(&xdr, sc);
 }
 
@@ -2284,7 +2285,7 @@ static int nfs40_xdr_enc_setclientid_confirm(struct rpc_rqst *req, __be32 *p, st
 	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 	status = encode_setclientid_confirm(&xdr, clp);
 	if (!status)
 		status = encode_putrootfh(&xdr);
@@ -2319,7 +2320,7 @@ static int nfs40_xdr_enc_delegreturn(struct rpc_rqst *req, __be32 *p, const stru
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_delegreturn(&xdr, args);
 }
@@ -2358,7 +2359,7 @@ static int nfs40_xdr_enc_fs_locations(struct rpc_rqst *req, __be32 *p, struct nf
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-	encode_compound_hdr(&xdr, &hdr);
+	encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_fs_locations(req, &xdr, args);
 }
@@ -4305,7 +4306,7 @@ nfs40_xdr_enc_setacl(struct rpc_rqst *req, __be32 *p, struct nfs_setaclargs *arg
         };
 
         xdr_init_encode(&xdr, &req->rq_snd_buf, p);
-        encode_compound_hdr(&xdr, &hdr);
+        encode_compound_hdr(&xdr, &hdr, 0);
 
 	return nfs4_xdr_enc_setacl(&xdr, args);
 }
