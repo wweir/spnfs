@@ -52,6 +52,11 @@
 
 #define NFSPROC4_CB_NULL 0
 #define NFSPROC4_CB_COMPOUND 1
+#define NFS4_STATEID_SIZE 16
+
+#if defined(CONFIG_NFSD_V4_1)
+#define NFS4_CB_PROGRAM 0x40000000
+#endif
 
 /* declarations */
 static const struct rpc_call_ops nfs4_cb_null_ops;
@@ -59,12 +64,15 @@ static const struct rpc_call_ops nfs4_cb_null_ops;
 /* Index of predefined Linux callback client operations */
 
 enum {
-        NFSPROC4_CLNT_CB_NULL = 0,
+	NFSPROC4_CLNT_CB_NULL = 0,
 	NFSPROC4_CLNT_CB_RECALL,
+	NFSPROC4_CLNT_CB_SEQUENCE,
 };
 
 enum nfs_cb_opnum4 {
 	OP_CB_RECALL            = 4,
+	OP_CB_LAYOUT            = 5,
+	OP_CB_SEQUENCE          = 11,
 };
 
 #define NFS4_MAXTAGLEN		20
@@ -80,9 +88,38 @@ enum nfs_cb_opnum4 {
 #define NFS4_enc_cb_recall_sz		(cb_compound_enc_hdr_sz +       \
 					1 + enc_stateid_sz +            \
 					enc_nfs4_fh_sz)
-
 #define NFS4_dec_cb_recall_sz		(cb_compound_dec_hdr_sz  +      \
 					op_dec_sz)
+
+#if defined(CONFIG_NFSD_V4_1)
+#define NFS41_enc_cb_null_sz		0
+#define NFS41_dec_cb_null_sz		0
+#define cb_compound41_enc_hdr_sz	3
+#define cb_compound41_dec_hdr_sz	(3 + (NFS4_MAXTAGLEN >> 2))
+#define sessionid_sz			(NFS4_MAX_SESSIONID_LEN >> 2)
+#define cb_sequence41_enc_sz		(sessionid_sz + 4 +             \
+					1 /* no referring calls list yet */)
+#define cb_sequence41_dec_sz		(op_dec_sz + sessionid_sz + 4)
+#define NFS41_enc_cb_recall_sz		(cb_compound41_enc_hdr_sz +     \
+					cb_sequence41_enc_sz +          \
+					1 + enc_stateid_sz +            \
+					enc_nfs4_fh_sz)
+#define NFS41_dec_cb_recall_sz		(cb_compound_dec_hdr_sz  +      \
+					cb_sequence41_dec_sz +          \
+					op_dec_sz)
+
+struct nfs41_rpc_args {
+	struct nfs4_callback     *args_callback;
+	void                     *args_op;
+	struct nfs41_cb_sequence *args_seq;
+};
+
+struct nfs41_rpc_res {
+	struct nfs4_callback     *res_callback;
+	void                     *res_op;
+	struct nfs41_cb_sequence *res_seq;
+};
+#endif /* defined(CONFIG_NFSD_V4_1) */
 
 /*
 * Generic encode routines from fs/nfs/nfs4xdr.c
@@ -138,11 +175,18 @@ xdr_error:                                      \
 		return -EIO; \
 	} \
 } while (0)
+#define COPYMEM(x,nbytes) do {			\
+	memcpy((x), p, nbytes);			\
+	p += XDR_QUADLEN(nbytes);		\
+} while (0)
 
 struct nfs4_cb_compound_hdr {
-	int		status;
-	u32		ident;
+	/* args */
+	u32		ident;		/* minorversion 0 only */
 	u32		nops;
+
+	/* res */
+	int		status;
 	u32		taglen;
 	char *		tag;
 };
@@ -211,7 +255,7 @@ encode_cb_compound_hdr(struct xdr_stream *xdr, struct nfs4_cb_compound_hdr *hdr)
 
 	RESERVE_SPACE(16);
 	WRITE32(0);            /* tag length is always 0 */
-	WRITE32(NFS4_MINOR_VERSION);
+	WRITE32(0);            /* minorversion */
 	WRITE32(hdr->ident);
 	WRITE32(hdr->nops);
 	return 0;
@@ -231,6 +275,14 @@ encode_cb_recall(struct xdr_stream *xdr, struct nfs4_cb_recall *cb_rec)
 	WRITEMEM(cb_rec->cbr_fhval, len);
 	return 0;
 }
+
+#if defined(CONFIG_NFSD_V4_1)
+static int
+encode_cb_sequence(struct xdr_stream *xdr, struct nfs41_cb_sequence *args)
+{
+	return -1;	/* stub */
+}
+#endif /* defined(CONFIG_NFSD_V4_1) */
 
 static int
 nfs4_xdr_enc_cb_null(struct rpc_rqst *req, __be32 *p)
@@ -256,6 +308,28 @@ nfs4_xdr_enc_cb_recall(struct rpc_rqst *req, __be32 *p, struct nfs4_cb_recall *a
 	return (encode_cb_recall(&xdr, args));
 }
 
+
+#if defined(CONFIG_NFSD_V4_1)
+static int
+encode_cb_compound41_hdr(struct xdr_stream *xdr,
+			 struct nfs4_cb_compound_hdr *hdr)
+{
+	u32 *p;
+
+	RESERVE_SPACE(12);
+	WRITE32(0);             /* tag length is always 0 */
+	WRITE32(1);             /* minorversion */
+	WRITE32(hdr->nops);
+	return 0;
+}
+
+static int
+nfs41_xdr_enc_cb_recall(struct rpc_rqst *req, u32 *p,
+                        struct nfs41_rpc_args *rpc_args)
+{
+	return -1;	/* stub */
+}
+#endif /* defined(CONFIG_NFSD_V4_1) */
 
 static int
 decode_cb_compound_hdr(struct xdr_stream *xdr, struct nfs4_cb_compound_hdr *hdr){
@@ -314,6 +388,21 @@ out:
 	return status;
 }
 
+#if defined(CONFIG_NFSD_V4_1)
+static int
+decode_cb_sequence(struct xdr_stream *xdr, struct nfs41_cb_sequence *res)
+{
+	return -1;	/* stub */
+}
+
+static int
+nfs41_xdr_dec_cb_recall(struct rpc_rqst *rqstp, u32 *p,
+                        struct nfs41_rpc_res *rpc_res)
+{
+	return -1;	/* stub */
+}
+#endif /* defined(CONFIG_NFSD_V4_1) */
+
 /*
  * RPC procedure tables
  */
@@ -334,39 +423,41 @@ static struct rpc_procinfo     nfs4_cb_procedures[] = {
 };
 
 static struct rpc_version       nfs_cb_version4 = {
-        .number                 = 1,
+	.number                 = 0,
         .nrprocs                = ARRAY_SIZE(nfs4_cb_procedures),
         .procs                  = nfs4_cb_procedures
 };
 
-static struct rpc_version *	nfs_cb_version[] = {
-	NULL,
-	&nfs_cb_version4,
+#if defined(CONFIG_NFSD_V4_1)
+#define PROC41(proc, call, argtype, restype)                            \
+[NFSPROC4_CLNT_##proc] = {                                              \
+	.p_proc   = NFSPROC4_CB_##call,                                 \
+	.p_encode = (kxdrproc_t) nfs41_xdr_##argtype,                   \
+	.p_decode = (kxdrproc_t) nfs41_xdr_##restype,                   \
+	.p_arglen = NFS41_##argtype##_sz,                                \
+	.p_replen = NFS41_##restype##_sz,                                \
+	.p_statidx = NFSPROC4_CB_##call,                                \
+	.p_name   = #proc,                                              \
+}
+
+static struct rpc_procinfo     nfs41_cb_procedures[] = {
+    PROC(CB_NULL,        NULL,       enc_cb_null,        dec_cb_null),
+    PROC41(CB_RECALL,    COMPOUND,   enc_cb_recall,      dec_cb_recall),
 };
 
-/* Reference counting, callback cleanup, etc., all look racy as heck.
- * And why is cb_set an atomic? */
+static struct rpc_version       nfs_cb_version41 = {
+	.number                 = 1,
+	.nrprocs                = ARRAY_SIZE(nfs41_cb_procedures),
+	.procs                  = nfs41_cb_procedures
+};
+#endif /* defined(CONFIG_NFSD_V4_1) */
 
-static int do_probe_callback(void *data)
-{
-	struct nfs4_client *clp = data;
-	struct nfs4_callback *cb = &clp->cl_callback;
-	struct rpc_message msg = {
-		.rpc_proc       = &nfs4_cb_procedures[NFSPROC4_CLNT_CB_NULL],
-		.rpc_argp       = clp,
-	};
-	int status;
-
-	status = rpc_call_sync(cb->cb_client, &msg, RPC_TASK_SOFT);
-
-	if (status) {
-		rpc_shutdown_client(cb->cb_client);
-		cb->cb_client = NULL;
-	} else
-		atomic_set(&cb->cb_set, 1);
-	put_nfs4_client(clp);
-	return 0;
-}
+static struct rpc_version *	nfs_cb_version[] = {
+	&nfs_cb_version4,
+#if defined(CONFIG_NFSD_V4_1)
+	&nfs_cb_version41,
+#endif
+};
 
 /*
  * Set up the callback client and put a NFSPROC4_CB_NULL on the wire...
@@ -389,11 +480,15 @@ nfsd4_probe_callback(struct nfs4_client *clp)
 		.addrsize	= sizeof(addr),
 		.timeout	= &timeparms,
 		.program	= program,
-		.version	= nfs_cb_version[1]->number,
+		.version	= nfs_cb_version[0]->number,
 		.authflavor	= RPC_AUTH_UNIX,	/* XXX: need AUTH_GSS... */
 		.flags		= (RPC_CLNT_CREATE_NOPING),
 	};
-	struct task_struct *t;
+	struct rpc_message msg = {
+		.rpc_proc       = &nfs4_cb_procedures[NFSPROC4_CLNT_CB_NULL],
+		.rpc_argp       = clp,
+	};
+	int status;
 
 	if (atomic_read(&cb->cb_set))
 		return;
@@ -422,24 +517,129 @@ nfsd4_probe_callback(struct nfs4_client *clp)
 		goto out_err;
 	}
 
-	/* the task holds a reference to the nfs4_client struct */
-	atomic_inc(&clp->cl_count);
+	status = rpc_call_async(cb->cb_client, &msg, RPC_TASK_ASYNC,
+				&nfs4_cb_null_ops, NULL);
 
-	t = kthread_run(do_probe_callback, clp, "nfs4_cb_probe");
-
-	if (IS_ERR(t))
+	if (status != 0) {
+		dprintk("NFSD: asynchronous NFSPROC4_CB_NULL failed!\n");
 		goto out_release_clp;
-
+	}
 	return;
 
 out_release_clp:
-	atomic_dec(&clp->cl_count);
 	rpc_shutdown_client(cb->cb_client);
 out_err:
 	cb->cb_client = NULL;
 	dprintk("NFSD: warning: no callback path to client %.*s\n",
 		(int)clp->cl_name.len, clp->cl_name.data);
 }
+
+#if defined(CONFIG_NFSD_V4_1)
+/*
+ * Set up the callback client and put a NFSPROC4_CB_NULL on the wire...
+ */
+void
+nfsd41_probe_callback(struct nfs4_client *clp)
+{
+	struct sockaddr_in	addr;
+	struct nfs4_callback    *cb = &clp->cl_callback;
+	struct rpc_timeout	timeparms = {
+		.to_initval	= (NFSD_LEASE_TIME/4) * HZ,
+		.to_retries	= 0,
+		.to_maxval	= (NFSD_LEASE_TIME/2) * HZ,
+		.to_exponential	= 1,
+	};
+	struct rpc_program *program = &cb->cb_program;
+	struct rpc_create_args args = {
+		.protocol	= IPPROTO_TCP,
+		.address	= (struct sockaddr *)&addr,
+		.addrsize	= sizeof(addr),
+		.timeout	= &timeparms,
+		.program	= program,
+		.version	= nfs_cb_version[1]->number,
+		.authflavor	= RPC_AUTH_UNIX,	/* XXX: need AUTH_GSS... */
+		.flags		= (RPC_CLNT_CREATE_NOPING),
+		.svsk		= clp->svsk,
+	};
+	struct rpc_message msg = {
+		.rpc_proc       = &nfs41_cb_procedures[NFSPROC4_CLNT_CB_NULL],
+		.rpc_argp       = clp,
+	};
+	int status;
+
+	if (atomic_read(&cb->cb_set))
+		return;
+
+	/*
+	 * Temporarily set the IP address to 0 and port to 2049. Realistically,
+	 * we'll never need this as we'll never launch a connection.
+	 */
+	memset(&addr, 0, sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(NFS_PORT);
+	addr.sin_addr.s_addr = htonl(0);
+
+	/* Initialize rpc_program */
+	program->name = "nfs4_cb";
+	program->number = cb->cb_prog = NFS4_CB_PROGRAM;
+	program->nrvers = ARRAY_SIZE(nfs_cb_version);
+	program->version = nfs_cb_version;
+	program->stats = &cb->cb_stat;
+
+	/* Initialize rpc_stat */
+	memset(program->stats, 0, sizeof(cb->cb_stat));
+	program->stats->program = program;
+
+	/* Create RPC client */
+	cb->cb_client = rpc_create(&args);
+	if (IS_ERR(cb->cb_client)) {
+		dprintk("NFSD: couldn't create callback client\n");
+		goto out_err;
+	}
+	dprintk("NFSD: %s: clp %p cb_client %p\n", __FUNCTION__,
+		clp, clp->cl_callback.cb_client);
+
+	status = rpc_call_async(cb->cb_client, &msg, RPC_TASK_ASYNC,
+				&nfs4_cb_null_ops, NULL);
+
+	if (status != 0) {
+		dprintk("NFSD: asynchronous NFSPROC4_CB_NULL failed!\n");
+		goto out_release_clp;
+	}
+	return;
+
+out_release_clp:
+	rpc_shutdown_client(cb->cb_client);
+out_err:
+	cb->cb_client = NULL;
+	dprintk("NFSD: warning: no callback path to client %.*s\n",
+		(int)clp->cl_name.len, clp->cl_name.data);
+}
+#endif /* defined(CONFIG_NFSD_V4_1) */
+
+static void
+nfs4_cb_null(struct rpc_task *task, void *dummy)
+{
+	struct nfs4_client *clp = (struct nfs4_client *)task->tk_msg.rpc_argp;
+	struct nfs4_callback *cb = &clp->cl_callback;
+	__be32 addr = htonl(cb->cb_addr);
+
+	dprintk("NFSD: nfs4_cb_null task->tk_status %d\n", task->tk_status);
+
+	if (task->tk_status < 0) {
+		dprintk("NFSD: callback establishment to client %.*s failed\n",
+			(int)clp->cl_name.len, clp->cl_name.data);
+		goto out;
+	}
+	atomic_set(&cb->cb_set, 1);
+	dprintk("NFSD: callback set to client %u.%u.%u.%u\n", NIPQUAD(addr));
+out:
+	put_nfs4_client(clp);
+}
+
+static const struct rpc_call_ops nfs4_cb_null_ops = {
+	.rpc_call_done = nfs4_cb_null,
+};
 
 /*
  * called with dp->dl_count inc'ed.
