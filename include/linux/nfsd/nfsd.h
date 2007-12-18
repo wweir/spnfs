@@ -25,7 +25,11 @@
  * nfsd version
  */
 #define NFSD_VERSION		"0.5"
+#if defined(CONFIG_NFSD_V4_1)
+#define NFSD_SUPPORTED_MINOR_VERSION	1
+#else /* CONFIG_NFSD_V4_1 */
 #define NFSD_SUPPORTED_MINOR_VERSION	0
+#endif /* CONFIG_NFSD_V4_1 */
 
 #ifdef __KERNEL__
 /*
@@ -243,6 +247,22 @@ void		nfsd_lockd_shutdown(void);
 #define	nfserr_locked		__constant_htonl(NFSERR_LOCKED)
 #define	nfserr_wrongsec		__constant_htonl(NFSERR_WRONGSEC)
 #define	nfserr_replay_me	__constant_htonl(NFSERR_REPLAY_ME)
+#define	nfserr_badiomode	__constant_htonl(NFSERR_BADIOMODE)
+#define	nfserr_badlayout	__constant_htonl(NFSERR_BADLAYOUT)
+#define nfserr_bad_session_digest	__constant_htonl(NFSERR_BAD_SESSION_DIGEST)
+#define nfserr_badsession	__constant_htonl(NFSERR_BADSESSION)
+#define nfserr_badslot	__constant_htonl(NFSERR_BADSLOT)
+#define nfserr_complete_already	__constant_htonl(NFSERR_COMPLETE_ALREADY)
+#define nfserr_conn_not_bound_to_session	__constant_htonl(NFSERR_CONN_NOT_BOUND_TO_SESSION)
+#define nfserr_deleg_already_wanted	__constant_htonl(NFSERR_DELEG_ALREADY_WANTED)
+#define nfserr_dirdeleg_unavail	__constant_htonl(NFSERR_DIRDELEG_UNAVAIL)
+#define	nfserr_layouttrylater		__constant_htonl(NFSERR_LAYOUTTRYLATER)
+#define	nfserr_layoutunavailable	__constant_htonl(NFSERR_LAYOUTUNAVAILABLE)
+#define	nfserr_nomatching_layout	__constant_htonl(NFSERR_NOMATCHING_LAYOUT)
+#define nfserr_recallconflict	__constant_htonl(NFSERR_RECALLCONFLICT)
+#define	nfserr_unknown_layouttype	__constant_htonl(NFSERR_UNKNOWN_LAYOUTTYPE)
+#define	nfserr_seq_misordered		__constant_htonl(NFSERR_SEQ_MISORDERED)
+#define nfserr_sequence_pos	__constant_htonl(NFSERR_SEQUENCE_POS)
 
 /* error codes for internal use */
 /* if a request fails due to kmalloc failure, it gets dropped.
