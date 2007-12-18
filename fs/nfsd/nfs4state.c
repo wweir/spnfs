@@ -1306,6 +1306,25 @@ out:
 }
 
 #if defined(CONFIG_NFSD_V4_1)
+/*
+ * XXX Need slot->sl_seqid wraparound code.
+ */
+static int
+check_slot_seqid(u32 seqid, struct nfs41_slot *slot)
+{
+	dprintk("%s enter. seqid %d slot->sl_seqid %d\n", __FUNCTION__,
+		seqid, slot->sl_seqid);
+	/* Normal */
+	if (seqid == slot->sl_seqid +1)
+		return nfs_ok;
+	/* Replay */
+	else if (seqid == slot->sl_seqid)
+		return NFSERR_REPLAY_ME;
+	/* Misordered replay or misordered new request */
+	else
+		return nfserr_seq_misordered;
+}
+
 __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 			struct nfsd4_compound_state *cstate,
 			struct nfsd4_create_session *session)
@@ -2335,7 +2354,72 @@ nfsd4_sequence(struct svc_rqst *r,
 		struct nfsd4_compound_state *cstate,
 		struct nfsd4_sequence *seq)
 {
-	return -1;	/* stub */
+	struct nfs41_session *elem;
+	struct nfs41_slot *slot;
+	struct current_session *c_ses = cstate->current_ses;
+	int status;
+
+	if (STALE_CLIENTID((clientid_t *)seq->sessionid))
+		return nfserr_stale_clientid;
+
+	nfs4_lock_state();
+	status = nfserr_badsession;
+	elem = find_in_sessionid_hashtbl(&seq->sessionid);
+	if (!elem) {
+		dprintk("NFSD: SessionID not found!!\n");
+		dump_sessionid(__FUNCTION__, &seq->sessionid);
+		goto out;
+	}
+	status = nfserr_badslot;
+	if (seq->slotid >= elem->se_fnumslots)
+		goto out;
+
+	slot = &elem->se_slots[seq->slotid];
+	dprintk("%s slotid %d \n", __FUNCTION__, seq->slotid);
+
+	/* Server post op_sequence compound processing had an upcall which
+	 * resulted in replaying the compound processing including the
+	 * already processed op_sequence. Set current_session
+	 * but don't bump slot->sl_seqid which was incremented in successful
+	 * op_sequence processing prior to upcall.
+	 */
+	if (nfs41_get_slot_state(slot) == NFS4_SLOT_INPROGRESS) {
+		dprintk("%s NFS4_SLOT_INPROGRESS. set current_session\n",
+			__FUNCTION__);
+		goto set_curr_ses;
+	}
+
+	status = check_slot_seqid(seq->seqid, slot);
+	if (status == NFSERR_REPLAY_ME)
+		goto replay;
+	else if (status)
+		goto out;
+
+	/* Success! bump slot seqid and renew clientid */
+	slot->sl_seqid++;
+	renew_client(elem->se_client);
+	dprintk("%s set NFS4_SLOT_INPROGRESS\n",__FUNCTION__);
+	nfs41_set_slot_state(slot, NFS4_SLOT_INPROGRESS);
+
+set_curr_ses:
+	/* Set current_session. hold reference until done processing compound.
+	 * nfs41_put_session called only if cs_slot is set
+	 */
+	memcpy(&c_ses->cs_sid, &seq->sessionid, sizeof(c_ses->cs_sid));
+	BUG_ON(sizeof(c_ses->cs_sid) != sizeof(seq->sessionid));
+	c_ses->cs_slot = slot;
+	nfs41_get_session(slot->sl_session);
+
+	status = nfs_ok;
+out:
+	dprintk("%s returns %d\n", __FUNCTION__, status);
+	nfs4_unlock_state();
+	return status;
+replay:
+	dprintk("%s REPLAY - AKKKK! no code yet! return BAD SESSION\n",
+		__FUNCTION__);
+	status = nfserr_badsession;
+	goto out;
 }
 
 __be32
