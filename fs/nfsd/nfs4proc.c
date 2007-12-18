@@ -51,6 +51,62 @@
 
 #define NFSDDBG_FACILITY		NFSDDBG_PROC
 
+#ifdef OP
+#error OP is defined
+#endif
+#define OP(op) [OP_ ## op] = #op
+char *nfsd4_op_names[] = {
+	OP(ACCESS),
+	OP(CLOSE),
+	OP(COMMIT),
+	OP(CREATE),
+	OP(DELEGPURGE),
+	OP(DELEGRETURN),
+	OP(GETATTR),
+	OP(GETFH),
+	OP(LINK),
+	OP(LOCK),
+	OP(LOCKT),
+	OP(LOCKU),
+	OP(LOOKUP),
+	OP(LOOKUPP),
+	OP(NVERIFY),
+	OP(OPEN),
+	OP(OPENATTR),
+	OP(OPEN_CONFIRM),
+	OP(OPEN_DOWNGRADE),
+	OP(PUTFH),
+	OP(PUTPUBFH),
+	OP(PUTROOTFH),
+	OP(READ),
+	OP(READDIR),
+	OP(READLINK),
+	OP(REMOVE),
+	OP(RENAME),
+	OP(RENEW),
+	OP(RESTOREFH),
+	OP(SAVEFH),
+	OP(SECINFO),
+	OP(SETATTR),
+	OP(SETCLIENTID),
+	OP(SETCLIENTID_CONFIRM),
+	OP(VERIFY),
+	OP(WRITE),
+	OP(RELEASE_LOCKOWNER),
+#if defined(CONFIG_NFSD_V4_1)
+	OP(EXCHANGE_ID),
+	OP(CREATE_SESSION),
+	OP(DESTROY_SESSION),
+	OP(GETDEVICEINFO),
+	OP(GETDEVICELIST),
+	OP(LAYOUTCOMMIT),
+	OP(LAYOUTGET),
+	OP(LAYOUTRETURN),
+	OP(SEQUENCE),
+#endif /* CONFIG_NFSD_V4_1 */
+};
+#undef OP
+
 static inline void
 fh_dup2(struct svc_fh *dst, struct svc_fh *src)
 {
@@ -162,11 +218,22 @@ do_open_fhandle(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_
 	return status;
 }
 
+#if defined(CONFIG_NFSD_V4_1)
+static void
+nfsd41_set_clientid(clientid_t *clid, struct current_session *cses)
+{
+	clid->cl_boot = cses->cs_sid.clientid.cl_boot;
+	clid->cl_id = cses->cs_sid.clientid.cl_id;
+}
+#endif /* CONFIG_NFSD_V4_1 */
 
 static __be32
 nfsd4_open(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
-	   struct nfsd4_open *open)
+	   struct nfsd4_open *open, struct nfs4_stateowner **replay_owner)
 {
+#if defined(CONFIG_NFSD_V4_1)
+	struct current_session *current_ses = cstate->current_ses;
+#endif
 	__be32 status;
 	dprintk("NFSD: nfsd4_open filename %.*s op_stateowner %p\n",
 		(int)open->op_fname.len, open->op_fname.data,
@@ -176,6 +243,14 @@ nfsd4_open(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	if (open->op_create && open->op_claim_type != NFS4_OPEN_CLAIM_NULL)
 		return nfserr_inval;
 
+#if defined(CONFIG_NFSD_V4_1)
+	/* Set the NFSv4.1 client id */
+	if (current_ses) {
+		nfsd41_set_clientid(&open->op_clientid, current_ses);
+		open->op_minorversion = 1;
+	} else
+		open->op_minorversion = 0;
+#endif /* CONFIG_NFSD_V4_1 */
 	nfs4_lock_state();
 
 	/* check seqid for replay. set nfs4_owner */
@@ -508,6 +583,7 @@ nfsd4_read(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	   struct nfsd4_read *read)
 {
 	__be32 status;
+	int flags = 0;
 
 	/* no need to check permission - this will be done in nfsd_read() */
 
@@ -515,11 +591,14 @@ nfsd4_read(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	if (read->rd_offset >= OFFSET_MAX)
 		return nfserr_inval;
 
+	flags = CHECK_FH | RD_STATE;
+	if (read->rd_minorversion == 1)
+		flags |= NFS_4_1;
 	nfs4_lock_state();
 	/* check stateid */
 	if ((status = nfs4_preprocess_stateid_op(&cstate->current_fh,
 				&read->rd_stateid,
-				CHECK_FH | RD_STATE, &read->rd_filp))) {
+				flags, &read->rd_filp))) {
 		dprintk("NFSD: nfsd4_read: couldn't process stateid!\n");
 		goto out;
 	}
@@ -646,12 +725,15 @@ static __be32
 nfsd4_setattr(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	      struct nfsd4_setattr *setattr)
 {
-	__be32 status = nfs_ok;
+	__be32 status = nfs_ok, flags = 0;
 
 	if (setattr->sa_iattr.ia_valid & ATTR_SIZE) {
+		flags = CHECK_FH | WR_STATE;
+		if (setattr->sa_minorversion == 1)
+			flags |= NFS_4_1;
 		nfs4_lock_state();
 		status = nfs4_preprocess_stateid_op(&cstate->current_fh,
-			&setattr->sa_stateid, CHECK_FH | WR_STATE, NULL);
+			&setattr->sa_stateid, flags, NULL);
 		nfs4_unlock_state();
 		if (status) {
 			dprintk("NFSD: nfsd4_setattr: couldn't process stateid!\n");
@@ -676,16 +758,19 @@ nfsd4_write(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	stateid_t *stateid = &write->wr_stateid;
 	struct file *filp = NULL;
 	u32 *p;
-	__be32 status = nfs_ok;
+	__be32 status = nfs_ok, flags = 0;
 
 	/* no need to check permission - this will be done in nfsd_write() */
 
 	if (write->wr_offset >= OFFSET_MAX)
 		return nfserr_inval;
 
+	flags = CHECK_FH | WR_STATE;
+	if (write->wr_minorversion == 1)
+		flags |= NFS_4_1;
 	nfs4_lock_state();
 	status = nfs4_preprocess_stateid_op(&cstate->current_fh, stateid,
-					CHECK_FH | WR_STATE, &filp);
+					flags, &filp);
 	if (filp)
 		get_file(filp);
 	nfs4_unlock_state();
@@ -850,16 +935,30 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 		    struct nfsd4_compoundargs *args,
 		    struct nfsd4_compoundres *resp)
 {
-	struct nfsd4_op	*op;
+	struct nfsd4_op	*op = NULL;
 	struct nfsd4_operation *opdesc;
 	struct nfsd4_compound_state *cstate = NULL;
 	int		slack_bytes;
 	__be32		status;
+#if defined(CONFIG_NFSD_V4_1)
+	struct current_session *current_ses = NULL;
+#endif /* CONFIG_NFSD_V4_1 */
 
 	status = nfserr_resource;
 	cstate = cstate_alloc();
 	if (cstate == NULL)
 		goto out;
+
+#if defined(CONFIG_NFSD_V4_1)
+	if (args->minorversion == 1) {
+		/* FIXME: use kmem_cache */
+		current_ses = kzalloc(sizeof(*current_ses), GFP_KERNEL);
+		if (current_ses == NULL)
+			goto out;
+	}
+	/* DM: current_ses must be NULL for minorversion 0 */
+	cstate->current_ses = current_ses;
+#endif /* CONFIG_NFSD_V4_1 */
 
 	resp->xbuf = &rqstp->rq_res;
 	resp->p = rqstp->rq_res.head[0].iov_base + rqstp->rq_res.head[0].iov_len;
@@ -883,7 +982,8 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	while (!status && resp->opcnt < args->opcnt) {
 		op = &args->ops[resp->opcnt++];
 
-		dprintk("nfsv4 compound op #%d: %d\n", resp->opcnt, op->opnum);
+		dprintk("nfsv4 compound op %p opcnt %d #%d: %d\n",
+			args->ops, args->opcnt, resp->opcnt, op->opnum);
 
 		/*
 		 * The XDR decode routines may have pre-set op->status;
@@ -919,6 +1019,22 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			goto encode_op;
 		}
 
+#if defined(CONFIG_NFSD_V4_1)
+		if ((args->minorversion == 1) &&
+		    ((op->opnum == OP_SETCLIENTID) ||
+		    (op->opnum == OP_SETCLIENTID_CONFIRM) ||
+		    (op->opnum == OP_OPEN_CONFIRM) ||
+		    (op->opnum == OP_RELEASE_LOCKOWNER) ||
+		    (op->opnum == OP_RENEW))) {
+			op->status = nfserr_notsupp;
+			goto encode_op;
+		}
+#endif /* CONFIG_NFSD_V4_1 */
+		dprintk("xxx server proc %2d %s\n", op->opnum,
+			op->opnum < ARRAY_SIZE(nfsd4_op_names) &&
+			nfsd4_op_names[op->opnum] ? nfsd4_op_names[op->opnum]
+						  : "");
+
 		if (opdesc->op_func)
 			op->status = opdesc->op_func(rqstp, cstate, &op->u);
 		else
@@ -950,12 +1066,32 @@ encode_op:
 	}
 
 out:
-	nfsd4_release_compoundargs(args);
+#if defined(CONFIG_NFSD_V4_1)
+	if (current_ses) {
+		struct nfs41_slot *cs_slot = current_ses->cs_slot;
+		if (cs_slot) {
+			if (op && op->status != nfserr_dropit) {
+				dprintk("%s: SET SLOT STATE TO AVAILABLE\n",
+					__func__);
+				nfs41_set_slot_state(cs_slot,
+						     NFS4_SLOT_AVAILABLE);
+			}
+			nfs41_put_session(cs_slot->sl_session);
+		}
+		kfree(current_ses);
+	}
+#endif /* CONFIG_NFSD_V4_1 */
 	cstate_free(cstate);
 	return status;
 }
 
-static struct nfsd4_operation nfsd4_ops[OP_RELEASE_LOCKOWNER+1] = {
+#if defined(CONFIG_NFSD_V4_1)
+#define NFSD4_LAST_OP OP_SEQUENCE
+#else /* CONFIG_NFSD_V4_1 */
+#define NFSD4_LAST_OP OP_RELEASE_LOCKOWNER
+#endif /* CONFIG_NFSD_V4_1 */
+
+static struct nfsd4_operation nfsd4_ops[NFSD4_LAST_OP+1] = {
 	[OP_ACCESS] = {
 		.op_func = (nfsd4op_func)nfsd4_access,
 	},
@@ -1070,6 +1206,24 @@ static struct nfsd4_operation nfsd4_ops[OP_RELEASE_LOCKOWNER+1] = {
 		.op_func = (nfsd4op_func)nfsd4_release_lockowner,
 		.op_flags = ALLOWED_WITHOUT_FH | ALLOWED_ON_ABSENT_FS,
 	},
+#if defined(CONFIG_NFSD_V4_1)
+	[OP_EXCHANGE_ID] = {
+		.op_func = (nfsd4op_func)nfsd4_exchange_id,
+		.op_flags = ALLOWED_WITHOUT_FH,
+	},
+	[OP_CREATE_SESSION] = {
+		.op_func = (nfsd4op_func)nfsd4_create_session,
+		.op_flags = ALLOWED_WITHOUT_FH,
+	},
+	[OP_SEQUENCE] = {
+		.op_func = (nfsd4op_func)nfsd4_sequence,
+		.op_flags = ALLOWED_WITHOUT_FH,
+	},
+	[OP_DESTROY_SESSION] = {
+		.op_func = (nfsd4op_func)nfsd4_destroy_session,
+		.op_flags = ALLOWED_WITHOUT_FH,
+	},
+#endif /* CONFIG_NFSD_V4_1 */
 };
 
 #define nfs4svc_decode_voidargs		NULL

@@ -457,6 +457,7 @@ rpc_release_client(struct rpc_clnt *clnt)
 		wake_up(&destroy_wait);
 	kref_put(&clnt->cl_kref, rpc_free_auth);
 }
+EXPORT_SYMBOL_GPL(rpc_release_client);
 
 /**
  * rpc_bind_new_program - bind a new RPC program to an existing client
