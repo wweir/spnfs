@@ -924,11 +924,126 @@ void nfsd4_setup_callback_channel(void)
 	return;
 }
 
+/*
+ * Set the exchange_id flags returned by the server.
+ */
+static void
+nfsd4_set_ex_flags(struct nfs4_client *new, struct nfsd4_exchange_id *clid)
+{
+	/* if sessions only, ignore the wire_flags from client */
+
+	/* Referrals are supported, Migration is not. */
+	new->cl_exchange_flags |= EXCHGID4_FLAG_SUPP_MOVED_REFER;
+
+	/* pNFS is not supported */
+	new->cl_exchange_flags |=  EXCHGID4_FLAG_USE_NON_PNFS;
+
+	/* set the wire flags to return to client. */
+	clid->flags = new->cl_exchange_flags;
+}
+
 __be32 nfsd4_exchange_id(struct svc_rqst *rqstp,
 			struct nfsd4_compound_state *cstate,
 			struct nfsd4_exchange_id *clid)
 {
-	return -1;	/* stub */
+	struct nfs4_client *unconf, *conf, *new;
+	int status;
+	unsigned int		strhashval;
+	char			dname[HEXDIR_LEN];
+	nfs4_verifier		verf = clid->verifier;
+	u32			ip_addr = svc_addr_in(rqstp)->sin_addr.s_addr;
+	struct xdr_netobj clname = {
+		.len = clid->id_len,
+		.data = clid->id,
+	};
+
+	dprintk("%s rqstp=%p clid=%p clname.len=%u clname.data=%p "
+		" ip_addr=%u flags %x\n",
+		__func__, rqstp, clid, clname.len, clname.data,
+		ip_addr, clid->flags);
+
+	if (!check_name(clname) || (clid->flags & EXCHGID4_INVAL_FLAG_MASK))
+		return nfserr_inval;
+
+	status = nfs4_make_rec_clidname(dname, &clname);
+
+	if (status)
+		goto error;
+
+	strhashval = clientstr_hashval(dname);
+
+	nfs4_lock_state();
+	status = nfserr_clid_inuse;
+
+	conf = find_confirmed_client_by_str(dname, strhashval);
+	if (conf) {
+		if (!same_creds(&conf->cl_cred, &rqstp->rq_cred) ||
+		    (ip_addr != conf->cl_addr)) {
+			/* Client collision: send nfserr_clid_inuse */
+			goto out;
+		}
+
+		if (!same_verf(&verf, &conf->cl_verifier)) {
+			/* Client reboot: destroy old state */
+			expire_client(conf);
+			goto out_new;
+		}
+		/* router replay */
+		goto out;
+	}
+
+	unconf  = find_unconfirmed_client_by_str(dname, strhashval);
+	if (unconf) {
+		status = nfs_ok;
+		/* Found an unconfirmed record */
+		if (!same_creds(&unconf->cl_cred, &rqstp->rq_cred)) {
+			/* Principal changed: update to the new principal
+			 * and send nfs_ok */
+			copy_cred(&unconf->cl_cred, &rqstp->rq_cred);
+		}
+
+		if (!same_verf(&unconf->cl_verifier, &verf)) {
+			/* Reboot before confirmation: update the verifier and
+			 * send nfs_ok */
+			copy_verf(unconf, &verf);
+			new = unconf;
+			goto out_copy;
+		}
+		goto out;
+	}
+
+out_new:
+	/* Normal case */
+	status = nfserr_resource;
+	new = create_client(clname, dname);
+
+	if (new == NULL)
+		goto out;
+
+	copy_verf(new, &verf);
+	copy_cred(&new->cl_cred, &rqstp->rq_cred);
+	new->cl_addr = ip_addr;
+	gen_clid(new);
+	gen_confirm(new);
+	add_to_unconfirmed(new, strhashval);
+
+	nfsd4_setup_callback_channel();
+out_copy:
+	clid->clientid.cl_boot = new->cl_clientid.cl_boot;
+	clid->clientid.cl_id = new->cl_clientid.cl_id;
+
+	new->cl_seqid = clid->seqid = 1;
+	nfsd4_set_ex_flags(new, clid);
+
+	dprintk("nfsd4_exchange_id seqid %d flags %x\n",
+		new->cl_seqid, new->cl_exchange_flags);
+	status = nfs_ok;
+
+out:
+	nfs4_unlock_state();
+error:
+	dprintk("nfsd4_exchange_id returns %d\n", ntohl(status));
+	return status;
 }
 #endif /* CONFIG_NFSD_V4_1 */
 
