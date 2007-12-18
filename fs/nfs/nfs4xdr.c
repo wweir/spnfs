@@ -240,43 +240,43 @@ static int nfs4_stat_to_errno(int);
 				(encode_getattr_maxsz)
 #define decode_fs_locations_maxsz \
 				(0)
-#define NFS4_enc_compound_sz	(1024)  /* XXX: large enough? */
-#define NFS4_dec_compound_sz	(1024)  /* XXX: large enough? */
-#define NFS4_enc_read_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_compound_sz	(1024)  /* XXX: large enough? */
+#define NFS40_dec_compound_sz	(1024)  /* XXX: large enough? */
+#define NFS40_enc_read_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_read_maxsz)
-#define NFS4_dec_read_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_read_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_read_maxsz)
-#define NFS4_enc_readlink_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_readlink_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_readlink_maxsz)
-#define NFS4_dec_readlink_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_readlink_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_readlink_maxsz)
-#define NFS4_enc_readdir_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_readdir_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_readdir_maxsz)
-#define NFS4_dec_readdir_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_readdir_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_readdir_maxsz)
-#define NFS4_enc_write_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_write_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_write_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_write_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_write_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_write_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_commit_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_commit_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_commit_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_commit_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_commit_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_commit_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_open_sz        (compound_encode_hdr_maxsz + \
+#define NFS40_enc_open_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_savefh_maxsz + \
 				encode_open_maxsz + \
@@ -284,7 +284,7 @@ static int nfs4_stat_to_errno(int);
 				encode_getattr_maxsz + \
 				encode_restorefh_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_open_sz        (compound_decode_hdr_maxsz + \
+#define NFS40_dec_open_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_savefh_maxsz + \
 				decode_open_maxsz + \
@@ -292,131 +292,131 @@ static int nfs4_stat_to_errno(int);
 				decode_getattr_maxsz + \
 				decode_restorefh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_open_confirm_sz \
+#define NFS40_enc_open_confirm_sz \
 				(compound_encode_hdr_maxsz + \
 				 encode_putfh_maxsz + \
 				 encode_open_confirm_maxsz)
-#define NFS4_dec_open_confirm_sz \
+#define NFS40_dec_open_confirm_sz \
 				(compound_decode_hdr_maxsz + \
 				 decode_putfh_maxsz + \
 				 decode_open_confirm_maxsz)
-#define NFS4_enc_open_noattr_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_open_noattr_sz	(compound_encode_hdr_maxsz + \
 					encode_putfh_maxsz + \
 					encode_open_maxsz + \
 					encode_getattr_maxsz)
-#define NFS4_dec_open_noattr_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_open_noattr_sz	(compound_decode_hdr_maxsz + \
 					decode_putfh_maxsz + \
 					decode_open_maxsz + \
 					decode_getattr_maxsz)
-#define NFS4_enc_open_downgrade_sz \
+#define NFS40_enc_open_downgrade_sz \
 				(compound_encode_hdr_maxsz + \
 				 encode_putfh_maxsz + \
 				 encode_open_downgrade_maxsz + \
 				 encode_getattr_maxsz)
-#define NFS4_dec_open_downgrade_sz \
+#define NFS40_dec_open_downgrade_sz \
 				(compound_decode_hdr_maxsz + \
 				 decode_putfh_maxsz + \
 				 decode_open_downgrade_maxsz + \
 				 decode_getattr_maxsz)
-#define NFS4_enc_close_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_close_sz	(compound_encode_hdr_maxsz + \
 				 encode_putfh_maxsz + \
 				 encode_close_maxsz + \
 				 encode_getattr_maxsz)
-#define NFS4_dec_close_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_close_sz	(compound_decode_hdr_maxsz + \
 				 decode_putfh_maxsz + \
 				 decode_close_maxsz + \
 				 decode_getattr_maxsz)
-#define NFS4_enc_setattr_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_setattr_sz	(compound_encode_hdr_maxsz + \
 				 encode_putfh_maxsz + \
 				 encode_setattr_maxsz + \
 				 encode_getattr_maxsz)
-#define NFS4_dec_setattr_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_setattr_sz	(compound_decode_hdr_maxsz + \
 				 decode_putfh_maxsz + \
 				 decode_setattr_maxsz + \
 				 decode_getattr_maxsz)
-#define NFS4_enc_fsinfo_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_fsinfo_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_fsinfo_maxsz)
-#define NFS4_dec_fsinfo_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_fsinfo_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_fsinfo_maxsz)
-#define NFS4_enc_renew_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_renew_sz	(compound_encode_hdr_maxsz + \
 				encode_renew_maxsz)
-#define NFS4_dec_renew_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_renew_sz	(compound_decode_hdr_maxsz + \
 				decode_renew_maxsz)
-#define NFS4_enc_setclientid_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_setclientid_sz	(compound_encode_hdr_maxsz + \
 				encode_setclientid_maxsz)
-#define NFS4_dec_setclientid_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_setclientid_sz	(compound_decode_hdr_maxsz + \
 				decode_setclientid_maxsz)
-#define NFS4_enc_setclientid_confirm_sz \
+#define NFS40_enc_setclientid_confirm_sz \
 				(compound_encode_hdr_maxsz + \
 				encode_setclientid_confirm_maxsz + \
 				encode_putrootfh_maxsz + \
 				encode_fsinfo_maxsz)
-#define NFS4_dec_setclientid_confirm_sz \
+#define NFS40_dec_setclientid_confirm_sz \
 				(compound_decode_hdr_maxsz + \
 				decode_setclientid_confirm_maxsz + \
 				decode_putrootfh_maxsz + \
 				decode_fsinfo_maxsz)
-#define NFS4_enc_lock_sz        (compound_encode_hdr_maxsz + \
+#define NFS40_enc_lock_sz        (compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_lock_maxsz)
-#define NFS4_dec_lock_sz        (compound_decode_hdr_maxsz + \
+#define NFS40_dec_lock_sz        (compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_lock_maxsz)
-#define NFS4_enc_lockt_sz       (compound_encode_hdr_maxsz + \
+#define NFS40_enc_lockt_sz       (compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_lockt_maxsz)
-#define NFS4_dec_lockt_sz       (compound_decode_hdr_maxsz + \
+#define NFS40_dec_lockt_sz       (compound_decode_hdr_maxsz + \
 				 decode_putfh_maxsz + \
 				 decode_lockt_maxsz)
-#define NFS4_enc_locku_sz       (compound_encode_hdr_maxsz + \
+#define NFS40_enc_locku_sz       (compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_locku_maxsz)
-#define NFS4_dec_locku_sz       (compound_decode_hdr_maxsz + \
+#define NFS40_dec_locku_sz       (compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_locku_maxsz)
-#define NFS4_enc_access_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_access_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_access_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_access_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_access_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_access_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_getattr_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_getattr_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_getattr_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_getattr_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_lookup_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_lookup_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_lookup_maxsz + \
 				encode_getattr_maxsz + \
 				encode_getfh_maxsz)
-#define NFS4_dec_lookup_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_lookup_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_lookup_maxsz + \
 				decode_getattr_maxsz + \
 				decode_getfh_maxsz)
-#define NFS4_enc_lookup_root_sz (compound_encode_hdr_maxsz + \
+#define NFS40_enc_lookup_root_sz (compound_encode_hdr_maxsz + \
 				encode_putrootfh_maxsz + \
 				encode_getattr_maxsz + \
 				encode_getfh_maxsz)
-#define NFS4_dec_lookup_root_sz (compound_decode_hdr_maxsz + \
+#define NFS40_dec_lookup_root_sz (compound_decode_hdr_maxsz + \
 				decode_putrootfh_maxsz + \
 				decode_getattr_maxsz + \
 				decode_getfh_maxsz)
-#define NFS4_enc_remove_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_remove_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_remove_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_remove_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_remove_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + 5 + \
 				decode_getattr_maxsz)
-#define NFS4_enc_rename_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_rename_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_savefh_maxsz + \
 				encode_putfh_maxsz + \
@@ -424,7 +424,7 @@ static int nfs4_stat_to_errno(int);
 				encode_getattr_maxsz + \
 				encode_restorefh_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_rename_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_rename_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_savefh_maxsz + \
 				decode_putfh_maxsz + \
@@ -432,7 +432,7 @@ static int nfs4_stat_to_errno(int);
 				decode_getattr_maxsz + \
 				decode_restorefh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_link_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_link_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_savefh_maxsz + \
 				encode_putfh_maxsz + \
@@ -440,7 +440,7 @@ static int nfs4_stat_to_errno(int);
 				decode_getattr_maxsz + \
 				encode_restorefh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_dec_link_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_link_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_savefh_maxsz + \
 				decode_putfh_maxsz + \
@@ -448,17 +448,17 @@ static int nfs4_stat_to_errno(int);
 				decode_getattr_maxsz + \
 				decode_restorefh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_symlink_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_symlink_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_symlink_maxsz + \
 				encode_getattr_maxsz + \
 				encode_getfh_maxsz)
-#define NFS4_dec_symlink_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_symlink_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_symlink_maxsz + \
 				decode_getattr_maxsz + \
 				decode_getfh_maxsz)
-#define NFS4_enc_create_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_create_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_savefh_maxsz + \
 				encode_create_maxsz + \
@@ -466,7 +466,7 @@ static int nfs4_stat_to_errno(int);
 				encode_getattr_maxsz + \
 				encode_restorefh_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_create_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_create_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_savefh_maxsz + \
 				decode_create_maxsz + \
@@ -474,49 +474,49 @@ static int nfs4_stat_to_errno(int);
 				decode_getattr_maxsz + \
 				decode_restorefh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_pathconf_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_pathconf_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_pathconf_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_pathconf_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_statfs_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_statfs_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_statfs_maxsz)
-#define NFS4_dec_statfs_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_statfs_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_statfs_maxsz)
-#define NFS4_enc_server_caps_sz (compound_encode_hdr_maxsz + \
+#define NFS40_enc_server_caps_sz (compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_server_caps_sz (compound_decode_hdr_maxsz + \
+#define NFS40_dec_server_caps_sz (compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_delegreturn_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_delegreturn_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_delegreturn_maxsz + \
 				encode_getattr_maxsz)
-#define NFS4_dec_delegreturn_sz (compound_decode_hdr_maxsz + \
+#define NFS40_dec_delegreturn_sz (compound_decode_hdr_maxsz + \
 				decode_delegreturn_maxsz + \
 				decode_getattr_maxsz)
-#define NFS4_enc_getacl_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_getacl_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_getacl_maxsz)
-#define NFS4_dec_getacl_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_getacl_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_getacl_maxsz)
-#define NFS4_enc_setacl_sz	(compound_encode_hdr_maxsz + \
+#define NFS40_enc_setacl_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
 				encode_setacl_maxsz)
-#define NFS4_dec_setacl_sz	(compound_decode_hdr_maxsz + \
+#define NFS40_dec_setacl_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				decode_setacl_maxsz)
-#define NFS4_enc_fs_locations_sz \
+#define NFS40_enc_fs_locations_sz \
 				(compound_encode_hdr_maxsz + \
 				 encode_putfh_maxsz + \
 				 encode_lookup_maxsz + \
 				 encode_fs_locations_maxsz)
-#define NFS4_dec_fs_locations_sz \
+#define NFS40_dec_fs_locations_sz \
 				(compound_decode_hdr_maxsz + \
 				 decode_putfh_maxsz + \
 				 decode_lookup_maxsz + \
@@ -1900,7 +1900,7 @@ static int nfs4_xdr_enc_readlink(struct rpc_rqst *req, struct xdr_stream *xdr, c
 	 *    toplevel_status + taglen + rescount + OP_PUTFH + status
 	 *      + OP_READLINK + status + string length = 8
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS4_dec_readlink_sz) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS40_dec_readlink_sz) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen, args->pages,
 			args->pgbase, args->pglen);
 
@@ -1939,7 +1939,7 @@ static int nfs4_xdr_enc_readdir(struct rpc_rqst *req, struct xdr_stream *xdr, co
 	 *    toplevel_status + taglen + rescount + OP_PUTFH + status
 	 *      + OP_READDIR + status + verifer(2)  = 9
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS4_dec_readdir_sz) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS40_dec_readdir_sz) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen, args->pages,
 			 args->pgbase, args->count);
 	dprintk("%s: inlined page args = (%u, %p, %u, %u)\n",
@@ -1982,7 +1982,7 @@ static int nfs4_xdr_enc_read(struct rpc_rqst *req, struct xdr_stream *xdr, struc
 	 *    toplevel status + taglen=0 + rescount + OP_PUTFH + status
 	 *       + OP_READ + status + eof + datalen = 9
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS4_dec_read_sz) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS40_dec_read_sz) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen,
 			 args->pages, args->pgbase, args->count);
 	req->rq_rcv_buf.flags |= XDRBUF_READ;
@@ -2068,7 +2068,7 @@ nfs40_xdr_enc_getacl(struct rpc_rqst *req, __be32 *p,
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
 	encode_compound_hdr(&xdr, &hdr);
 
-	return nfs4_xdr_enc_getacl(req, &xdr, args, NFS4_dec_getacl_sz);
+	return nfs4_xdr_enc_getacl(req, &xdr, args, NFS40_dec_getacl_sz);
 }
 
 /*
@@ -5184,8 +5184,8 @@ nfs4_stat_to_errno(int stat)
 	.p_proc   = NFSPROC4_COMPOUND,				\
 	.p_encode = (kxdrproc_t) nfs4##minorversion##_xdr_##argtype,	\
 	.p_decode = (kxdrproc_t) nfs4##minorversion##_xdr_##restype,	\
-	.p_arglen = NFS4##_##argtype##_sz,			\
-	.p_replen = NFS4##_##restype##_sz,			\
+	.p_arglen = NFS4##minorversion##_##argtype##_sz,		\
+	.p_replen = NFS4##minorversion##_##restype##_sz,		\
 	.p_statidx = NFSPROC4_CLNT_##proc,			\
 	.p_name   = #proc,					\
     }
