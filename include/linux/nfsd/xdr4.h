@@ -362,8 +362,27 @@ struct nfsd4_exchange_id {
 	u32		seqid;
 };
 
+struct nfsd4_channel {
+	u32		headerpadsz;
+	u32		maxreq_sz;
+	u32		maxresp_sz;
+	u32		maxresp_cached;
+	u32		maxops;
+	u32		maxreqs;
+	u32		nr_rdma_attrs;
+	u32		rdma_attrs;
+};
+
 struct nfsd4_create_session {
-	int	foo;	/* stub */
+	clientid_t		clientid;
+	nfs41_sessionid		sessionid;
+	u32			seqid;
+	u32			flags;
+	struct nfsd4_channel	fore_channel;
+	struct nfsd4_channel	back_channel;
+	u32			callback_prog;
+	u32			uid;
+	u32			gid;
 };
 
 struct nfsd4_sequence {
