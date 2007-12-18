@@ -840,7 +840,16 @@ nfsd4_decode_renew(struct nfsd4_compoundargs *argp, clientid_t *clientid)
 static __be32 nfsd4_decode_sequence(struct nfsd4_compoundargs *argp,
 				    struct nfsd4_sequence *seq)
 {
-	return -1;	/* stub */
+	DECODE_HEAD;
+
+	READ_BUF(NFS4_MAX_SESSIONID_LEN + 16);
+	COPYMEM(seq->sessionid, NFS4_MAX_SESSIONID_LEN);
+	READ32(seq->seqid);
+	READ32(seq->slotid);
+	READ32(seq->maxslots);
+	READ32(seq->catchthis);
+
+	DECODE_TAIL;
 }
 
 static __be32 nfsd4_decode_destroy_session(struct nfsd4_compoundargs *argp,
@@ -2933,7 +2942,20 @@ nfsd4_encode_create_session(struct nfsd4_compoundres *resp, int nfserr,
 static void nfsd4_encode_sequence(struct nfsd4_compoundres *resp, int nfserr,
 				  struct nfsd4_sequence *seq)
 {
-	return;	/* stub */
+	ENCODE_HEAD;
+
+	if (!nfserr) {
+		RESERVE_SPACE(NFS4_MAX_SESSIONID_LEN + 20);
+
+		WRITEMEM(seq->sessionid, NFS4_MAX_SESSIONID_LEN);
+		WRITE32(seq->seqid);
+		WRITE32(seq->slotid);
+		WRITE32(seq->maxslots);
+		WRITE32(seq->target_maxslots);
+		WRITE32(seq->status_flags);
+
+		ADJUST_ARGS();
+	}
 }
 
 static void nfsd4_encode_destroy_session(struct nfsd4_compoundres *resp,
