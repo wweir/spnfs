@@ -280,7 +280,18 @@ encode_cb_recall(struct xdr_stream *xdr, struct nfs4_cb_recall *cb_rec)
 static int
 encode_cb_sequence(struct xdr_stream *xdr, struct nfs41_cb_sequence *args)
 {
-	return -1;	/* stub */
+	u32 *p;
+
+	RESERVE_SPACE(1 + NFS4_MAX_SESSIONID_LEN + 20);
+
+	WRITE32(OP_CB_SEQUENCE);
+	WRITEMEM(args->cbs_sessionid, NFS4_MAX_SESSIONID_LEN);
+	WRITE32(args->cbs_seqid);
+	WRITE32(args->cbs_slotid);
+	WRITE32(args->cbs_highest_slotid);
+	WRITE32(args->cbsa_cachethis);
+	WRITE32(0); /* FIXME: support referring_call_lists */
+	return 0;
 }
 #endif /* defined(CONFIG_NFSD_V4_1) */
 
@@ -392,7 +403,19 @@ out:
 static int
 decode_cb_sequence(struct xdr_stream *xdr, struct nfs41_cb_sequence *res)
 {
-	return -1;	/* stub */
+	int status;
+	u32 *p;
+
+	status = decode_cb_op_hdr(xdr, OP_CB_SEQUENCE);
+	if (status)
+		return status;
+	READ_BUF(NFS4_MAX_SESSIONID_LEN + 16);
+	COPYMEM(res->cbs_sessionid, NFS4_MAX_SESSIONID_LEN);
+	READ32(res->cbs_seqid);
+	READ32(res->cbs_slotid);
+	READ32(res->cbs_highest_slotid);
+	READ32(res->cbsr_target_highest_slotid);
+	return 0;
 }
 
 static int
@@ -614,6 +637,34 @@ out_err:
 	cb->cb_client = NULL;
 	dprintk("NFSD: warning: no callback path to client %.*s\n",
 		(int)clp->cl_name.len, clp->cl_name.data);
+}
+
+/* FIXME: cb_sequence should support referring call lists, cachethis, and multiple slots */
+static int
+nfs41_cb_sequence_setup(struct nfs4_client *clp, struct nfs41_cb_sequence *args)
+{
+	u32 *ptr = (u32 *)clp->cl_sessionid;
+	dprintk("%s: %u:%u:%u:%u\n", __FUNCTION__,
+		ptr[0], ptr[1], ptr[2], ptr[3]);
+
+	mutex_lock(&clp->cl_cb_mutex);
+	memcpy(args->cbs_sessionid, clp->cl_sessionid, NFS4_MAX_SESSIONID_LEN);
+	args->cbs_seqid = ++clp->cl_cb_seq_nr;
+	args->cbs_slotid = 0;
+	args->cbs_highest_slotid = 0;
+	args->cbsa_cachethis = 0;
+	return 0;
+}
+
+static void
+nfs41_cb_sequence_done(struct nfs4_client *clp, struct nfs41_cb_sequence *res)
+{
+	u32 *ptr = (u32 *)res->cbs_sessionid;
+	dprintk("%s: %u:%u:%u:%u\n", __FUNCTION__,
+		ptr[0], ptr[1], ptr[2], ptr[3]);
+
+	/* FIXME: support multiple callback slots */
+	mutex_unlock(&clp->cl_cb_mutex);
 }
 #endif /* defined(CONFIG_NFSD_V4_1) */
 
