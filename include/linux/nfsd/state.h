@@ -184,6 +184,16 @@ struct current_session {
 	nfsd_sessionid_t	cs_sid;
 	struct nfs41_slot	*cs_slot;
 };
+
+struct nfs41_cb_sequence {
+	/* args/res */
+	char			cbs_sessionid[NFS4_MAX_SESSIONID_LEN];
+	u32			cbs_seqid;
+	u32			cbs_slotid;
+	u32			cbs_highest_slotid;
+	u32			cbsa_cachethis;			/* args only */
+	u32			cbsr_target_highest_slotid;	/* res only */
+};
 #endif /* CONFIG_NFSD_V4_1 */
 
 #define HEXDIR_LEN     33 /* hex version of 16 byte md5 of cl_name plus '\0' */
