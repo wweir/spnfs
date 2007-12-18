@@ -386,7 +386,13 @@ struct nfsd4_create_session {
 };
 
 struct nfsd4_sequence {
-	int	foo;	/* stub */
+	nfs41_sessionid		sessionid;
+	u32			seqid;
+	u32			slotid;
+	u32			maxslots;
+	u32			target_maxslots;
+	u32			catchthis;
+	u32			status_flags;
 };
 
 struct nfsd4_destroy_session {
