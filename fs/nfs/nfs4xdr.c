@@ -1395,6 +1395,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_enc_access(struct rpc_rqst *req, __be32 *p, const struct nfs4_accessargs *args)
+{
+}
+
 /*
  * Encode LOOKUP request
  */
@@ -1420,6 +1424,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_enc_lookup(struct rpc_rqst *req, __be32 *p, const struct nfs4_lookup_arg *args)
+{
+}
+
 /*
  * Encode LOOKUP_ROOT request
  */
@@ -1440,6 +1448,10 @@ static int nfs4_xdr_enc_lookup_root(struct rpc_rqst *req, __be32 *p, const struc
 		status = encode_getfattr(xdrp, args->bitmask);
 out:
 	return status;
+}
+
+static int nfs40_xdr_enc_lookup_root(struct rpc_rqst *req, __be32 *p, const struct nfs4_lookup_root_arg *args)
+{
 }
 
 /*
@@ -1463,6 +1475,10 @@ static int nfs4_xdr_enc_remove(struct rpc_rqst *req, __be32 *p, const struct nfs
 	status = encode_getfattr(xdrp, args->bitmask);
 out:
 	return status;
+}
+
+static int nfs40_xdr_enc_remove(struct rpc_rqst *req, __be32 *p, const struct nfs_removeargs *args)
+{
 }
 
 /*
@@ -1496,6 +1512,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_enc_rename(struct rpc_rqst *req, __be32 *p, const struct nfs4_rename_arg *args)
+{
+}
+
 /*
  * Encode LINK request
  */
@@ -1525,6 +1545,10 @@ static int nfs4_xdr_enc_link(struct rpc_rqst *req, __be32 *p, const struct nfs4_
 	status = encode_getfattr(xdrp, args->bitmask);
 out:
 	return status;
+}
+
+static int nfs40_xdr_enc_link(struct rpc_rqst *req, __be32 *p, const struct nfs4_link_arg *args)
+{
 }
 
 /*
@@ -1558,12 +1582,20 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_enc_create(struct rpc_rqst *req, __be32 *p, const struct nfs4_create_arg *args)
+{
+}
+
 /*
  * Encode SYMLINK request
  */
 static int nfs4_xdr_enc_symlink(struct rpc_rqst *req, __be32 *p, const struct nfs4_create_arg *args)
 {
 	return nfs4_xdr_enc_create(req, p, args);
+}
+
+static int nfs40_xdr_enc_symlink(struct rpc_rqst *req, __be32 *p, const struct nfs4_create_arg *args)
+{
 }
 
 /*
@@ -1583,6 +1615,10 @@ static int nfs4_xdr_enc_getattr(struct rpc_rqst *req, __be32 *p, const struct nf
 	if ((status = encode_putfh(xdrp, args->fh)) == 0)
 		status = encode_getfattr(xdrp, args->bitmask);
 	return status;
+}
+
+static int nfs40_xdr_enc_getattr(struct rpc_rqst *req, __be32 *p, const struct nfs4_getattr_arg *args)
+{
 }
 
 /*
@@ -1608,6 +1644,10 @@ static int nfs4_xdr_enc_close(struct rpc_rqst *req, __be32 *p, struct nfs_closea
 	status = encode_getfattr(xdrp, args->bitmask);
 out:
         return status;
+}
+
+static int nfs40_xdr_enc_close(struct rpc_rqst *req, __be32 *p, struct nfs_closeargs *args)
+{
 }
 
 /*
@@ -1647,6 +1687,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_enc_open(struct rpc_rqst *req, __be32 *p, struct nfs_openargs *args)
+{
+}
+
 /*
  * Encode an OPEN_CONFIRM request
  */
@@ -1667,6 +1711,10 @@ static int nfs4_xdr_enc_open_confirm(struct rpc_rqst *req, __be32 *p, struct nfs
 	status = encode_open_confirm(xdrp, args);
 out:
 	return status;
+}
+
+static int nfs40_xdr_enc_open_confirm(struct rpc_rqst *req, __be32 *p, struct nfs_open_confirmargs *args)
+{
 }
 
 /*
@@ -1694,6 +1742,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_enc_open_noattr(struct rpc_rqst *req, __be32 *p, struct nfs_openargs *args)
+{
+}
+
 /*
  * Encode an OPEN_DOWNGRADE request
  */
@@ -1719,6 +1771,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_enc_open_downgrade(struct rpc_rqst *req, __be32 *p, struct nfs_closeargs *args)
+{
+}
+
 /*
  * Encode a LOCK request
  */
@@ -1739,6 +1795,10 @@ static int nfs4_xdr_enc_lock(struct rpc_rqst *req, __be32 *p, struct nfs_lock_ar
 	status = encode_lock(xdrp, args);
 out:
 	return status;
+}
+
+static int nfs40_xdr_enc_lock(struct rpc_rqst *req, __be32 *p, struct nfs_lock_args *args)
+{
 }
 
 /*
@@ -1763,6 +1823,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_enc_lockt(struct rpc_rqst *req, __be32 *p, struct nfs_lockt_args *args)
+{
+}
+
 /*
  * Encode a LOCKU request
  */
@@ -1783,6 +1847,10 @@ static int nfs4_xdr_enc_locku(struct rpc_rqst *req, __be32 *p, struct nfs_locku_
 	status = encode_locku(xdrp, args);
 out:
 	return status;
+}
+
+static int nfs40_xdr_enc_locku(struct rpc_rqst *req, __be32 *p, struct nfs_locku_args *args)
+{
 }
 
 /*
@@ -1816,6 +1884,10 @@ static int nfs4_xdr_enc_readlink(struct rpc_rqst *req, __be32 *p, const struct n
 
 out:
 	return status;
+}
+
+static int nfs40_xdr_enc_readlink(struct rpc_rqst *req, __be32 *p, const struct nfs4_readlink *args)
+{
 }
 
 /*
@@ -1854,6 +1926,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_enc_readdir(struct rpc_rqst *req, __be32 *p, const struct nfs4_readdir_arg *args)
+{
+}
+
 /*
  * Encode a READ request
  */
@@ -1888,6 +1964,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_enc_read(struct rpc_rqst *req, __be32 *p, struct nfs_readargs *args)
+{
+}
+
 /*
  * Encode an SETATTR request
  */
@@ -1912,6 +1992,10 @@ static int nfs4_xdr_enc_setattr(struct rpc_rqst *req, __be32 *p, struct nfs_seta
 	status = encode_getfattr(xdrp, args->bitmask);
 out:
         return status;
+}
+
+static int nfs40_xdr_enc_setattr(struct rpc_rqst *req, __be32 *p, struct nfs_setattrargs *args)
+{
 }
 
 /*
@@ -1943,6 +2027,12 @@ out:
 	return status;
 }
 
+static int
+nfs40_xdr_enc_getacl(struct rpc_rqst *req, __be32 *p,
+		struct nfs_getaclargs *args)
+{
+}
+
 /*
  * Encode a WRITE request
  */
@@ -1967,6 +2057,10 @@ static int nfs4_xdr_enc_write(struct rpc_rqst *req, __be32 *p, struct nfs_writea
 	status = encode_getfattr(xdrp, args->bitmask);
 out:
 	return status;
+}
+
+static int nfs40_xdr_enc_write(struct rpc_rqst *req, __be32 *p, struct nfs_writeargs *args)
+{
 }
 
 /*
@@ -1994,6 +2088,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_enc_commit(struct rpc_rqst *req, __be32 *p, struct nfs_writeargs *args)
+{
+}
+
 /*
  * FSINFO request
  */
@@ -2012,6 +2110,10 @@ static int nfs4_xdr_enc_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs4_fsin
 	if (!status)
 		status = encode_fsinfo(xdrp, args->bitmask);
 	return status;
+}
+
+static int nfs40_xdr_enc_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs4_fsinfo_arg *args)
+{
 }
 
 /*
@@ -2033,6 +2135,10 @@ static int nfs4_xdr_enc_pathconf(struct rpc_rqst *req, __be32 *p, const struct n
 		status = encode_getattr_one(xdrp,
 				args->bitmask[0] & nfs4_pathconf_bitmap[0]);
 	return status;
+}
+
+static int nfs40_xdr_enc_pathconf(struct rpc_rqst *req, __be32 *p, const struct nfs4_pathconf_arg *args)
+{
 }
 
 /*
@@ -2057,6 +2163,10 @@ static int nfs4_xdr_enc_statfs(struct rpc_rqst *req, __be32 *p, const struct nfs
 	return status;
 }
 
+static int nfs40_xdr_enc_statfs(struct rpc_rqst *req, __be32 *p, const struct nfs4_statfs_arg *args)
+{
+}
+
 /*
  * GETATTR_BITMAP request
  */
@@ -2078,6 +2188,10 @@ static int nfs4_xdr_enc_server_caps(struct rpc_rqst *req, __be32 *p, const struc
 				FATTR4_WORD0_SYMLINK_SUPPORT|
 				FATTR4_WORD0_ACLSUPPORT);
 	return status;
+}
+
+static int nfs40_xdr_enc_server_caps(struct rpc_rqst *req, __be32 *p, const struct nfs_fh *fhandle)
+{
 }
 
 /*
@@ -2160,6 +2274,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_enc_delegreturn(struct rpc_rqst *req, __be32 *p, const struct nfs4_delegreturnargs *args)
+{
+}
+
 /*
  * Encode FS_LOCATIONS request
  */
@@ -2191,6 +2309,10 @@ static int nfs4_xdr_enc_fs_locations(struct rpc_rqst *req, __be32 *p, struct nfs
 			0, PAGE_SIZE);
 out:
 	return status;
+}
+
+static int nfs40_xdr_enc_fs_locations(struct rpc_rqst *req, __be32 *p, struct nfs4_fs_locations_arg *args)
+{
 }
 
 /*
@@ -3809,6 +3931,10 @@ out:
         return status;
 }
 
+static int nfs40_xdr_dec_open_downgrade(struct rpc_rqst *rqstp, __be32 *p, struct nfs_closeres *res)
+{
+}
+
 /*
  * END OF "GENERIC" DECODE ROUTINES.
  */
@@ -3837,6 +3963,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_dec_access(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_accessres *res)
+{
+}
+
 /*
  * Decode LOOKUP response
  */
@@ -3861,6 +3991,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_dec_lookup(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_lookup_res *res)
+{
+}
+
 /*
  * Decode LOOKUP_ROOT response
  */
@@ -3880,6 +4014,10 @@ static int nfs4_xdr_dec_lookup_root(struct rpc_rqst *rqstp, __be32 *p, struct nf
 		status = decode_getfattr(xdrp, res->fattr, res->server);
 out:
 	return status;
+}
+
+static int nfs40_xdr_dec_lookup_root(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_lookup_res *res)
+{
 }
 
 /*
@@ -3902,6 +4040,10 @@ static int nfs4_xdr_dec_remove(struct rpc_rqst *rqstp, __be32 *p, struct nfs_rem
 	decode_getfattr(xdrp, &res->dir_attr, res->server);
 out:
 	return status;
+}
+
+static int nfs40_xdr_dec_remove(struct rpc_rqst *rqstp, __be32 *p, struct nfs_removeres *res)
+{
 }
 
 /*
@@ -3933,6 +4075,10 @@ static int nfs4_xdr_dec_rename(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_re
 	decode_getfattr(xdrp, res->old_fattr, res->server);
 out:
 	return status;
+}
+
+static int nfs40_xdr_dec_rename(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_rename_res *res)
+{
 }
 
 /*
@@ -3969,6 +4115,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_dec_link(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_link_res *res)
+{
+}
+
 /*
  * Decode CREATE response
  */
@@ -3999,12 +4149,20 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_dec_create(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_create_res *res)
+{
+}
+
 /*
  * Decode SYMLINK response
  */
 static int nfs4_xdr_dec_symlink(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_create_res *res)
 {
 	return nfs4_xdr_dec_create(rqstp, p, res);
+}
+
+static int nfs40_xdr_dec_symlink(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_create_res *res)
+{
 }
 
 /*
@@ -4030,6 +4188,10 @@ out:
 
 }
 
+static int nfs40_xdr_dec_getattr(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_getattr_res *res)
+{
+}
+
 /*
  * Encode an SETACL request
  */
@@ -4052,6 +4214,12 @@ nfs4_xdr_enc_setacl(struct rpc_rqst *req, __be32 *p, struct nfs_setaclargs *args
 out:
         return status;
 }
+
+static int
+nfs40_xdr_enc_setacl(struct rpc_rqst *req, __be32 *p, struct nfs_setaclargs *args)
+{
+}
+
 /*
  * Decode SETACL response
  */
@@ -4073,6 +4241,11 @@ nfs4_xdr_dec_setacl(struct rpc_rqst *rqstp, __be32 *p, void *res)
 	status = decode_setattr(xdrp, res);
 out:
 	return status;
+}
+
+static int
+nfs40_xdr_dec_setacl(struct rpc_rqst *rqstp, __be32 *p, void *res)
+{
 }
 
 /*
@@ -4097,6 +4270,11 @@ nfs4_xdr_dec_getacl(struct rpc_rqst *rqstp, __be32 *p, size_t *acl_len)
 
 out:
 	return status;
+}
+
+static int
+nfs40_xdr_dec_getacl(struct rpc_rqst *rqstp, __be32 *p, size_t *acl_len)
+{
 }
 
 /*
@@ -4128,6 +4306,10 @@ static int nfs4_xdr_dec_close(struct rpc_rqst *rqstp, __be32 *p, struct nfs_clos
 	decode_getfattr(xdrp, res->fattr, res->server);
 out:
         return status;
+}
+
+static int nfs40_xdr_dec_close(struct rpc_rqst *rqstp, __be32 *p, struct nfs_closeres *res)
+{
 }
 
 /*
@@ -4164,6 +4346,10 @@ out:
         return status;
 }
 
+static int nfs40_xdr_dec_open(struct rpc_rqst *rqstp, __be32 *p, struct nfs_openres *res)
+{
+}
+
 /*
  * Decode OPEN_CONFIRM response
  */
@@ -4184,6 +4370,10 @@ static int nfs4_xdr_dec_open_confirm(struct rpc_rqst *rqstp, __be32 *p, struct n
         status = decode_open_confirm(xdrp, res);
 out:
         return status;
+}
+
+static int nfs40_xdr_dec_open_confirm(struct rpc_rqst *rqstp, __be32 *p, struct nfs_open_confirmres *res)
+{
 }
 
 /*
@@ -4209,6 +4399,10 @@ static int nfs4_xdr_dec_open_noattr(struct rpc_rqst *rqstp, __be32 *p, struct nf
 	decode_getfattr(xdrp, res->f_attr, res->server);
 out:
         return status;
+}
+
+static int nfs40_xdr_dec_open_noattr(struct rpc_rqst *rqstp, __be32 *p, struct nfs_openres *res)
+{
 }
 
 /*
@@ -4238,6 +4432,10 @@ out:
         return status;
 }
 
+static int nfs40_xdr_dec_setattr(struct rpc_rqst *rqstp, __be32 *p, struct nfs_setattrres *res)
+{
+}
+
 /*
  * Decode LOCK response
  */
@@ -4258,6 +4456,10 @@ static int nfs4_xdr_dec_lock(struct rpc_rqst *rqstp, __be32 *p, struct nfs_lock_
 	status = decode_lock(xdrp, res);
 out:
 	return status;
+}
+
+static int nfs40_xdr_dec_lock(struct rpc_rqst *rqstp, __be32 *p, struct nfs_lock_res *res)
+{
 }
 
 /*
@@ -4282,6 +4484,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_dec_lockt(struct rpc_rqst *rqstp, __be32 *p, struct nfs_lockt_res *res)
+{
+}
+
 /*
  * Decode LOCKU response
  */
@@ -4302,6 +4508,10 @@ static int nfs4_xdr_dec_locku(struct rpc_rqst *rqstp, __be32 *p, struct nfs_lock
 	status = decode_locku(xdrp, res);
 out:
 	return status;
+}
+
+static int nfs40_xdr_dec_locku(struct rpc_rqst *rqstp, __be32 *p, struct nfs_locku_res *res)
+{
 }
 
 /*
@@ -4326,6 +4536,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_dec_readlink(struct rpc_rqst *rqstp, __be32 *p, void *res)
+{
+}
+
 /*
  * Decode READDIR response
  */
@@ -4346,6 +4560,10 @@ static int nfs4_xdr_dec_readdir(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_r
 	status = decode_readdir(xdrp, rqstp, res);
 out:
 	return status;
+}
+
+static int nfs40_xdr_dec_readdir(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_readdir_res *res)
+{
 }
 
 /*
@@ -4370,6 +4588,10 @@ static int nfs4_xdr_dec_read(struct rpc_rqst *rqstp, __be32 *p, struct nfs_readr
 		status = res->count;
 out:
 	return status;
+}
+
+static int nfs40_xdr_dec_read(struct rpc_rqst *rqstp, __be32 *p, struct nfs_readres *res)
+{
 }
 
 /*
@@ -4399,6 +4621,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_dec_write(struct rpc_rqst *rqstp, __be32 *p, struct nfs_writeres *res)
+{
+}
+
 /*
  * Decode COMMIT response
  */
@@ -4424,6 +4650,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_dec_commit(struct rpc_rqst *rqstp, __be32 *p, struct nfs_writeres *res)
+{
+}
+
 /*
  * FSINFO request
  */
@@ -4445,6 +4675,10 @@ static int nfs4_xdr_dec_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs_fsinf
 	return status;
 }
 
+static int nfs40_xdr_dec_fsinfo(struct rpc_rqst *req, __be32 *p, struct nfs_fsinfo *fsinfo)
+{
+}
+
 /*
  * PATHCONF request
  */
@@ -4462,6 +4696,10 @@ static int nfs4_xdr_dec_pathconf(struct rpc_rqst *req, __be32 *p, struct nfs_pat
 	if (!status)
 		status = decode_pathconf(xdrp, pathconf);
 	return status;
+}
+
+static int nfs40_xdr_dec_pathconf(struct rpc_rqst *req, __be32 *p, struct nfs_pathconf *pathconf)
+{
 }
 
 /*
@@ -4483,6 +4721,10 @@ static int nfs4_xdr_dec_statfs(struct rpc_rqst *req, __be32 *p, struct nfs_fssta
 	return status;
 }
 
+static int nfs40_xdr_dec_statfs(struct rpc_rqst *req, __be32 *p, struct nfs_fsstat *fsstat)
+{
+}
+
 /*
  * GETATTR_BITMAP request
  */
@@ -4501,6 +4743,10 @@ static int nfs4_xdr_dec_server_caps(struct rpc_rqst *req, __be32 *p, struct nfs4
 	status = decode_server_caps(xdrp, res);
 out:
 	return status;
+}
+
+static int nfs40_xdr_dec_server_caps(struct rpc_rqst *req, __be32 *p, struct nfs4_server_caps_res *res)
+{
 }
 
 /*
@@ -4586,6 +4832,10 @@ out:
 	return status;
 }
 
+static int nfs40_xdr_dec_delegreturn(struct rpc_rqst *rqstp, __be32 *p, struct nfs4_delegreturnres *res)
+{
+}
+
 /*
  * FS_LOCATIONS request
  */
@@ -4608,6 +4858,10 @@ static int nfs4_xdr_dec_fs_locations(struct rpc_rqst *req, __be32 *p, struct nfs
 	status = decode_getfattr(xdrp, &res->fattr, res->server);
 out:
 	return status;
+}
+
+static int nfs40_xdr_dec_fs_locations(struct rpc_rqst *req, __be32 *p, struct nfs4_fs_locations *res)
+{
 }
 
 __be32 *nfs4_decode_dirent(__be32 *p, struct nfs_entry *entry, int plus)
