@@ -2255,7 +2255,31 @@ nfsd4_destroy_session(struct svc_rqst *r,
 			struct nfsd4_compound_state *cstate,
 			struct nfsd4_destroy_session *sessionid)
 {
-	return -1;	/* stub */
+	struct nfs41_session *ses;
+	u32 status = nfserr_badsession;
+
+	/* Notes:
+	 * - The confirmed nfs4_client->cl_sessionid holds destroyed sessinid
+	 * - Should we return nfserr_back_chan_busy if waiting for
+	 *   callbacks on to-be-destroyed session?
+	 * - Do we need to clear any callback info from previous session?
+	 */
+
+	dump_sessionid(__func__, &sessionid->sessionid);
+	nfs4_lock_state();
+	ses = find_in_sessionid_hashtbl(&sessionid->sessionid);
+	if (!ses)
+		goto out;
+
+	/* wait for callbacks */
+	shutdown_callback_client(ses->se_client);
+
+	destroy_session(ses);
+	status = nfs_ok;
+out:
+	nfs4_unlock_state();
+	dprintk("%s returns %d\n", __func__, ntohl(status));
+	return status;
 }
 #endif /* CONFIG_NFSD_V4_1 */
 
