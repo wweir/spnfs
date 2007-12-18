@@ -354,7 +354,12 @@ struct nfsd4_write {
 
 #if defined(CONFIG_NFSD_V4_1)
 struct nfsd4_exchange_id {
-	int	foo;	/* stub */
+	nfs4_verifier	verifier;
+	u32		id_len;
+	char		*id;
+	u32		flags;
+	clientid_t	clientid;
+	u32		seqid;
 };
 
 struct nfsd4_create_session {
