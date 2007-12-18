@@ -924,7 +924,82 @@ static __be32
 nfsd4_decode_exchange_id(struct nfsd4_compoundargs *argp,
 			 struct nfsd4_exchange_id *clid)
 {
-	return -1;	/* stub */
+	int dummy;
+	DECODE_HEAD;
+
+	READ_BUF(NFS4_VERIFIER_SIZE);
+	COPYMEM(clid->verifier.data, NFS4_VERIFIER_SIZE);
+
+	READ_BUF(4);
+	READ32(clid->id_len);
+
+	READ_BUF(clid->id_len);
+	SAVEMEM(clid->id, clid->id_len);
+
+	READ_BUF(4);
+	READ32(clid->flags);
+
+	/* Ignore state_protect4_a */
+	READ_BUF(4);
+	READ32(dummy);
+	switch (dummy) {
+	case SP4_NONE:
+		break;
+	case SP4_MACH_CRED:
+		READ_BUF(8);
+		READ32(dummy);
+		READ32(dummy);
+		break;
+	case SP4_SSV:
+		/* ssp_ops */
+		READ_BUF(8);
+		READ32(dummy);
+		READ32(dummy);
+
+		/* ssp_hash_algs<> */
+		READ_BUF(4);
+		READ32(dummy);
+		READ_BUF(dummy);
+		p += XDR_QUADLEN(dummy);
+
+		/* ssp_encr_algs<> */
+		READ_BUF(4);
+		READ32(dummy);
+		READ_BUF(dummy);
+		p += XDR_QUADLEN(dummy);
+
+		/* ssp_window and ssp_num_gss_handles */
+		READ_BUF(8);
+		READ32(dummy);
+		READ32(dummy);
+
+		break;
+	default:
+		goto xdr_error;
+	}
+
+	/* Ignore Implementation ID */
+	READ_BUF(4);    /* nfs_impl_id4 array length */
+	READ32(dummy);
+
+	if (dummy > 1)
+		goto xdr_error;
+
+	if (dummy == 1) {
+		READ_BUF(4);
+		READ32(dummy);
+		READ_BUF(dummy);
+		p += XDR_QUADLEN(dummy);
+
+		READ_BUF(4);
+		READ32(dummy);
+		READ_BUF(dummy);
+		p += XDR_QUADLEN(dummy);
+
+		READ_BUF(12);
+		p += 12;
+	}
+	DECODE_TAIL;
 }
 
 static int
@@ -2656,7 +2731,42 @@ static void
 nfsd4_encode_exchange_id(struct nfsd4_compoundres *resp, int nfserr,
 			 struct nfsd4_exchange_id *exid)
 {
-	return;	/* stub */
+	ENCODE_HEAD;
+	char major_id[] = "fixme_please!";
+	char server_scope[] = "fixme_please!";
+	int major_id_sz;
+	int server_scope_sz;
+	uint64_t minor_id = 0;
+
+	/* XXX FIXME We currently use ia dummy  as the major id. Need to change
+	 * this to something more meaningful...
+	 */
+	if (!nfserr) {
+		major_id_sz = strlen(major_id);
+		server_scope_sz = strlen(server_scope);
+
+		RESERVE_SPACE(8+4+8+4+major_id_sz+4+server_scope_sz+4+4+8+4);
+		WRITEMEM(&exid->clientid, 8);
+		WRITE32(exid->seqid);
+		WRITE32(exid->flags);
+
+		/* state_protect4_r */
+		WRITE32(SP4_NONE);
+
+		/* The server_owner struct */
+		WRITE64(minor_id);      /* Minor id */
+		/* major id */
+		WRITE32(major_id_sz);
+		WRITEMEM(major_id, major_id_sz);
+
+		/* Server scope */
+		WRITE32(server_scope_sz);
+		WRITEMEM(server_scope, server_scope_sz);
+
+		/* Implementation id */
+		WRITE32(0);	/* zero length nfs_impl_id4 array */
+		ADJUST_ARGS();
+	}
 }
 
 static void
