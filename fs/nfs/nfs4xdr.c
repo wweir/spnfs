@@ -260,6 +260,8 @@ static int nr_sequence_quads;
 					3 + 4 + 2 + 4 /* auth sys */)
 #define decode_create_session_maxsz	(op_decode_hdr_maxsz + 4 + 3 + \
 					3 + 7 + 7)
+#define encode_destroy_session_maxsz    (op_encode_hdr_maxsz + 4)
+#define decode_destroy_session_maxsz    (op_decode_hdr_maxsz)
 #define encode_sequence_maxsz	(op_encode_hdr_maxsz + \
 				0 /* stub */)
 #define decode_sequence_maxsz	(op_decode_hdr_maxsz + \
@@ -565,9 +567,9 @@ static int nr_sequence_quads;
 #define NFS41_dec_sequence_sz \
 				0	/* stub */
 #define NFS41_enc_destroy_session_sz	(compound_encode_hdr_maxsz + \
-					 0 /* stub */)
+					 encode_destroy_session_maxsz)
 #define NFS41_dec_destroy_session_sz	(compound_decode_hdr_maxsz + \
-					 0 /* stub */)
+					 decode_destroy_session_maxsz)
 #define NFS41_enc_access_sz	(NFS40_enc_access_sz + \
 				 encode_sequence_maxsz)
 #define NFS41_dec_access_sz	(NFS40_dec_access_sz + \
@@ -1641,7 +1643,12 @@ static int encode_sequence(struct xdr_stream *xdr,
 static int encode_destroy_session(struct xdr_stream *xdr,
 				  struct nfs4_session *session)
 {
-	return -1;	/* stub */
+	uint32_t *p;
+	RESERVE_SPACE(4 + NFS4_MAX_SESSIONID_LEN);
+	WRITE32(OP_DESTROY_SESSION);
+	WRITEMEM(session->sess_id, NFS4_MAX_SESSIONID_LEN);
+
+	return 0;
 }
 #endif /* CONFIG_NFS_V4_1 */
 
@@ -3118,7 +3125,17 @@ static int nfs41_xdr_enc_get_lease_time(struct rpc_rqst *req, uint32_t *p,
 static int nfs41_xdr_enc_destroy_session(struct rpc_rqst *req, uint32_t *p,
 					struct nfs4_session *session)
 {
-	return -1;	/* stub */
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 1,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+
+	encode_destroy_session(&xdr, session);
+
+	return 0;
 }
 #endif /* CONFIG_NFS_V4_1 */
 
@@ -4901,7 +4918,7 @@ static int decode_create_session(struct xdr_stream *xdr,
 
 static int decode_destroy_session(struct xdr_stream *xdr, void *dummy)
 {
-	return -1;	/* stub */
+	return decode_op_hdr(xdr, OP_DESTROY_SESSION);
 }
 #endif /* CONFIG_NFS_V4_1 */
 
@@ -6637,7 +6654,14 @@ static int nfs41_xdr_dec_get_lease_time(struct rpc_rqst *rqstp, uint32_t *p,
 static int nfs41_xdr_dec_destroy_session(struct rpc_rqst *rqstp, uint32_t *p,
 					 void *dummy)
 {
-	return -1;	/* stub */
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+
+	return decode_destroy_session(&xdr, dummy);
 }
 #endif /* CONFIG_NFS_V4_1 */
 
