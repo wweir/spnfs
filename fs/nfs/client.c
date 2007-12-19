@@ -836,6 +836,17 @@ error:
 }
 
 #ifdef CONFIG_NFS_V4
+/* FIXME: nfs_version4 can't be global as the client can talk to multiple servers with different minorversions concurrently */
+static int nfs4_setup_nfs4_program(int minorversion)
+{
+	if (minorversion > NFS4_MAX_MINOR_VERSION)
+		return -ENOTSUPP;
+
+	nfs_version4 = *(nfs4_minorversions[minorversion]);
+
+	return 0;
+}
+
 /*
  * Initialise an NFS4 client record
  */
@@ -853,7 +864,15 @@ static int nfs4_init_client(struct nfs_client *clp,
 	}
 
 	/* Check NFS protocol revision and initialize RPC op vector */
-	clp->rpc_ops = &nfs_v4_clientops;
+	clp->rpc_ops = nfsv4_minorversion_clientops[clp->cl_minorversion];
+	nfs4_procedures = nfs4_minorversion_procedures[clp->cl_minorversion];
+
+	/* Setup the nfs_program based on the minorversion */
+	error = nfs4_setup_nfs4_program(clp->cl_minorversion);
+	if (error)
+		goto error;
+
+	/* XXX TODO: Need to start the callback server here */
 
 	error = nfs_create_rpc_client(clp, proto, timeo, retrans, authflavour,
 					RPC_CLNT_CREATE_DISCRTRY);
