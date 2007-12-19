@@ -3646,6 +3646,80 @@ int nfs4_proc_setclientid_confirm(struct nfs_client *clp, struct rpc_cred *cred)
 }
 
 #ifdef CONFIG_NFS_V4_1
+struct nfs4_get_lease_time_data {
+	struct nfs4_get_lease_time_args *args;
+	struct nfs4_get_lease_time_res *res;
+	struct nfs_client *clp;
+	struct nfs4_session *session;
+};
+
+static void nfs4_get_lease_time_prepare(struct rpc_task *task,
+					void *calldata)
+{
+	int ret;
+	struct nfs4_get_lease_time_data *data =
+			(struct nfs4_get_lease_time_data *)calldata;
+
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_GET_LEASE_TIME],
+		.rpc_argp = data->args,
+		.rpc_resp = data->res,
+	};
+
+	rpc_call_setup(task, &msg, 0);
+
+	ret = nfs41_setup_sequence(data->session,
+					&data->args->la_seq_args,
+					&data->res->lr_seq_res, 0, task);
+
+	BUG_ON((ret == -EAGAIN));
+}
+
+static void nfs4_get_lease_time_done(struct rpc_task *task,
+					void *calldata)
+{
+	struct nfs4_get_lease_time_data *data =
+			(struct nfs4_get_lease_time_data *)calldata;
+
+	nfs41_sequence_done(data->clp, data->session,
+				&data->res->lr_seq_res, task->tk_status);
+}
+
+struct rpc_call_ops nfs4_get_lease_time_ops = {
+	.rpc_call_prepare = nfs4_get_lease_time_prepare,
+	.rpc_call_done = nfs4_get_lease_time_done,
+};
+
+int nfs4_proc_get_lease_time(struct nfs_client *clp,
+		struct nfs4_session *session, struct nfs_fsinfo *fsinfo)
+{
+	struct rpc_task *task;
+	struct nfs4_get_lease_time_args args;
+	struct nfs4_get_lease_time_res res = {
+		.lr_fsinfo = fsinfo,
+	};
+
+	struct nfs4_get_lease_time_data data = {
+		.args = &args,
+		.res = &res,
+		.clp = clp,
+		.session = session,
+	};
+	int status;
+
+	task = rpc_run_task(session->clnt, 0,
+			&nfs4_get_lease_time_ops, &data);
+
+	if (IS_ERR(task))
+		status = PTR_ERR(task);
+	else {
+		status = task->tk_status;
+		rpc_put_task(task);
+	}
+
+	return status;
+}
+
 /* Initialize a slot table */
 int nfs4_init_slot_table(struct nfs4_channel *channel)
 {
