@@ -2562,6 +2562,18 @@ int nfs4_proc_renew(struct nfs_client *clp, struct rpc_cred *cred)
 	return 0;
 }
 
+#if defined(CONFIG_NFS_V4_1)
+int nfs4_proc_sequence(struct nfs_client *clp, struct rpc_cred *cred)
+{
+	return -1;	/* stub */
+}
+
+int nfs41_proc_async_sequence(struct nfs_client *clp, struct rpc_cred *cred)
+{
+	return -1;	/* stub */
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 static inline int nfs4_server_supports_acls(struct nfs_server *server)
 {
 	return (server->caps & NFS_CAP_ACLS)
@@ -2936,6 +2948,13 @@ int nfs4_proc_setclientid(struct nfs_client *clp, u32 program, unsigned short po
 	return status;
 }
 
+#ifdef CONFIG_NFS_V4_1
+int nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
+{
+	return -1;	/* stub */
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 static int _nfs4_proc_setclientid_confirm(struct nfs_client *clp, struct rpc_cred *cred)
 {
 	struct nfs_fsinfo fsinfo;
@@ -2977,6 +2996,19 @@ int nfs4_proc_setclientid_confirm(struct nfs_client *clp, struct rpc_cred *cred)
 	} while (err == 0);
 	return err;
 }
+
+#ifdef CONFIG_NFS_V4_1
+int nfs4_proc_create_session(struct nfs_client *clp,
+			     struct nfs4_session *session)
+{
+	return -1;	/* stub */
+}
+
+int nfs4_proc_destroy_session(struct nfs_server *sp)
+{
+	return -1;	/* stub */
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 struct nfs4_delegreturndata {
 	struct nfs4_delegreturnargs args;
