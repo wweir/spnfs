@@ -242,6 +242,10 @@ static int nfs4_stat_to_errno(int);
 				(0)
 
 #if defined(CONFIG_NFS_V4_1)
+#define encode_exchange_id_maxsz (op_encode_hdr_maxsz + \
+				0 /* stub */)
+#define decode_exchange_id_maxsz (op_decode_hdr_maxsz + \
+				0 /* stub */)
 #define encode_sequence_maxsz	(op_encode_hdr_maxsz + \
 				0 /* stub */)
 #define decode_sequence_maxsz	(op_decode_hdr_maxsz + \
@@ -650,6 +654,26 @@ static int nfs4_stat_to_errno(int);
 					 encode_sequence_maxsz)
 #define NFS41_dec_fs_locations_sz	(NFS40_dec_fs_locations_sz + \
 					 decode_sequence_maxsz)
+#define NFS41_enc_exchange_id_sz \
+				0	/* stub */
+#define NFS41_dec_exchange_id_sz \
+				0	/* stub */
+#define NFS41_enc_create_session_sz \
+				0	/* stub */
+#define NFS41_dec_create_session_sz \
+				0	/* stub */
+#define NFS41_enc_destroy_session_sz	(compound_encode_hdr_maxsz + \
+					 0 /* stub */)
+#define NFS41_dec_destroy_session_sz	(compound_decode_hdr_maxsz + \
+					 0 /* stub */)
+#define NFS41_enc_sequence_sz \
+				0	/* stub */
+#define NFS41_dec_sequence_sz \
+				0	/* stub */
+#define NFS41_enc_get_lease_time_sz	(compound_encode_hdr_maxsz + \
+					 0 /* stub */)
+#define NFS41_dec_get_lease_time_sz	(compound_decode_hdr_maxsz + \
+					 0 /* stub */)
 #define NFS41_enc_error_sz		(0)
 #define NFS41_dec_error_sz		(0)
 #endif /* CONFIG_NFS_V4_1 */
@@ -1504,6 +1528,24 @@ static int encode_delegreturn(struct xdr_stream *xdr, const nfs4_stateid *statei
 
 #if defined(CONFIG_NFS_V4_1)
 /* NFSv4.1 operations */
+static int encode_exchange_id(struct xdr_stream *xdr,
+			      void *dummy)
+{
+	return -1;	/* stub */
+}
+
+static int encode_create_session(struct xdr_stream *xdr,
+				 void *dummy)
+{
+	return -1;	/* stub */
+}
+
+static int encode_destroy_session(struct xdr_stream *xdr,
+				  struct nfs4_session *session)
+{
+	return -1;	/* stub */
+}
+
 static int encode_sequence(struct xdr_stream *xdr,
 			   const struct nfs41_sequence_args *args)
 {
@@ -3009,6 +3051,53 @@ static int nfs41_xdr_enc_fs_locations(struct rpc_rqst *req, __be32 *p,
 	encode_sequence(&xdr, &args->seq_args);
 
 	return nfs4_xdr_enc_fs_locations(req, &xdr, args, NFS41_enc_fsinfo_sz);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
+#if defined(CONFIG_NFS_V4_1)
+/*
+ * EXCHANGE_ID request
+ */
+static int nfs41_xdr_enc_exchange_id(struct rpc_rqst *req, uint32_t *p,
+				     void *args)
+{
+	return -1;	/* stub */
+}
+
+/*
+ * a CREATE_SESSION request
+ */
+static int nfs41_xdr_enc_create_session(struct rpc_rqst *req, uint32_t *p,
+					void *args)
+{
+	return -1;	/* stub */
+}
+
+/*
+ * a DESTROY_SESSION request
+ */
+static int nfs41_xdr_enc_destroy_session(struct rpc_rqst *req, uint32_t *p,
+					struct nfs4_session *session)
+{
+	return -1;	/* stub */
+}
+
+/*
+ * a SEQUENCE request
+ */
+static int nfs41_xdr_enc_sequence(struct rpc_rqst *req, uint32_t *p,
+				  struct nfs41_sequence_args *args)
+{
+	return -1;	/* stub */
+}
+
+/*
+ * a GET_LEASE_TIME request
+ */
+static int nfs41_xdr_enc_get_lease_time(struct rpc_rqst *req, uint32_t *p,
+					void *args)
+{
+	return -1;	/* stub */
 }
 #endif /* CONFIG_NFS_V4_1 */
 
@@ -4608,6 +4697,23 @@ static int decode_delegreturn(struct xdr_stream *xdr)
 }
 
 #if defined(CONFIG_NFS_V4_1)
+static int decode_exchange_id(struct xdr_stream *xdr,
+			      void *dummy)
+{
+	return -1;	/* stub */
+}
+
+static int decode_create_session(struct xdr_stream *xdr,
+				 void *dummy)
+{
+	return -1;	/* stub */
+}
+
+static int decode_destroy_session(struct xdr_stream *xdr, void *dummy)
+{
+	return -1;	/* stub */
+}
+
 static int decode_sequence(struct xdr_stream *xdr,
 			   struct nfs41_sequence_res *res)
 {
@@ -6228,6 +6334,53 @@ static int nfs40_xdr_dec_setclientid(struct rpc_rqst *req, __be32 *p,
 	return status;
 }
 
+#if defined(CONFIG_NFS_V4_1)
+/*
+ * EXCHANGE_ID request
+ */
+static int nfs41_xdr_dec_exchange_id(struct rpc_rqst *rqstp, uint32_t *p,
+				     void *res)
+{
+	return -1;	/* stub */
+}
+
+/*
+ * a CREATE_SESSION request
+ */
+static int nfs41_xdr_dec_create_session(struct rpc_rqst *rqstp, uint32_t *p,
+					void *res)
+{
+	return -1;	/* stub */
+}
+
+/*
+ * a DESTROY_SESSION request
+ */
+static int nfs41_xdr_dec_destroy_session(struct rpc_rqst *rqstp, uint32_t *p,
+					 void *dummy)
+{
+	return -1;	/* stub */
+}
+
+/*
+ * a SEQUENCE request
+ */
+static int nfs41_xdr_dec_sequence(struct rpc_rqst *rqstp, uint32_t *p,
+				  struct nfs41_sequence_res *res)
+{
+	return -1;	/* stub */
+}
+
+/*
+ * a GET_LEASE_TIME request
+ */
+static int nfs41_xdr_dec_get_lease_time(struct rpc_rqst *rqstp, uint32_t *p,
+					void *res)
+{
+	return -1;	/* stub */
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * a SETCLIENTID_CONFIRM request
  */
@@ -6565,6 +6718,11 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(GETACL,		enc_getacl,	dec_getacl, 1),
   PROC(SETACL,		enc_setacl,	dec_setacl, 1),
   PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations, 1),
+  PROC(EXCHANGE_ID,	enc_exchange_id,	dec_exchange_id, 1),
+  PROC(CREATE_SESSION,	enc_create_session,	dec_create_session, 1),
+  PROC(DESTROY_SESSION,	enc_destroy_session,	dec_destroy_session, 1),
+  PROC(SEQUENCE,	enc_sequence,	dec_sequence, 1),
+  PROC(GET_LEASE_TIME,	enc_get_lease_time,	dec_get_lease_time, 1),
 };
 #endif /* CONFIG_NFS_V4_1 */
 
