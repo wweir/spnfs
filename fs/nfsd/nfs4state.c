@@ -1069,7 +1069,7 @@ void nfsd4_setup_callback_channel(void)
 /*
  * Set the exchange_id flags returned by the server.
  */
-void
+static void
 nfsd4_set_ex_flags(struct nfs4_client *new, struct nfsd4_exchange_id *clid)
 {
 	/* if sessions only, ignore the wire_flags from client */
