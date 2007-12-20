@@ -263,9 +263,9 @@ static int nr_sequence_quads;
 #define encode_destroy_session_maxsz    (op_encode_hdr_maxsz + 4)
 #define decode_destroy_session_maxsz    (op_decode_hdr_maxsz)
 #define encode_sequence_maxsz	(op_encode_hdr_maxsz + \
-				XDR_QUADLEN(SESSIONID_SIZE) + 4)
+				XDR_QUADLEN(NFS4_MAX_SESSIONID_LEN) + 4)
 #define decode_sequence_maxsz	(op_decode_hdr_maxsz + \
-				XDR_QUADLEN(SESSIONID_SIZE) + 5)
+				XDR_QUADLEN(NFS4_MAX_SESSIONID_LEN) + 5)
 #endif /* CONFIG_NFS_V4_1 */
 
 #define NFS40_enc_compound_sz	(1024)  /* XXX: large enough? */

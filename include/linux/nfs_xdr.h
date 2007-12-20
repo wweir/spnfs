@@ -118,9 +118,7 @@ struct nfs_seqid;
 
 #if defined(CONFIG_NFS_V4_1)
 
-#define SESSIONID_SIZE	128
-
-typedef char	sessionid4[SESSIONID_SIZE];
+typedef char	sessionid4[NFS4_MAX_SESSIONID_LEN];
 typedef u32	sequenceid4;
 typedef u32	slotid4;
 
