@@ -48,6 +48,7 @@
 #include <linux/smp_lock.h>
 #include <linux/namei.h>
 #include <linux/mount.h>
+#include <linux/module.h>
 
 #include "nfs4_fs.h"
 #include "delegation.h"
@@ -4368,9 +4369,70 @@ int nfs4_proc_fs_locations(struct inode *dir, const struct qstr *name,
 }
 
 #ifdef CONFIG_NFS_V4_1
+int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
+{
+	nfs4_verifier verifier;
+	struct nfs41_exchange_id_args args = {
+		.flags = clp->cl_exchange_flags,
+	};
+	struct nfs41_exchange_id_res res = {
+		.client = clp,
+	};
+	int status;
+	int loop = 0;
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_EXCHANGE_ID],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+		.rpc_cred = cred,
+	};
+	u32 *p;
+
+	dprintk("--> %s\n", __FUNCTION__);
+	BUG_ON(clp == NULL);
+	p = (u32*)verifier.data;
+	*p++ = htonl((u32)clp->cl_boot_time.tv_sec);
+	*p = htonl((u32)clp->cl_boot_time.tv_nsec);
+	args.verifier = &verifier;
+
+	while (1) {
+		args.id_len = scnprintf(args.id, sizeof(args.id),
+				"%s/%u.%u.%u.%u %s %u",
+				clp->cl_ipaddr, NIPQUAD(
+					clp->cl_addr.sin_addr.s_addr),
+			         "AUTH_SYS", clp->cl_id_uniquifier);
+
+		status = rpc_call_sync(clp->cl_rpcclient, &msg, 0);
+
+		if (status != NFS4ERR_CLID_INUSE)
+			break;
+
+		if (signalled())
+			break;
+
+		if (loop++ & 1)
+			ssleep(clp->cl_lease_time + 1);
+		else if (++clp->cl_id_uniquifier == 0)
+			break;
+	}
+
+	dprintk("<-- %s status= %d\n", __FUNCTION__, status);
+	return status;
+}
+EXPORT_SYMBOL(_nfs4_proc_exchange_id);
+
 int nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
 {
-	return -1;	/* stub */
+	struct nfs_server *server;
+
+	/*
+	 * Since we're going to blow away the client id, invalidate all the
+	 * sessions that were associated with this clientid.
+	 */
+	list_for_each_entry(server, &clp->cl_superblocks, client_link)
+		nfs41_set_session_expired(server->session);
+
+	return _nfs4_proc_exchange_id(clp, cred);
 }
 
 /* Initialize a slot table */
