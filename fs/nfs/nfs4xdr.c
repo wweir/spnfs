@@ -263,9 +263,9 @@ static int nr_sequence_quads;
 #define encode_destroy_session_maxsz    (op_encode_hdr_maxsz + 4)
 #define decode_destroy_session_maxsz    (op_decode_hdr_maxsz)
 #define encode_sequence_maxsz	(op_encode_hdr_maxsz + \
-				0 /* stub */)
+				XDR_QUADLEN(NFS4_MAX_SESSIONID_LEN) + 4)
 #define decode_sequence_maxsz	(op_decode_hdr_maxsz + \
-				0 /* stub */)
+				XDR_QUADLEN(NFS4_MAX_SESSIONID_LEN) + 5)
 #endif /* CONFIG_NFS_V4_1 */
 
 #define NFS40_enc_compound_sz	(1024)  /* XXX: large enough? */
@@ -687,9 +687,11 @@ static int nr_sequence_quads;
 #define NFS41_dec_destroy_session_sz	(compound_decode_hdr_maxsz + \
 					 decode_destroy_session_maxsz)
 #define NFS41_enc_sequence_sz \
-				0	/* stub */
+				(compound_decode_hdr_maxsz + \
+				 encode_sequence_maxsz)
 #define NFS41_dec_sequence_sz \
-				0	/* stub */
+				(compound_decode_hdr_maxsz + \
+				 decode_sequence_maxsz)
 #define NFS41_enc_get_lease_time_sz	(compound_encode_hdr_maxsz + \
 					 encode_sequence_maxsz + \
 					 encode_putrootfh_maxsz + \
@@ -1647,7 +1649,26 @@ static int encode_destroy_session(struct xdr_stream *xdr,
 static int encode_sequence(struct xdr_stream *xdr,
 			   const struct nfs41_sequence_args *args)
 {
-	return -1;	/* stub */
+	__be32 *p;
+
+	RESERVE_SPACE(4);
+	WRITE32(OP_SEQUENCE);
+
+	/*
+	 * Sessionid + seqid + slotid + max slotid + cache_this
+	 */
+	RESERVE_SPACE(NFS4_MAX_SESSIONID_LEN + 16);
+	WRITEMEM(args->sa_sessionid, NFS4_MAX_SESSIONID_LEN);
+	dprintk("%s: sessionid=%d\n", __FUNCTION__, args->sa_seqid);
+	WRITE32(args->sa_seqid);
+	dprintk("%s: slotid=%d\n", __FUNCTION__, args->sa_slotid);
+	WRITE32(args->sa_slotid);
+	dprintk("%s: max_slotid=%d\n", __FUNCTION__, args->sa_max_slotid);
+	WRITE32(args->sa_max_slotid);
+	dprintk("%s: cache_this=%d\n", __FUNCTION__, args->sa_cache_this);
+	WRITE32(args->sa_cache_this);
+
+	return 0;
 }
 #endif /* CONFIG_NFS_V4_1 */
 
@@ -3214,7 +3235,14 @@ static int nfs41_xdr_enc_destroy_session(struct rpc_rqst *req, uint32_t *p,
 static int nfs41_xdr_enc_sequence(struct rpc_rqst *req, uint32_t *p,
 				  struct nfs41_sequence_args *args)
 {
-	return -1;	/* stub */
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 1,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+	return encode_sequence(&xdr, args);
 }
 
 /*
@@ -4948,7 +4976,22 @@ static int decode_destroy_session(struct xdr_stream *xdr, void *dummy)
 static int decode_sequence(struct xdr_stream *xdr,
 			   struct nfs41_sequence_res *res)
 {
-	return -1;	/* stub */
+	__be32 *p;
+	int status;
+
+	status = decode_op_hdr(xdr, OP_SEQUENCE);
+	if (status)
+		return status;
+
+	READ_BUF(NFS4_MAX_SESSIONID_LEN + 20);
+	COPYMEM(res->sr_sessionid, NFS4_MAX_SESSIONID_LEN);
+	READ32(res->sr_seqid);
+	READ32(res->sr_slotid);
+	READ32(res->sr_max_slotid);
+	READ32(res->sr_target_max_slotid);
+	READ32(res->sr_flags);
+
+	return 0;
 }
 #endif /* CONFIG_NFS_V4_1 */
 
@@ -6633,7 +6676,16 @@ static int nfs41_xdr_dec_destroy_session(struct rpc_rqst *rqstp, uint32_t *p,
 static int nfs41_xdr_dec_sequence(struct rpc_rqst *rqstp, uint32_t *p,
 				  struct nfs41_sequence_res *res)
 {
-	return -1;	/* stub */
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (!status)
+		status = decode_sequence(&xdr, res);
+
+	return status;
 }
 
 /*
