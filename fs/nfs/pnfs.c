@@ -996,6 +996,8 @@ pnfs_readpages(struct nfs_read_data *rdata)
 		numpages++;
 
 	dprintk("%s: Calling layout driver read with %d pages\n", __func__, numpages);
+	if (pnfs_get_type(inode) != LAYOUT_NFSV4_FILES)
+		rdata->pnfsflags |= PNFS_NO_RPC;
 	status = nfss->pnfs_curr_ld->ld_io_ops->read_pagelist(nfsi->current_layout,
 							      inode,
 							      args->pages,
