@@ -278,7 +278,8 @@ static int nr_sequence_quads;
 #define decode_getdeviceinfo_maxsz (op_decode_hdr_maxsz + 3 + \
 				   NFS4_PNFS_DEV_MAXSIZE)
 #define encode_pnfs_layoutget_sz (op_encode_hdr_maxsz + 13)
-#define decode_pnfs_layoutget_maxsz (op_decode_hdr_maxsz + 8)
+#define decode_pnfs_layoutget_maxsz	(op_decode_hdr_maxsz + 8 + \
+					 PNFS_LAYOUT_MAXSIZE)
 #define encode_pnfs_layoutreturn_sz	(8 + op_encode_hdr_maxsz)
 #define decode_pnfs_layoutreturn_maxsz	(op_decode_hdr_maxsz)
 #endif /* CONFIG_PNFS */
