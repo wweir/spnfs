@@ -904,6 +904,8 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 		__func__,
 		how,
 		numpages);
+	if (pnfs_get_type(inode) != LAYOUT_NFSV4_FILES)
+		wdata->pnfsflags |= PNFS_NO_RPC;
 	status = nfss->pnfs_curr_ld->ld_io_ops->write_pagelist(nfsi->current_layout,
 							       inode,
 							       args->pages,
