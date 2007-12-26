@@ -58,7 +58,6 @@
 #if defined(CONFIG_PNFSD)
 #include <linux/exportfs.h>
 #include <linux/nfsd/pnfsd.h>
-#include <linux/nfs4_pnfs.h>
 #endif /* CONFIG_PNFSD */
 
 #define NFSDDBG_FACILITY                NFSDDBG_PROC
