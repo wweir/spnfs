@@ -405,38 +405,65 @@ out:
  *     the I/O module has its read/write methods called.
  */
 static struct pnfs_layout_type *
-pnfs_inject_layout(struct nfs_inode *nfsi,
-		   struct layoutdriver_io_operations *io_ops,
+pnfs_inject_layout(struct pnfs_layout_type *layid,
 		   struct nfs4_pnfs_layoutget_res *lgr)
 {
-	struct pnfs_layout_type *layid;
-	struct inode *inode = &nfsi->vfs_inode;
-	struct nfs_server *server = NFS_SERVER(inode);
+	struct layoutdriver_io_operations *io_ops = PNFS_LD_IO_OPS(layid);
 
 	dprintk("%s Begin\n", __func__);
 
-	if (!io_ops->alloc_layout || !io_ops->set_layout) {
+	if (!io_ops->set_layout) {
 		printk(KERN_ERR "%s ERROR! Layout driver lacking pNFS layout ops!!!\n", __func__);
 		return NULL;
 	}
 
-	if (nfsi->current_layout == NULL) {
-		dprintk("%s Alloc'ing layout\n", __func__);
-		layid = io_ops->alloc_layout(server->pnfs_mountid, inode);
-		if (layid)
-			layid->inode = inode;
-	} else {
-		dprintk("%s Adding to current layout\n", __func__);
-		layid = nfsi->current_layout;
-	}
-
-	if (!layid) {
-		printk(KERN_ERR "%s ERROR! Layout id non-existent!!!\n",
-		       __func__);
-		return NULL;
-	}
 	dprintk("%s Calling set layout\n", __func__);
 	return io_ops->set_layout(layid, lgr);
+}
+
+static struct pnfs_layout_type *
+alloc_init_layout(struct inode *ino, struct layoutdriver_io_operations *io_ops)
+{
+	struct pnfs_layout_type *lo;
+
+	lo = io_ops->alloc_layout(NFS_SERVER(ino)->pnfs_mountid, ino);
+	if (!lo) {
+		printk(KERN_ERR
+			"%s: out of memory: io_ops->alloc_layout failed\n",
+			__func__);
+		return NULL;
+	}
+
+	lo->roc_iomode = 0;
+	lo->inode = ino;
+	return lo;
+}
+
+/*
+ * get, possibly allocate current_layout
+ */
+static struct pnfs_layout_type *
+get_alloc_layout(struct inode *ino,
+		 struct layoutdriver_io_operations *io_ops)
+{
+	struct nfs_inode *nfsi = NFS_I(ino);
+	struct pnfs_layout_type *lo;
+
+	dprintk("%s Begin\n", __FUNCTION__);
+
+	if ((lo = nfsi->current_layout) == NULL) {
+		lo = nfsi->current_layout = alloc_init_layout(ino, io_ops);
+		if (!lo)
+			lo = ERR_PTR(-ENOMEM);
+	}
+
+#ifdef NFS_DEBUG
+	if (!IS_ERR(lo))
+		dprintk("%s Return %p\n", __FUNCTION__, lo);
+	else
+		dprintk("%s Return error %ld\n", __FUNCTION__, PTR_ERR(lo));
+#endif
+	return lo;
 }
 
 /* Update the file's layout for the given range and iomode.
@@ -455,6 +482,12 @@ pnfs_update_layout(struct inode *ino,
 	struct nfs_server *nfss = NFS_SERVER(ino);
 	struct pnfs_layout_type *layout_new;
 	int result = -EIO;
+
+	layout_new = get_alloc_layout(ino, nfss->pnfs_curr_ld->ld_io_ops);
+	if (IS_ERR(layout_new)) {
+		result = PTR_ERR(layout_new);
+		goto ret;
+	}
 
 	arg.lseg.iomode = iomode;
 	arg.lseg.offset = pos;
@@ -531,8 +564,7 @@ pnfs_update_layout(struct inode *ino,
 	}
 
 	/* Inject layout blob into I/O device driver */
-	layout_new = pnfs_inject_layout(nfsi,
-					nfss->pnfs_curr_ld->ld_io_ops,
+	layout_new = pnfs_inject_layout(nfsi->current_layout,
 					&res);
 	if (layout_new == NULL) {
 		printk(KERN_ERR "%s: ERROR!  Could not inject layout (%d)\n",
@@ -557,7 +589,8 @@ out:
 
 	/* res.layout.buf kalloc'ed by the xdr decoder? */
 	kfree(res.layout.buf);
-	dprintk("%s end (err:%d) state %d\n",
+ret:
+	dprintk("%s end (err:%d) state 0x%lx\n",
 		__func__, result, nfsi->pnfs_layout_state);
 	return result;
 }
