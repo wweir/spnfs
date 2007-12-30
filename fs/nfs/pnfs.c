@@ -346,6 +346,9 @@ pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range)
 	if (nfsi->current_layout == NULL)
 		return 0;
 
+	server->pnfs_curr_ld->ld_io_ops->free_layout(
+		&nfsi->current_layout, &arg.lseg);
+
 	arg.reclaim = 0;
 	arg.layout_type = server->pnfs_curr_ld->id;
 	arg.return_type = RETURN_FILE;
@@ -359,18 +362,6 @@ pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range)
 	arg.inode = ino;
 
 	status = pnfs_return_layout_rpc(server, &arg);
-
-	if (nfsi->current_layout) {
-		if (status)
-			dprintk("%s: pnfs_return_layout_rpc status=%d. "
-				"removing layout anyway\n", __func__,
-				status);
-		else
-			dprintk("%s: removing layout\n", __func__);
-
-		server->pnfs_curr_ld->ld_io_ops->free_layout(
-			&nfsi->current_layout, &arg.lseg);
-	}
 
 	dprintk("%s:Exit status %d\n", __func__, status);
 	return status;
