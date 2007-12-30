@@ -493,9 +493,10 @@ virtual_update_layout(struct inode *ino,
 			dprintk("%s: layout_get resumed\n", __func__);
 			nfsi->pnfs_layout_state &= ~NFS_INO_LAYOUT_FAILED;
 			nfsi->pnfs_layout_suspend = 0;
-		} else
+		} else {
 			result = 1;
-		goto out;
+			goto out;
+		}
 	}
 
 	result = get_layout(ino, ctx, &arg, &res);
