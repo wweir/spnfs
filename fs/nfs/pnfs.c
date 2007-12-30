@@ -423,6 +423,8 @@ pnfs_inject_layout(struct nfs_inode *nfsi,
 	if (nfsi->current_layout == NULL) {
 		dprintk("%s Alloc'ing layout\n", __func__);
 		layid = io_ops->alloc_layout(server->pnfs_mountid, inode);
+		if (layid)
+			layid->inode = inode;
 	} else {
 		dprintk("%s Adding to current layout\n", __func__);
 		layid = nfsi->current_layout;
