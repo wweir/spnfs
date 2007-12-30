@@ -181,20 +181,14 @@ struct pnfs_client_operations {
 	int (*nfs_getdevicelist) (struct super_block *sb, struct nfs_fh *fh, struct pnfs_devicelist *devlist);
 	int (*nfs_getdeviceinfo) (struct inode *inode, u32 dev_id, struct pnfs_device *dev);
 
-	/* Post read callback.  Layout driver calls this function if unstable data was
-	 * written and requires a commit call
-	 */
-	void (*nfs_readlist_complete) (struct nfs_read_data *nfs_data, ssize_t status, int eof);
+	/* Post read callback. */
+	void (*nfs_readlist_complete) (struct nfs_read_data *nfs_data);
 
-	/* Post write callback.  Layout driver calls this function if unstable data was
-	 * written and requires a commit call
-	 */
-	void (*nfs_writelist_complete) (struct nfs_write_data *nfs_data, ssize_t status);
+	/* Post write callback. */
+	void (*nfs_writelist_complete) (struct nfs_write_data *nfs_data);
 
-	/* Post commit callback.  Layout driver calls this function once data is
-	 * on stable storage.
-	 */
-	void (*nfs_commit_complete) (struct nfs_write_data *nfs_data, ssize_t status);
+	/* Post commit callback. */
+	void (*nfs_commit_complete) (struct nfs_write_data *nfs_data);
 	void (*nfs_return_layout) (struct inode *);
 };
 
