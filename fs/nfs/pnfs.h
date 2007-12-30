@@ -26,9 +26,7 @@ int pnfs_use_read(struct inode *inode, ssize_t count);
 int pnfs_use_ds_io(struct list_head *, struct inode *, int);
 
 int pnfs_use_write(struct inode *inode, ssize_t count);
-int pnfs_writepages(struct nfs_write_data *wdata, int how);
 int pnfs_try_to_write_data(struct nfs_write_data *, const struct rpc_call_ops *, int);
-int pnfs_readpages(struct nfs_read_data *rdata);
 int pnfs_try_to_read_data(struct nfs_read_data *data, const struct rpc_call_ops *call_ops);
 int pnfs_initialize(void);
 void pnfs_uninitialize(void);
