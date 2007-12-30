@@ -24,7 +24,7 @@ extern int nfs4_pnfs_getdeviceinfo(struct inode *inode, u32 dev_id,
 				   struct pnfs_device *res);
 
 /* pnfs.c */
-int virtual_update_layout(struct inode *ino, struct nfs_open_context *ctx,
+int pnfs_update_layout(struct inode *ino, struct nfs_open_context *ctx,
 	size_t count, loff_t pos, enum pnfs_iomode access_type);
 
 int pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range);
