@@ -176,7 +176,7 @@ struct nfs_inode {
 
 	/* pNFS layout information */
 #if defined(CONFIG_PNFS)
-	u32 pnfs_layout_state;
+	unsigned long pnfs_layout_state;
 #define NFS_INO_LAYOUT_FAILED	0x0001	/* get layout failed, stop trying */
 	time_t pnfs_layout_suspend;
 	struct pnfs_layout_type *current_layout;
