@@ -76,13 +76,7 @@ struct nfs4_pnfs_dserver {
 	struct kref           ref;
 };
 
-struct nfs4_filelayout {
-	int uncommitted_write;
-	loff_t last_commit_size;
-	u64 layout_id;
-	u64 offset;
-	u64 length;
-	u32 iomode;
+struct nfs4_filelayout_segment {
 	u32 stripe_type;
 	u32 commit_through_mds;
 	u64 stripe_unit;
@@ -90,6 +84,13 @@ struct nfs4_filelayout {
 	u32 dev_id;
 	unsigned int num_fh;
 	struct nfs_fh fh_array[NFS4_PNFS_MAX_STRIPE_CNT];
+};
+
+struct nfs4_filelayout {
+	int uncommitted_write;
+	loff_t last_commit_size;
+	u64 layout_id;
+	struct pnfs_layout_segment pnfs_lseg;
 };
 
 struct filelayout_mount_type {
