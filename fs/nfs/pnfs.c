@@ -596,8 +596,6 @@ pnfs_update_layout(struct inode *ino,
 		return 0; /* Already have layout information */
 	}
 
-	res.layout.buf = NULL;
-
 	/* if get layout already failed once goto out */
 	if (nfsi->pnfs_layout_state & NFS_INO_LAYOUT_FAILED) {
 		if (unlikely(nfsi->pnfs_layout_suspend &&
@@ -611,7 +609,16 @@ pnfs_update_layout(struct inode *ino,
 		}
 	}
 
+	res.layout.buf = NULL;
+	spin_unlock(&nfsi->lo_lock);
 	result = get_layout(ino, ctx, &arg, &res);
+	spin_lock(&nfsi->lo_lock);
+
+	/* we got a reference on nfsi->current_layout hence it must never
+	 * change, even while nfsi->lo_lock was not held.
+	 */
+	BUG_ON(nfsi->current_layout != layout_new);
+
 	if (result) {
 		dprintk("%s: ERROR retrieving layout %d\n",
 			__func__, result);
@@ -638,14 +645,14 @@ pnfs_update_layout(struct inode *ino,
 			/* mark with NFS_INO_LAYOUT_FAILED */
 			break;
 		}
-		goto out;
+		goto get_out;
 	}
 
 	if (res.layout.len <= 0) {
 		printk(KERN_ERR
 		       "%s: ERROR!  Layout size is ZERO!\n", __func__);
 		result =  -EIO;
-		goto out;
+		goto get_out;
 	}
 
 	/* Inject layout blob into I/O device driver */
@@ -655,7 +662,7 @@ pnfs_update_layout(struct inode *ino,
 		printk(KERN_ERR "%s: ERROR!  Could not inject layout (%d)\n",
 		       __func__, result);
 		result =  -EIO;
-		goto out;
+		goto get_out;
 	}
 
 	if (res.return_on_close) {
@@ -666,14 +673,14 @@ pnfs_update_layout(struct inode *ino,
 	nfsi->current_layout = layout_new;
 
 	result = 0;
-out:
-
+get_out:
 	/* remember that get layout failed and don't try again */
 	if (result < 0)
 		nfsi->pnfs_layout_state |= NFS_INO_LAYOUT_FAILED;
 
 	/* res.layout.buf kalloc'ed by the xdr decoder? */
 	kfree(res.layout.buf);
+out:
 	put_unlock_current_layout(nfsi, layout_new);
 ret:
 	dprintk("%s end (err:%d) state 0x%lx\n",
