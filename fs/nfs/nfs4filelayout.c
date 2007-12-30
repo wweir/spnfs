@@ -165,10 +165,14 @@ filelayout_uninitialize_mountpoint(struct pnfs_mount_type *mountid)
  * layout type is STRIPE_DENSE or STRIPE_SPARSE
  */
 loff_t
-filelayout_get_dserver_offset(loff_t offset, struct nfs4_filelayout *layout)
+filelayout_get_dserver_offset(loff_t offset, struct nfs4_filelayout *flo)
 {
-	if (layout == NULL)
+	struct nfs4_filelayout_segment *layout;
+
+	if (flo == NULL)
 		return offset;
+
+	layout = LSEG_LD_DATA(&flo->pnfs_lseg);
 
 	switch (layout->stripe_type) {
 	case STRIPE_SPARSE:
@@ -560,7 +564,8 @@ filelayout_alloc_layout(struct pnfs_mount_type *mountid, struct inode *inode)
 {
 	dprintk("NFS_FILELAYOUT: allocating layout\n");
 	return kzalloc(sizeof(struct pnfs_layout_type) +
-		       sizeof(struct nfs4_filelayout), GFP_KERNEL);
+		       sizeof(struct nfs4_filelayout) +
+		       sizeof(struct nfs4_filelayout_segment), GFP_KERNEL);
 }
 
 /* Free a filelayout layout structure
@@ -581,20 +586,17 @@ filelayout_free_layout(struct pnfs_layout_type **layoutidp,
 /* Decode layout and store in layoutid.  Overwrite any existing layout
  * information for this file.
  */
-struct pnfs_layout_type*
+static struct pnfs_layout_type*
 filelayout_set_layout(struct pnfs_layout_type *layoutid,
 			struct nfs4_pnfs_layoutget_res *lgr)
 {
-	struct nfs4_filelayout *fl = NULL;
+	struct nfs4_filelayout *flo = PNFS_LD_DATA(layoutid);
+	struct nfs4_filelayout_segment *fl = LSEG_LD_DATA(&flo->pnfs_lseg);
 	int i;
 	uint32_t *p = (uint32_t *)lgr->layout.buf;
 	uint32_t nfl_util;
 
 	dprintk("%s: set_layout_map Begin\n", __func__);
-
-	if (!layoutid)
-		goto nfserr;
-	fl = PNFS_LD_DATA(layoutid);
 
 	READ32(fl->dev_id);
 	READ32(nfl_util);
@@ -622,8 +624,27 @@ filelayout_set_layout(struct pnfs_layout_type *layoutid,
 	}
 
 	return layoutid;
-nfserr:
-	return NULL;
+}
+
+static struct pnfs_layout_segment *
+filelayout_alloc_lseg(struct pnfs_layout_type *layoutid,
+		      struct nfs4_pnfs_layoutget_res *lgr)
+{
+	struct nfs4_filelayout *fl;
+
+	filelayout_set_layout(layoutid, lgr);
+
+	fl = PNFS_LD_DATA(layoutid);
+	return &fl->pnfs_lseg;
+}
+
+static void
+filelayout_free_lseg(struct pnfs_layout_segment *lseg)
+{
+	struct nfs4_filelayout *flo = PNFS_LD_DATA(lseg->layout);
+	struct nfs4_filelayout_segment *fls = LSEG_LD_DATA(&flo->pnfs_lseg);
+
+	memset(fls, 0, sizeof(*fls));
 }
 
 /* TODO: Technically we would need to execute a COMMIT op to each
@@ -636,7 +657,8 @@ filelayout_commit(struct pnfs_layout_type *layoutid, int sync,
 {
 	struct inode *ino = PNFS_INODE(layoutid);
 	struct nfs_write_data   *dsdata = NULL;
-	struct nfs4_filelayout *nfslay;
+	struct nfs4_filelayout *flo;
+	struct nfs4_filelayout_segment *nfslay;
 	struct nfs4_pnfs_dev_item *dev;
 	struct nfs4_pnfs_dev *fdev;
 	struct nfs4_pnfs_dserver dserver;
@@ -646,7 +668,8 @@ filelayout_commit(struct pnfs_layout_type *layoutid, int sync,
 	struct list_head *pos, *tmp;
 	int i;
 
-	nfslay = PNFS_LD_DATA(layoutid);
+	flo = PNFS_LD_DATA(layoutid);
+	nfslay = LSEG_LD_DATA(&flo->pnfs_lseg);
 
 	dprintk("%s data %p pnfs_client %p nfslay %p\n",
 			__func__, data, data->pnfs_client, nfslay);
@@ -728,7 +751,9 @@ out_bad:
 ssize_t
 filelayout_get_stripesize(struct pnfs_layout_type *layoutid)
 {
-	struct nfs4_filelayout *fl = PNFS_LD_DATA(layoutid);
+	struct nfs4_filelayout *flo = PNFS_LD_DATA(layoutid);
+	struct nfs4_filelayout_segment *fl = LSEG_LD_DATA(&flo->pnfs_lseg);
+
 	ssize_t stripesize = fl->stripe_unit;
 	return stripesize;
 }
@@ -797,6 +822,8 @@ struct layoutdriver_io_operations filelayout_io_operations = {
 	.set_layout              = filelayout_set_layout,
 	.alloc_layout            = filelayout_alloc_layout,
 	.free_layout             = filelayout_free_layout,
+	.alloc_lseg              = filelayout_alloc_lseg,
+	.free_lseg               = filelayout_free_lseg,
 	.initialize_mountpoint   = filelayout_initialize_mountpoint,
 	.uninitialize_mountpoint = filelayout_uninitialize_mountpoint,
 };
