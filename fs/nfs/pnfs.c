@@ -990,15 +990,6 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 		goto out;
 	}
 
-	if (!nfss->pnfs_curr_ld->ld_io_ops ||
-	    !nfss->pnfs_curr_ld->ld_io_ops->write_pagelist) {
-		printk(KERN_ERR
-		       "%s: ERROR, no layout driver write operation\n",
-		       __FUNCTION__);
-		status = 1;
-		goto out;
-	}
-
 	/* Determine number of pages
 	 */
 	pgcount = args->pgbase + args->count;
@@ -1096,13 +1087,6 @@ pnfs_readpages(struct nfs_read_data *rdata)
 		status = 1;
 		goto out;
 	}
-	if (!nfss->pnfs_curr_ld->ld_io_ops ||
-	    !nfss->pnfs_curr_ld->ld_io_ops->read_pagelist) {
-		printk(KERN_ERR "%s: ERROR, no layout driver read operation\n",
-		       __FUNCTION__);
-		status = 1;
-		goto out;
-	}
 
 	/* Determine number of pages. */
 	pgcount = args->pgbase + args->count;
@@ -1135,9 +1119,13 @@ pnfs_readpages(struct nfs_read_data *rdata)
 int pnfs_try_to_read_data(struct nfs_read_data *data,
 			   const struct rpc_call_ops *call_ops)
 {
+	struct inode *ino = data->inode;
+	struct nfs_server *nfss = NFS_SERVER(ino);
+
 	dprintk("%s:Begin\n", __FUNCTION__);
 	/* Only create an rpc request if utilizing NFSv4 I/O */
-	if (!pnfs_use_read(data->inode, data->args.count)) {
+	if (!pnfs_use_read(ino, data->args.count) ||
+	    !nfss->pnfs_curr_ld->ld_io_ops->read_pagelist) {
 		dprintk("%s:End not using pnfs\n", __FUNCTION__);
 		return 1;
 	} else {
@@ -1150,9 +1138,13 @@ int pnfs_try_to_read_data(struct nfs_read_data *data,
 int pnfs_try_to_write_data(struct nfs_write_data *data,
 				const struct rpc_call_ops *call_ops, int how)
 {
+	struct inode *ino = data->inode;
+	struct nfs_server *nfss = NFS_SERVER(ino);
+
 	dprintk("%s:Begin\n", __FUNCTION__);
 	/* Only create an rpc request if utilizing NFSv4 I/O */
-	if (!pnfs_use_write(data->inode, data->args.count)) {
+	if (!pnfs_use_write(ino, data->args.count) ||
+	    !nfss->pnfs_curr_ld->ld_io_ops->write_pagelist) {
 		dprintk("%s:End. not using pnfs\n", __FUNCTION__);
 		return 1;
 	} else {
