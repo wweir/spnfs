@@ -657,17 +657,20 @@ nfs4_pnfs_device_item_get(struct inode *inode, u32 dev_id)
  */
 int
 nfs4_pnfs_dserver_get(struct inode *inode,
-		      struct nfs4_filelayout *layout,
+		      struct nfs4_filelayout *flo,
 		      loff_t offset,
 		      size_t count,
 		      struct nfs4_pnfs_dserver *dserver)
 {
+	struct nfs4_filelayout_segment *layout;
 	struct nfs4_pnfs_dev_item *di;
 	u64 tmp;
 	u32 stripe_idx, end_idx;
 
-	if (!layout)
+	if (!flo)
 		return 1;
+
+	layout = LSEG_LD_DATA(&flo->pnfs_lseg);
 
 	di = nfs4_pnfs_device_item_get(inode, layout->dev_id);
 	if (di == NULL)
