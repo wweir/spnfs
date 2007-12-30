@@ -86,26 +86,6 @@ const struct inode_operations nfs_file_inode_operations = {
 	.setattr	= nfs_setattr,
 };
 
-#ifdef CONFIG_PNFS
-const struct file_operations pnfs_file_operations = {
-	.llseek		= nfs_file_llseek,
-	.read		= do_sync_read,
-	.write		= do_sync_write,
-	.aio_read	= nfs_file_read,
-	.aio_write	= nfs_file_write,
-	.mmap		= nfs_file_mmap,
-	.open		= nfs_file_open,
-	.flush		= nfs_file_flush,
-	.release	= nfs_file_release,
-	.fsync		= nfs_fsync,
-	.lock		= nfs_lock,
-	.flock		= nfs_flock,
-	.splice_read	= nfs_file_splice_read,
-	.check_flags	= nfs_check_flags,
-	.setlease	= nfs_setlease,
-};
-#endif /* CONFIG_PNFS */
-
 #ifdef CONFIG_NFS_V3
 const struct inode_operations nfs3_file_inode_operations = {
 	.permission	= nfs_permission,
