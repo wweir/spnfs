@@ -5602,11 +5602,10 @@ const struct nfs_rpc_ops pnfs_v41_clientops = {
 
 const struct nfs_rpc_ops *nfsv4_minorversion_clientops[] = {
 	&nfs_v40_clientops,
-#if defined(CONFIG_NFS_V4_1)
-	&nfs_v41_clientops,
-#endif
 #if defined(CONFIG_PNFS)
 	&pnfs_v41_clientops,
+#elif defined(CONFIG_NFS_V4_1)
+	&nfs_v41_clientops,
 #endif
 };
 
