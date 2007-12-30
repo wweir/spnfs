@@ -362,7 +362,7 @@ pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range)
 			dprintk("%s: removing layout\n", __func__);
 
 		server->pnfs_curr_ld->ld_io_ops->free_layout(
-			&nfsi->current_layout, ino, &arg.lseg);
+			&nfsi->current_layout, &arg.lseg);
 	}
 
 	dprintk("%s:Exit status %d\n", __func__, status);
@@ -436,7 +436,7 @@ pnfs_inject_layout(struct nfs_inode *nfsi,
 		return NULL;
 	}
 	dprintk("%s Calling set layout\n", __func__);
-	return io_ops->set_layout(layid, inode, lgr);
+	return io_ops->set_layout(layid, lgr);
 }
 
 /* Update the file's layout for the given range and iomode.
@@ -680,7 +680,7 @@ pnfs_getboundary(struct inode *inode)
 	nfsi = NFS_I(inode);
 	lo = nfsi->current_layout;
 	if (lo)
-		stripe_size = policy_ops->get_stripesize(lo, inode);
+		stripe_size = policy_ops->get_stripesize(lo);
 out:
 	return stripe_size;
 }
@@ -1001,15 +1001,15 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 		numpages);
 	if (pnfs_get_type(inode) != LAYOUT_NFSV4_FILES)
 		wdata->pnfsflags |= PNFS_NO_RPC;
-	status = nfss->pnfs_curr_ld->ld_io_ops->write_pagelist(nfsi->current_layout,
-							       inode,
-							       args->pages,
-							       args->pgbase,
-							       numpages,
-							       (loff_t)args->offset,
-							       args->count,
-							       how,
-							       wdata);
+	status = nfss->pnfs_curr_ld->ld_io_ops->write_pagelist(
+							nfsi->current_layout,
+							args->pages,
+							args->pgbase,
+							numpages,
+							(loff_t)args->offset,
+							args->count,
+							how,
+							wdata);
 
 	if (status > 0) {
 		dprintk("%s: LD write_pagelist returned status %d > 0\n", __func__, status);
@@ -1095,14 +1095,14 @@ pnfs_readpages(struct nfs_read_data *rdata)
 	dprintk("%s: Calling layout driver read with %d pages\n", __func__, numpages);
 	if (pnfs_get_type(inode) != LAYOUT_NFSV4_FILES)
 		rdata->pnfsflags |= PNFS_NO_RPC;
-	status = nfss->pnfs_curr_ld->ld_io_ops->read_pagelist(nfsi->current_layout,
-							      inode,
-							      args->pages,
-							      args->pgbase,
-							      numpages,
-							      (loff_t)args->offset,
-							      args->count,
-							      rdata);
+	status = nfss->pnfs_curr_ld->ld_io_ops->read_pagelist(
+							nfsi->current_layout,
+							args->pages,
+							args->pgbase,
+							numpages,
+							(loff_t)args->offset,
+							args->count,
+							rdata);
 	if (status > 0) {
 		dprintk("%s: LD read_pagelist returned status %d > 0\n", __func__, status);
 		status = 0;
@@ -1207,7 +1207,7 @@ pnfs_commit(struct nfs_write_data *data, int sync)
 
 	dprintk("%s: Calling layout driver commit\n", __func__);
 	result = nfss->pnfs_curr_ld->ld_io_ops->commit(nfsi->current_layout,
-						       data->inode, sync, data);
+						       sync, data);
 
 	dprintk("%s end (err:%d)\n", __func__, result);
 	return result;
@@ -1260,10 +1260,10 @@ pnfs_layoutcommit_done(
 	 * to directly xdr its layout on the wire.
 	 */
 	if (nfss->pnfs_curr_ld->ld_io_ops->cleanup_layoutcommit)
-		nfss->pnfs_curr_ld->ld_io_ops->cleanup_layoutcommit(nfsi->current_layout,
-								    data->inode,
-								    &data->args,
-								    &data->res);
+		nfss->pnfs_curr_ld->ld_io_ops->cleanup_layoutcommit(
+							nfsi->current_layout,
+							&data->args,
+							&data->res);
 
 	/* release the open_context acquired in pnfs_writeback_done */
 	put_nfs_open_context(data->ctx);
@@ -1360,7 +1360,6 @@ pnfs_layoutcommit_setup(struct pnfs_layoutcommit_data *data, int sync)
 	if (nfss->pnfs_curr_ld->ld_io_ops->setup_layoutcommit) {
 		result = nfss->pnfs_curr_ld->ld_io_ops->setup_layoutcommit(
 				nfsi->current_layout,
-				data->inode,
 				&data->args);
 		if (result)
 			goto out;
