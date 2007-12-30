@@ -212,8 +212,7 @@ static void filelayout_read_call_done(struct rpc_task *task, void *data)
 	if (rdata->orig_offset)
 		rdata->args.offset = rdata->orig_offset;
 
-	/* Call the NFS call ops now */
-	rdata->call_ops->rpc_call_done(task, data);
+	pnfs_callback_ops->nfs_readlist_complete(rdata);
 }
 
 static void filelayout_write_call_done(struct rpc_task *task, void *data)
@@ -223,8 +222,7 @@ static void filelayout_write_call_done(struct rpc_task *task, void *data)
 	if (wdata->orig_offset)
 		wdata->args.offset = wdata->orig_offset;
 
-	/* Call the NFS call ops now */
-	wdata->call_ops->rpc_call_done(task, data);
+	pnfs_callback_ops->nfs_writelist_complete(wdata);
 }
 
 struct rpc_call_ops filelayout_read_call_ops = {
