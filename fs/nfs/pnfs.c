@@ -439,16 +439,15 @@ pnfs_inject_layout(struct nfs_inode *nfsi,
 	return io_ops->set_layout(layid, inode, lgr);
 }
 
-/* Check to see if the module is handling which layouts need to be
- * retrieved from the server.  If they are not, then use retrieve based
- * upon the returned data ranges from get_layout.
+/* Update the file's layout for the given range and iomode.
+ * Layout is retreived from the server if needed.
  */
 int
-virtual_update_layout(struct inode *ino,
-		      struct nfs_open_context *ctx,
-		      size_t count,
-		      loff_t pos,
-		      enum pnfs_iomode iomode)
+pnfs_update_layout(struct inode *ino,
+		   struct nfs_open_context *ctx,
+		   size_t count,
+		   loff_t pos,
+		   enum pnfs_iomode iomode)
 {
 	struct nfs4_pnfs_layoutget_res res;
 	struct nfs4_pnfs_layoutget_arg arg;
@@ -456,11 +455,6 @@ virtual_update_layout(struct inode *ino,
 	struct nfs_server *nfss = NFS_SERVER(ino);
 	struct pnfs_layout_type *layout_new;
 	int result = -EIO;
-
-	/* TODO: Check to see if the pnfs module is handling data layout
-	 * range caching Something like:
-	 * return(nfss->pnfs_module->pnfs_io_interface->have_layout(..))
-	 */
 
 	arg.lseg.iomode = iomode;
 	arg.lseg.offset = pos;
@@ -718,7 +712,7 @@ pnfs_pageio_init_read(struct nfs_pageio_descriptor *pgio,
 	readahead_range(inode, pages, &loff, &count);
 
 	if (count > 0 && !below_threshold(inode, count, 0)) {
-		status = virtual_update_layout(inode, ctx, count,
+		status = pnfs_update_layout(inode, ctx, count,
 						loff, IOMODE_READ);
 		dprintk("%s *rsize %Zd virt update returned %d\n",
 					__func__, *rsize, status);
@@ -766,7 +760,7 @@ pnfs_update_layout_commit(struct inode *inode,
 
 	if (!pnfs_enabled_sb(nfss))
 		return;
-	status = virtual_update_layout(inode, nfs_page->wb_context,
+	status = pnfs_update_layout(inode, nfs_page->wb_context,
 				(size_t)npages * PAGE_SIZE,
 				(loff_t)idx_start * PAGE_SIZE,
 				IOMODE_RW);
@@ -983,11 +977,11 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 		args->offset);
 
 	/* Retrieve and set layout if not allready cached */
-	status = virtual_update_layout(inode,
-				       args->context,
-				       args->count,
-				       args->offset,
-				       IOMODE_RW);
+	status = pnfs_update_layout(inode,
+				    args->context,
+				    args->count,
+				    args->offset,
+				    IOMODE_RW);
 	if (status) {
 		status = 1;	/* retry with nfs I/O */
 		goto out;
@@ -1078,11 +1072,11 @@ pnfs_readpages(struct nfs_read_data *rdata)
 		args->offset);
 
 	/* Retrieve and set layout if not allready cached */
-	status = virtual_update_layout(inode,
-				       args->context,
-				       args->count,
-				       args->offset,
-				       IOMODE_READ);
+	status = pnfs_update_layout(inode,
+				    args->context,
+				    args->count,
+				    args->offset,
+				    IOMODE_READ);
 	if (status) {
 		printk(KERN_WARNING
 		       "%s: ERROR %d from virtual_update_layout\n",
