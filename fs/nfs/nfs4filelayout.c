@@ -67,7 +67,7 @@ MODULE_DESCRIPTION("The NFSv4 file layout driver");
 struct pnfs_client_operations *pnfs_callback_ops;
 
 /* Forward declaration */
-ssize_t filelayout_get_stripesize(struct pnfs_layout_type*, struct inode*);
+ssize_t filelayout_get_stripesize(struct pnfs_layout_type *);
 
 /* Initialize a mountpoint by retrieving the list of
  * available devices for it.
@@ -256,7 +256,6 @@ struct rpc_call_ops filelayout_write_call_ops = {
  */
 ssize_t filelayout_read_pagelist(
 	struct pnfs_layout_type *layoutid,
-	struct inode *inode,
 	struct page **pages,
 	unsigned int pgbase,
 	unsigned nr_pages,
@@ -264,6 +263,7 @@ ssize_t filelayout_read_pagelist(
 	size_t count,
 	struct nfs_read_data *data)
 {
+	struct inode *inode = PNFS_INODE(layoutid);
 	struct nfs4_filelayout *nfslay = NULL;
 	struct nfs4_pnfs_dserver dserver;
 	int status;
@@ -400,8 +400,7 @@ int filelayout_flush_one(struct inode *inode, struct list_head *head,
 		return status;
 	INIT_LIST_HEAD(dslist);
 
-	stripesz = filelayout_get_stripesize(NFS_I(inode)->current_layout,
-					     inode);
+	stripesz = filelayout_get_stripesize(NFS_I(inode)->current_layout);
 	dprintk("%s stripesize %Zd\n", __func__, stripesz);
 	/* split up the list according to DS */
 	while (!list_empty(head)) {
@@ -497,7 +496,6 @@ out:
  */
 ssize_t filelayout_write_pagelist(
 	struct pnfs_layout_type *layoutid,
-	struct inode *inode,
 	struct page **pages,
 	unsigned int pgbase,
 	unsigned nr_pages,
@@ -576,7 +574,7 @@ filelayout_alloc_layout(struct pnfs_mount_type *mountid, struct inode *inode)
 		return NULL;
 
 	pnfslay->layoutid = (void *)nfslay;
-	pnfslay->mountid = mountid;
+	pnfslay->inode = inode;
 	return pnfslay;
 }
 
@@ -584,7 +582,6 @@ filelayout_alloc_layout(struct pnfs_mount_type *mountid, struct inode *inode)
  */
 void
 filelayout_free_layout(struct pnfs_layout_type **layoutidp,
-		       struct inode *inode,
 		       struct nfs4_pnfs_layout_segment *range)
 {
 	struct nfs4_filelayout *nfslay = NULL;
@@ -605,7 +602,7 @@ filelayout_free_layout(struct pnfs_layout_type **layoutidp,
  * information for this file.
  */
 struct pnfs_layout_type*
-filelayout_set_layout(struct pnfs_layout_type *layoutid, struct inode *inode,
+filelayout_set_layout(struct pnfs_layout_type *layoutid,
 			struct nfs4_pnfs_layoutget_res *lgr)
 {
 	struct nfs4_filelayout *fl = NULL;
@@ -656,9 +653,10 @@ nfserr:
  * Once we fix this, we will need to invoke the pnfs_commit_complete callback.
  */
 int
-filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino,
-		  int sync, struct nfs_write_data *data)
+filelayout_commit(struct pnfs_layout_type *layoutid, int sync,
+		  struct nfs_write_data *data)
 {
+	struct inode *ino = PNFS_INODE(layoutid);
 	struct nfs_write_data   *dsdata = NULL;
 	struct pnfs_layout_type *laytype;
 	struct nfs4_filelayout *nfslay;
@@ -752,8 +750,7 @@ out_bad:
 /* Return the stripesize for the specified file.
  */
 ssize_t
-filelayout_get_stripesize(struct pnfs_layout_type *layoutid,
-			  struct inode *inode)
+filelayout_get_stripesize(struct pnfs_layout_type *layoutid)
 {
 	struct nfs4_filelayout *fl =
 		(struct nfs4_filelayout *)layoutid->layoutid;
