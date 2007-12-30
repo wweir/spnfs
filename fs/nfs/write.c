@@ -1004,13 +1004,6 @@ static void nfs_pageio_init_write(struct nfs_pageio_descriptor *pgio,
 #endif /* CONFIG_PNFS */
 }
 
-#ifdef CONFIG_PNFS
-void pnfs_commit_done_norpc(struct rpc_task *task, void *calldata)
-{
-	printk("%s XXX Need to Implement\n", __func__);
-}
-#endif /* CONFIG_PNFS */
-
 /*
  * Handle a write reply that flushed part of a page.
  */
