@@ -448,9 +448,8 @@ pnfs_inject_layout(struct nfs_inode *nfsi,
 	return io_ops->set_layout(layid, inode, lgr);
 }
 
-/* Check to see if the module is handling which layouts need to be
- * retrieved from the server.  If they are not, then use retrieve based
- * upon the returned data ranges from get_layout.
+/* Update the file's layout for the given range and iomode.
+ * Layout is retreived from the server if needed.
  */
 int
 pnfs_update_layout(struct inode *ino,
@@ -465,11 +464,6 @@ pnfs_update_layout(struct inode *ino,
 	struct nfs_server *nfss = NFS_SERVER(ino);
 	struct pnfs_layout_type *layout_new;
 	int result = -EIO;
-
-	/* TODO: Check to see if the pnfs module is handling data layout
-	 * range caching Something like:
-	 * return(nfss->pnfs_module->pnfs_io_interface->have_layout(..))
-	 */
 
 	arg.lseg.iomode = iomode;
 	arg.lseg.offset = pos;
