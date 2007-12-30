@@ -39,6 +39,7 @@ struct pnfs_mount_type {
  * A reference is stored in the nfs_inode structure.
  */
 struct pnfs_layout_type {
+	int refcount;
 	int roc_iomode;			/* iomode to return on close, 0=none */
 	struct inode *inode;
 	u8 ld_data[];			/* layout driver private data */
