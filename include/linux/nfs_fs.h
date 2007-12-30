@@ -178,7 +178,9 @@ struct nfs_inode {
 #if defined(CONFIG_PNFS)
 	unsigned long pnfs_layout_state;
 #define NFS_INO_LAYOUT_FAILED	0x0001	/* get layout failed, stop trying */
+#define NFS_INO_LAYOUT_ALLOC	0x0002	/* get layout failed, stop trying */
 	time_t pnfs_layout_suspend;
+	wait_queue_head_t lo_waitq;
 	struct pnfs_layout_type *current_layout;
 	/* use rpc_creds in this open_context to send LAYOUTCOMMIT to MDS */
 	struct nfs_open_context *layoutcommit_ctx;
