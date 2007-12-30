@@ -39,9 +39,9 @@ struct pnfs_mount_type {
  * A reference is stored in the nfs_inode structure.
  */
 struct pnfs_layout_type {
-	void *layoutid;
-	int roc_iomode;	/* iomode to return on close, 0=none */
+	int roc_iomode;			/* iomode to return on close, 0=none */
 	struct inode *inode;
+	u8 ld_data[];			/* layout driver private data */
 };
 
 static inline struct inode *
@@ -66,6 +66,12 @@ static inline struct pnfs_mount_type *
 PNFS_MOUNTID(struct pnfs_layout_type *lo)
 {
 	return NFS_SERVER(PNFS_INODE(lo))->pnfs_mountid;
+}
+
+static inline void *
+PNFS_LD_DATA(struct pnfs_layout_type *lo)
+{
+	return lo->ld_data;
 }
 
 static inline struct pnfs_layoutdriver_type *
