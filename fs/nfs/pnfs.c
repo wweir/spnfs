@@ -439,6 +439,14 @@ alloc_init_layout(struct inode *ino, struct layoutdriver_io_operations *io_ops)
 	return lo;
 }
 
+static int pnfs_wait_schedule(void *word)
+{
+	if (signal_pending(current))
+		return -ERESTARTSYS;
+	schedule();
+	return 0;
+}
+
 /*
  * get, possibly allocate current_layout
  */
@@ -448,13 +456,40 @@ get_alloc_layout(struct inode *ino,
 {
 	struct nfs_inode *nfsi = NFS_I(ino);
 	struct pnfs_layout_type *lo;
+	int res;
 
 	dprintk("%s Begin\n", __FUNCTION__);
 
-	if ((lo = nfsi->current_layout) == NULL) {
-		lo = nfsi->current_layout = alloc_init_layout(ino, io_ops);
+	while ((lo = nfsi->current_layout) == NULL) {
+		/* Compete against other threads on who's doing the allocation,
+		 * wait until bit is cleared if we lost this race.
+		 */
+		res = wait_on_bit_lock(
+			&nfsi->pnfs_layout_state, NFS_INO_LAYOUT_ALLOC,
+			pnfs_wait_schedule, TASK_INTERRUPTIBLE);
+		if (res) {
+			lo = ERR_PTR(res);
+			break;
+		}
+
+		/* Was current_layout already allocated while we slept?
+		 * If not, allocate it.
+		 */
+		lo = nfsi->current_layout;
+		if (!lo)
+			lo = nfsi->current_layout =
+				alloc_init_layout(ino, io_ops);
+
+		/* release the NFS_INO_LAYOUT_ALLOC bit and wake up waiters */
+		clear_bit_unlock(NFS_INO_LAYOUT_ALLOC, &nfsi->pnfs_layout_state);
+		wake_up_bit(&nfsi->pnfs_layout_state, NFS_INO_LAYOUT_ALLOC);
+
+		/* we're done here.
+		 * just check whether alloc_init_layout succeeded.
+		 */
 		if (!lo)
 			lo = ERR_PTR(-ENOMEM);
+		break;
 	}
 
 #ifdef NFS_DEBUG
