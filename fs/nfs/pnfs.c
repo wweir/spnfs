@@ -1542,6 +1542,7 @@ pnfs_layoutcommit_setup(struct pnfs_layoutcommit_data *data, int sync)
 	 * the actual size of an updated layout.
 	 */
 	data->args.new_layout_size = 0;
+	data->args.new_layout = NULL;
 
 	/* TODO: Need to determine the correct values */
 	data->args.time_modify_changed = 0;
