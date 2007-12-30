@@ -267,7 +267,7 @@ ssize_t filelayout_read_pagelist(
 	int status;
 
 	if (layoutid) {
-		nfslay = (struct nfs4_filelayout *)layoutid->layoutid;
+		nfslay = PNFS_LD_DATA(layoutid);
 		/* Retrieve the correct rpc_client for the byte range */
 		status = nfs4_pnfs_dserver_get(inode,
 						nfslay,
@@ -381,7 +381,7 @@ int filelayout_flush_one(struct inode *inode, struct list_head *head,
 			 unsigned int npages, size_t count, int how)
 {
 	struct pnfs_layout_type *ltype = NFS_I(inode)->current_layout;
-	struct nfs4_filelayout *nfslay = ltype->layoutid;
+	struct nfs4_filelayout *nfslay = PNFS_LD_DATA(ltype);
 	struct nfs4_pnfs_dserver *dserver = NULL;
 	struct nfs4_pnfs_ds *ds = NULL;  /* current stripe data server */
 	struct nfs_page *req;
@@ -502,8 +502,7 @@ ssize_t filelayout_write_pagelist(
 	int sync,
 	struct nfs_write_data *data)
 {
-	struct nfs4_filelayout *nfslay =
-		(struct nfs4_filelayout *)layoutid->layoutid;
+	struct nfs4_filelayout *nfslay = PNFS_LD_DATA(layoutid);
 	struct nfs4_pnfs_dserver *dserver = NULL;
 	struct nfs4_pnfs_ds *ds;
 	struct nfs_page *req = NULL;
@@ -559,21 +558,9 @@ ssize_t filelayout_write_pagelist(
 struct pnfs_layout_type*
 filelayout_alloc_layout(struct pnfs_mount_type *mountid, struct inode *inode)
 {
-	struct pnfs_layout_type *pnfslay = NULL;
-	struct nfs4_filelayout *nfslay = NULL;
-
 	dprintk("NFS_FILELAYOUT: allocating layout\n");
-
-	pnfslay = kzalloc(sizeof(struct pnfs_layout_type), GFP_KERNEL);
-	if (!pnfslay)
-		return NULL;
-	nfslay = kzalloc(sizeof(struct nfs4_filelayout), GFP_KERNEL);
-	if (!nfslay)
-		return NULL;
-
-	pnfslay->layoutid = (void *)nfslay;
-	pnfslay->inode = inode;
-	return pnfslay;
+	return kzalloc(sizeof(struct pnfs_layout_type) +
+		       sizeof(struct nfs4_filelayout), GFP_KERNEL);
 }
 
 /* Free a filelayout layout structure
@@ -582,16 +569,11 @@ void
 filelayout_free_layout(struct pnfs_layout_type **layoutidp,
 		       struct nfs4_pnfs_layout_segment *range)
 {
-	struct nfs4_filelayout *nfslay = NULL;
 	struct pnfs_layout_type *layoutid;
 
 	dprintk("NFS_FILELAYOUT: freeing layout\n");
 
 	layoutid = *layoutidp;
-	if (layoutid)
-		nfslay = (struct nfs4_filelayout *)layoutid->layoutid;
-	if (nfslay != NULL)
-		kfree(nfslay);
 	kfree(layoutid);
 	*layoutidp = NULL;
 }
@@ -612,9 +594,7 @@ filelayout_set_layout(struct pnfs_layout_type *layoutid,
 
 	if (!layoutid)
 		goto nfserr;
-	fl = (struct nfs4_filelayout *)layoutid->layoutid;
-	if (!fl)
-		goto nfserr;
+	fl = PNFS_LD_DATA(layoutid);
 
 	READ32(fl->dev_id);
 	READ32(nfl_util);
@@ -656,7 +636,6 @@ filelayout_commit(struct pnfs_layout_type *layoutid, int sync,
 {
 	struct inode *ino = PNFS_INODE(layoutid);
 	struct nfs_write_data   *dsdata = NULL;
-	struct pnfs_layout_type *laytype;
 	struct nfs4_filelayout *nfslay;
 	struct nfs4_pnfs_dev_item *dev;
 	struct nfs4_pnfs_dev *fdev;
@@ -667,8 +646,7 @@ filelayout_commit(struct pnfs_layout_type *layoutid, int sync,
 	struct list_head *pos, *tmp;
 	int i;
 
-	laytype = NFS_I(ino)->current_layout;
-	nfslay = (struct nfs4_filelayout *)layoutid->layoutid;
+	nfslay = PNFS_LD_DATA(layoutid);
 
 	dprintk("%s data %p pnfs_client %p nfslay %p\n",
 			__func__, data, data->pnfs_client, nfslay);
@@ -750,8 +728,7 @@ out_bad:
 ssize_t
 filelayout_get_stripesize(struct pnfs_layout_type *layoutid)
 {
-	struct nfs4_filelayout *fl =
-		(struct nfs4_filelayout *)layoutid->layoutid;
+	struct nfs4_filelayout *fl = PNFS_LD_DATA(layoutid);
 	ssize_t stripesize = fl->stripe_unit;
 	return stripesize;
 }
