@@ -964,7 +964,7 @@ pnfs_flush_one(struct inode *inode, struct list_head *head,
  * in data->res.verf->committed.  Do we need this ability
  * for non-file layout drivers?
  */
-int
+static int
 pnfs_writepages(struct nfs_write_data *wdata, int how)
 {
 	struct nfs_writeargs *args = &wdata->args;
@@ -1068,7 +1068,7 @@ pnfs_read_done(struct nfs_read_data *data, ssize_t status, int eof)
  * If no I/O device driver exists, or one does match the returned
  * fstype, then return a positive status for regular NFS processing.
  */
-int
+static int
 pnfs_readpages(struct nfs_read_data *rdata)
 {
 	struct nfs_readargs *args = &rdata->args;
