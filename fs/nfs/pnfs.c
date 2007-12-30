@@ -832,40 +832,6 @@ pnfs_get_type(struct inode *inode)
 	return nfss->pnfs_curr_ld->id;
 }
 
-/* Determine if the the NFSv4 protocol is to be used for writes,
- * whether pNFS is being used or not.
- * TODO: Instead of checking for the file layout type, maybe
- * we should make this a policy option in the future if more
- * layout drivers uses NFSv4 I/O.
- */
-int
-pnfs_use_nfsv4_wproto(struct inode *inode, ssize_t count)
-{
-	struct nfs_server *nfss = NFS_SERVER(inode);
-	if (!pnfs_enabled_sb(nfss) ||
-	    pnfs_get_type(inode) == LAYOUT_NFSV4_FILES ||
-	    !pnfs_use_write(inode, count))
-		return 1;
-
-	return 0;
-}
-
-/* Determine if the the NFSv4 protocol is to be used for reads,
- * whether pNFS is being used or not.
- * TODO: See pnfs_use_nfsv4_wproto.
- */
-int
-pnfs_use_nfsv4_rproto(struct inode *inode, ssize_t count)
-{
-	struct nfs_server *nfss = NFS_SERVER(inode);
-	if (!pnfs_enabled_sb(nfss) ||
-	    pnfs_get_type(inode) == LAYOUT_NFSV4_FILES ||
-	    !pnfs_use_read(inode, count))
-		return 1;
-
-	return 0;
-}
-
 /* Return I/O buffer size for a layout driver
  * This value will determine what size reads and writes
  * will be gathered into and sent to the data servers.
@@ -908,28 +874,18 @@ pnfs_set_ds_iosize(struct nfs_server *server)
 	}
 }
 
-/* Post-write completion function.  Invoked by non RPC layout drivers
- * to clean up write pages.
+/* Post-write completion function
+ * Invoked by all layout drivers when write_pagelist is done.
  *
  * NOTE: callers must set data->pnfsflags PNFS_NO_RPC
  * so that the NFS cleanup routines perform only the page cache
  * cleanup.
  */
 static void
-pnfs_writeback_done(struct nfs_write_data *data, ssize_t status)
+pnfs_writeback_done(struct nfs_write_data *data)
 {
-	dprintk("%s: Begin (status %Zd)\n", __func__, status);
+	dprintk("%s: Begin (status %d)\n", __func__, data->task.tk_status);
 
-	/* NFSv4 will have sunrpc call the callbacks */
-	if (data->call_ops == NULL ||
-	    pnfs_use_nfsv4_wproto(data->inode, data->args.count))
-		return;
-
-	/* Status is the number of bytes written or an error code */
-	data->task.tk_status = status;
-	data->res.count = status;
-
-	/* call the NFS cleanup routines. */
 	data->call_ops->rpc_call_done(&data->task, data);
 	data->call_ops->rpc_release(data);
 }
@@ -1023,30 +979,14 @@ out:
 	return status;
 }
 
-/* Post-read completion function.  Invoked by non RPC layout drivers
- * to clean up read pages.
- *
- * NOTE: called must set data->pnfsflags PNFS_NO_RPC
+/* Post-read completion function.  Invoked by all layout drivers when
+ * read_pagelist is done
  */
 static void
-pnfs_read_done(struct nfs_read_data *data, ssize_t status, int eof)
+pnfs_read_done(struct nfs_read_data *data)
 {
-	dprintk("%s: Begin (status %Zd)\n", __func__, status);
+	dprintk("%s: Begin (status %d)\n", __func__, data->task.tk_status);
 
-	/* NFSv4 will have sunrpc call the callbacks */
-	if (data->call_ops == NULL ||
-	    pnfs_use_nfsv4_rproto(data->inode, data->args.count))
-		return;
-
-	/* Status is the number of bytes written or an error code
-	 * the rpc_task is uninitialized, and tk_status is all that
-	 * is used in the call done routines.
-	 */
-	data->task.tk_status = status;
-	data->res.eof = eof;
-	data->res.count = status;
-
-	/* call the NFS cleanup routines. */
 	data->call_ops->rpc_call_done(&data->task, data);
 	data->call_ops->rpc_release(data);
 }
@@ -1170,17 +1110,11 @@ int _pnfs_try_to_commit(struct nfs_write_data *data)
 
 /* pNFS Commit callback function for non-file layout drivers */
 static void
-pnfs_commit_done(struct nfs_write_data *data, ssize_t status)
+pnfs_commit_done(struct nfs_write_data *data)
 {
-	dprintk("%s: Begin (status %Zd)\n", __func__, status);
+	dprintk("%s: Begin (status %d)\n", __func__, data->task.tk_status);
 
-	/* NFSv4 will have sunrpc call the callbacks */
-	if (pnfs_use_nfsv4_wproto(data->inode, -1))
-		return;
-
-	/* Status is the number of bytes written or an error code */
-	data->task.tk_status = status;
-	pnfs_commit_done_norpc(&data->task, data);
+	data->call_ops->rpc_call_done(&data->task, data);
 	data->call_ops->rpc_release(data);
 }
 
