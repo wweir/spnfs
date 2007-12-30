@@ -1015,10 +1015,6 @@ pnfs_writeback_done_update(struct nfs_write_data *data)
 		pnfs_need_layoutcommit(nfsi, argp->context);
 }
 
-void pnfs_commit_done_norpc(struct rpc_task *task, void *calldata)
-{
-	printk("%s XXX Need to Implement\n", __func__);
-}
 #endif /* CONFIG_PNFS */
 
 /*
