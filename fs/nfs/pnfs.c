@@ -1116,13 +1116,17 @@ pnfs_readpages(struct nfs_read_data *rdata)
 int _pnfs_try_to_read_data(struct nfs_read_data *data,
 			   const struct rpc_call_ops *call_ops)
 {
-	dprintk("%s:Begin\n", __func__);
+	struct inode *ino = data->inode;
+	struct nfs_server *nfss = NFS_SERVER(ino);
+
+	dprintk("--> %s\n", __func__);
 	/* Only create an rpc request if utilizing NFSv4 I/O */
-	if (!pnfs_use_read(data->inode, data->args.count)) {
-		dprintk("%s:End not using pnfs\n", __func__);
+	if (!pnfs_use_read(ino, data->args.count) ||
+	    !nfss->pnfs_curr_ld->ld_io_ops->read_pagelist) {
+		dprintk("<-- %s: not using pnfs\n", __func__);
 		return 1;
 	} else {
-		dprintk("%s Utilizing pNFS I/O\n", __func__);
+		dprintk("%s: Utilizing pNFS I/O\n", __func__);
 		data->call_ops = call_ops;
 		return pnfs_readpages(data);
 	}
@@ -1131,13 +1135,17 @@ int _pnfs_try_to_read_data(struct nfs_read_data *data,
 int _pnfs_try_to_write_data(struct nfs_write_data *data,
 			    const struct rpc_call_ops *call_ops, int how)
 {
-	dprintk("%s:Begin\n", __func__);
+	struct inode *ino = data->inode;
+	struct nfs_server *nfss = NFS_SERVER(ino);
+
+	dprintk("--> %s\n", __func__);
 	/* Only create an rpc request if utilizing NFSv4 I/O */
-	if (!pnfs_use_write(data->inode, data->args.count)) {
-		dprintk("%s:End. not using pnfs\n", __func__);
+	if (!pnfs_use_write(ino, data->args.count) ||
+	    !nfss->pnfs_curr_ld->ld_io_ops->write_pagelist) {
+		dprintk("<-- %s: not using pnfs\n", __func__);
 		return 1;
 	} else {
-		dprintk("%s Utilizing pNFS I/O\n", __func__);
+		dprintk("%s: Utilizing pNFS I/O\n", __func__);
 		data->call_ops = call_ops;
 		data->how = how;
 		return pnfs_writepages(data, how);
