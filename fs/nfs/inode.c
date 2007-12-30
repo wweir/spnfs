@@ -1200,6 +1200,9 @@ static inline void nfs4_init_once(struct nfs_inode *nfsi)
 	nfsi->delegation_state = 0;
 	init_rwsem(&nfsi->rwsem);
 #endif
+#ifdef CONFIG_PNFS
+	init_waitqueue_head(&nfsi->lo_waitq);
+#endif /* CONFIG_PNFS */
 }
 
 static void init_once(struct kmem_cache * cachep, void *foo)
