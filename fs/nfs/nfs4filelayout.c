@@ -588,7 +588,6 @@ filelayout_alloc_layout(struct pnfs_mount_type *mountid, struct inode *inode)
 		return NULL;
 
 	pnfslay->layoutid = (void *)nfslay;
-	pnfslay->inode = inode;
 	return pnfslay;
 }
 
