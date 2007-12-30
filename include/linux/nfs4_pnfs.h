@@ -93,6 +93,20 @@ PNFS_LD_POLICY_OPS(struct pnfs_layout_type *lo)
 	return PNFS_LD(lo)->ld_policy_ops;
 }
 
+struct pnfs_layout_segment {
+	struct list_head fi_list;
+	struct nfs4_pnfs_layout_segment range;
+	struct kref kref;
+	struct pnfs_layout_type *layout;
+	u8 ld_data[];			/* layout driver private data */
+};
+
+static inline void *
+LSEG_LD_DATA(struct pnfs_layout_segment *lseg)
+{
+	return lseg->ld_data;
+}
+
 /* Layout driver I/O operations.
  * Either the pagecache or non-pagecache read/write operations must be implemented
  */
@@ -119,6 +133,8 @@ struct layoutdriver_io_operations {
 	int (*has_layout) (struct pnfs_layout_type *layoutid, struct inode *inode, struct nfs4_pnfs_layout_segment *range);
 	void (*free_layout) (struct pnfs_layout_type **layoutidp, struct nfs4_pnfs_layout_segment *range);
 	struct pnfs_layout_type * (*set_layout) (struct pnfs_layout_type *layoutid, struct nfs4_pnfs_layoutget_res *lgr);
+	struct pnfs_layout_segment * (*alloc_lseg) (struct pnfs_layout_type *layoutid, struct nfs4_pnfs_layoutget_res *lgr);
+	void (*free_lseg) (struct pnfs_layout_segment *lseg);
 
 	int (*setup_layoutcommit) (struct pnfs_layout_type *layoutid, struct pnfs_layoutcommit_arg *arg);
 	void (*cleanup_layoutcommit) (struct pnfs_layout_type *layoutid, struct pnfs_layoutcommit_arg *arg, struct pnfs_layoutcommit_res *res);
