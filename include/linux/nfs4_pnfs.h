@@ -19,6 +19,14 @@
 #define NFS4_PNFS_DEV_MAXCOUNT 16
 #define NFS4_PNFS_DEV_MAXSIZE 128
 
+/* Per-layout driver specific registration structure */
+struct pnfs_layoutdriver_type {
+	const u32 id;
+	const char *name;
+	struct layoutdriver_io_operations *ld_io_ops;
+	struct layoutdriver_policy_operations *ld_policy_ops;
+};
+
 /* Layout driver specific identifier for a mount point.  For each mountpoint
  * a reference is stored in the nfs_server structure.
  */
@@ -31,10 +39,52 @@ struct pnfs_mount_type {
  * A reference is stored in the nfs_inode structure.
  */
 struct pnfs_layout_type {
-	struct pnfs_mount_type *mountid;
 	void *layoutid;
 	int roc_iomode;	/* iomode to return on close, 0=none */
+	struct inode *inode;
 };
+
+static inline struct inode *
+PNFS_INODE(struct pnfs_layout_type *lo)
+{
+	return lo->inode;
+}
+
+static inline struct nfs_inode *
+PNFS_NFS_INODE(struct pnfs_layout_type *lo)
+{
+	return NFS_I(PNFS_INODE(lo));
+}
+
+static inline struct nfs_server *
+PNFS_NFS_SERVER(struct pnfs_layout_type *lo)
+{
+	return NFS_SERVER(PNFS_INODE(lo));
+}
+
+static inline struct pnfs_mount_type *
+PNFS_MOUNTID(struct pnfs_layout_type *lo)
+{
+	return NFS_SERVER(PNFS_INODE(lo))->pnfs_mountid;
+}
+
+static inline struct pnfs_layoutdriver_type *
+PNFS_LD(struct pnfs_layout_type *lo)
+{
+	return NFS_SERVER(PNFS_INODE(lo))->pnfs_curr_ld;
+}
+
+static inline struct layoutdriver_io_operations *
+PNFS_LD_IO_OPS(struct pnfs_layout_type *lo)
+{
+	return PNFS_LD(lo)->ld_io_ops;
+}
+
+static inline struct layoutdriver_policy_operations *
+PNFS_LD_POLICY_OPS(struct pnfs_layout_type *lo)
+{
+	return PNFS_LD(lo)->ld_policy_ops;
+}
 
 /* Layout driver I/O operations.
  * Either the pagecache or non-pagecache read/write operations must be implemented
@@ -43,8 +93,8 @@ struct layoutdriver_io_operations {
 	/* Functions that use the pagecache.
 	 * If use_pagecache == 1, then these functions must be implemented.
 	 */
-	ssize_t (*read_pagelist) (struct pnfs_layout_type *layoutid, struct inode *, struct page **pages, unsigned int pgbase, unsigned nr_pages, loff_t offset, size_t count, struct nfs_read_data *nfs_data);
-	ssize_t (*write_pagelist) (struct pnfs_layout_type *layoutid, struct inode *, struct page **pages, unsigned int pgbase, unsigned nr_pages, loff_t offset, size_t count, int sync, struct nfs_write_data *nfs_data);
+	ssize_t (*read_pagelist) (struct pnfs_layout_type *layoutid, struct page **pages, unsigned int pgbase, unsigned nr_pages, loff_t offset, size_t count, struct nfs_read_data *nfs_data);
+	ssize_t (*write_pagelist) (struct pnfs_layout_type *layoutid, struct page **pages, unsigned int pgbase, unsigned nr_pages, loff_t offset, size_t count, int sync, struct nfs_write_data *nfs_data);
 	int (*flush_one) (struct inode *inode, struct list_head *head, unsigned int npages, size_t count, int how);
 
 
@@ -53,18 +103,18 @@ struct layoutdriver_io_operations {
 	 * 1) the page list contains nfs_pages, NOT pages
 	 * 2) currently the NFS code doesn't create a page array (as it does with read/write)
 	 */
-	int (*commit) (struct pnfs_layout_type *layoutid, struct inode *, int sync, struct nfs_write_data *nfs_data);
+	int (*commit) (struct pnfs_layout_type *layoutid, int sync, struct nfs_write_data *nfs_data);
 
 	/* Layout information. For each inode, alloc_layout is executed once to retrieve an
 	 * inode specific layout structure.  Each subsequent layoutget operation results in
 	 * a set_layout call to set the opaque layout in the layout driver.*/
 	struct pnfs_layout_type * (*alloc_layout) (struct pnfs_mount_type *mountid, struct inode *inode);
 	int (*has_layout) (struct pnfs_layout_type *layoutid, struct inode *inode, struct nfs4_pnfs_layout_segment *range);
-	void (*free_layout) (struct pnfs_layout_type **layoutidp, struct inode *inode, struct nfs4_pnfs_layout_segment *range);
-	struct pnfs_layout_type * (*set_layout) (struct pnfs_layout_type *layoutid, struct inode *inode, struct nfs4_pnfs_layoutget_res *lgr);
+	void (*free_layout) (struct pnfs_layout_type **layoutidp, struct nfs4_pnfs_layout_segment *range);
+	struct pnfs_layout_type * (*set_layout) (struct pnfs_layout_type *layoutid, struct nfs4_pnfs_layoutget_res *lgr);
 
-	int (*setup_layoutcommit) (struct pnfs_layout_type *layoutid, struct inode *inode, struct pnfs_layoutcommit_arg *arg);
-	void (*cleanup_layoutcommit) (struct pnfs_layout_type *layoutid, struct inode *inode, struct pnfs_layoutcommit_arg *arg, struct pnfs_layoutcommit_res *res);
+	int (*setup_layoutcommit) (struct pnfs_layout_type *layoutid, struct pnfs_layoutcommit_arg *arg);
+	void (*cleanup_layoutcommit) (struct pnfs_layout_type *layoutid, struct pnfs_layoutcommit_arg *arg, struct pnfs_layoutcommit_res *res);
 
 	/* Registration information for a new mounted file system
 	 */
@@ -77,7 +127,7 @@ struct layoutdriver_io_operations {
 
 struct layoutdriver_policy_operations {
 	/* The stripe size of the file system */
-	ssize_t (*get_stripesize) (struct pnfs_layout_type *layoutid, struct inode *);
+	ssize_t (*get_stripesize) (struct pnfs_layout_type *layoutid);
 
 	/* Should the NFS req. gather algorithm cross stripe boundaries? */
 	int (*gather_across_stripes) (struct pnfs_mount_type *mountid);
@@ -105,14 +155,6 @@ struct layoutdriver_policy_operations {
 	/* Should the pNFS client commit and return the layout upon a setattr
 	 */
 	int (*layoutret_on_setattr) (struct pnfs_mount_type *);
-};
-
-/* Per-layout driver specific registration structure */
-struct pnfs_layoutdriver_type {
-	const u32 id;
-	const char *name;
-	struct layoutdriver_io_operations *ld_io_ops;
-	struct layoutdriver_policy_operations *ld_policy_ops;
 };
 
 struct pnfs_device {
