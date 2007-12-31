@@ -1235,6 +1235,7 @@ pnfs_writeback_done(struct nfs_write_data *data)
 {
 	dprintk("%s: Begin (status %d)\n", __func__, data->task.tk_status);
 
+	put_lseg(data->lseg);
 	data->call_ops->rpc_call_done(&data->task, data);
 	data->call_ops->rpc_release(data);
 }
@@ -1274,6 +1275,7 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 	int numpages, status, pgcount, temp;
 	struct nfs_server *nfss = NFS_SERVER(inode);
 	struct nfs_inode *nfsi = NFS_I(inode);
+	struct pnfs_layout_segment *lseg;
 
 	dprintk("%s: Writing ino:%lu %u@%llu\n",
 		__func__,
@@ -1287,7 +1289,7 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 				    args->count,
 				    args->offset,
 				    IOMODE_RW,
-				    NULL);
+				    &lseg);
 	if (status) {
 		status = 1;	/* retry with nfs I/O */
 		goto out;
@@ -1307,6 +1309,7 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 		numpages);
 	if (pnfs_get_type(inode) != LAYOUT_NFSV4_FILES)
 		wdata->pnfsflags |= PNFS_NO_RPC;
+	wdata->lseg = lseg;
 	status = nfss->pnfs_curr_ld->ld_io_ops->write_pagelist(
 							nfsi->current_layout,
 							args->pages,
@@ -1317,6 +1320,8 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 							how,
 							wdata);
 
+	if (status)
+		put_lseg(lseg);
 	if (status > 0) {
 		dprintk("%s: LD write_pagelist returned status %d > 0\n", __func__, status);
 		pnfs_update_last_write(nfsi, args->offset, status);
@@ -1337,6 +1342,7 @@ pnfs_read_done(struct nfs_read_data *data)
 {
 	dprintk("%s: Begin (status %d)\n", __func__, data->task.tk_status);
 
+	put_lseg(data->lseg);
 	data->call_ops->rpc_call_done(&data->task, data);
 	data->call_ops->rpc_release(data);
 }
@@ -1354,6 +1360,7 @@ pnfs_readpages(struct nfs_read_data *rdata)
 	int numpages, status, pgcount, temp;
 	struct nfs_server *nfss = NFS_SERVER(inode);
 	struct nfs_inode *nfsi = NFS_I(inode);
+	struct pnfs_layout_segment *lseg;
 
 	dprintk("%s: Reading ino:%lu %u@%llu\n",
 		__func__,
@@ -1367,7 +1374,7 @@ pnfs_readpages(struct nfs_read_data *rdata)
 				    args->count,
 				    args->offset,
 				    IOMODE_READ,
-				    NULL);
+				    &lseg);
 	if (status) {
 		dprintk("%s: ERROR %d from pnfs_update_layout\n",
 			__func__, status);
@@ -1385,6 +1392,7 @@ pnfs_readpages(struct nfs_read_data *rdata)
 	dprintk("%s: Calling layout driver read with %d pages\n", __func__, numpages);
 	if (pnfs_get_type(inode) != LAYOUT_NFSV4_FILES)
 		rdata->pnfsflags |= PNFS_NO_RPC;
+	rdata->lseg = lseg;
 	status = nfss->pnfs_curr_ld->ld_io_ops->read_pagelist(
 							nfsi->current_layout,
 							args->pages,
@@ -1393,6 +1401,8 @@ pnfs_readpages(struct nfs_read_data *rdata)
 							(loff_t)args->offset,
 							args->count,
 							rdata);
+	if (status)
+		put_lseg(lseg);
 	if (status > 0) {
 		dprintk("%s: LD read_pagelist returned status %d > 0\n", __func__, status);
 		status = 0;
