@@ -40,6 +40,7 @@ struct pnfs_mount_type {
  */
 struct pnfs_layout_type {
 	int refcount;
+	struct list_head segs;		/* layout segments list */
 	int roc_iomode;			/* iomode to return on close, 0=none */
 	struct inode *inode;
 	u8 ld_data[];			/* layout driver private data */
