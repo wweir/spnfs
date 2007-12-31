@@ -369,6 +369,65 @@ put_lseg(struct pnfs_layout_segment *lseg)
 	kref_put(&lseg->kref, destroy_lseg);
 }
 
+static inline u64
+end_offset(u64 start, u64 len)
+{
+	u64 end;
+
+	end = start + len;
+	return end >= start ? end: NFS4_LENGTH_EOF;
+}
+
+/* last octet in a range */
+static inline u64
+last_byte_offset(u64 start, u64 len)
+{
+	u64 end;
+
+	BUG_ON(!len);
+	end = start + len;
+	return end > start ? end - 1: NFS4_LENGTH_EOF;
+}
+
+/*
+ * is l2 fully contained in l1?
+ *   start1                             end1
+ *   [----------------------------------)
+ *           start2           end2
+ *           [----------------)
+ */
+static inline int
+lo_seg_contained(struct nfs4_pnfs_layout_segment *l1,
+		 struct nfs4_pnfs_layout_segment *l2)
+{
+	u64 start1 = l1->offset;
+	u64 end1 = end_offset(start1, l1->length);
+	u64 start2 = l2->offset;
+	u64 end2 = end_offset(start2, l2->length);
+
+	return (start1 <= start2) && (end1 >= end2);
+}
+
+/*
+ * is l1 and l2 intersecting?
+ *   start1                             end1
+ *   [----------------------------------)
+ *                              start2           end2
+ *                              [----------------)
+ */
+static inline int
+lo_seg_intersecting(struct nfs4_pnfs_layout_segment *l1,
+		    struct nfs4_pnfs_layout_segment *l2)
+{
+	u64 start1 = l1->offset;
+	u64 end1 = end_offset(start1, l1->length);
+	u64 start2 = l2->offset;
+	u64 end2 = end_offset(start2, l2->length);
+
+	return (end1 == NFS4_LENGTH_EOF || end1 > start2) &&
+	       (end2 == NFS4_LENGTH_EOF || end2 > start1);
+}
+
 /*
 * Get layout from server.
 *    for now, assume that whole file layouts are requested.
