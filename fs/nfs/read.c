@@ -22,6 +22,7 @@
 #include <linux/module.h>
 
 #include <asm/system.h>
+#include <linux/module.h>
 
 #include "nfs4_fs.h"
 #include "internal.h"
@@ -452,6 +453,13 @@ static void nfs_readpage_set_pages_uptodate(struct nfs_read_data *data)
 	if (data->res.eof || data->res.count == data->args.count)
 		SetPageUptodate(*pages);
 }
+
+#ifdef CONFIG_PNFS
+void pnfs_readpage_result_norpc(struct rpc_task *task, void *calldata)
+{
+	/* XXX Need to implement */
+}
+#endif
 
 /*
  * This is the callback from RPC telling us whether a reply was
