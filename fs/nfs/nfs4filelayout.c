@@ -819,7 +819,6 @@ struct layoutdriver_io_operations filelayout_io_operations = {
 	.read_pagelist           = filelayout_read_pagelist,
 	.write_pagelist          = filelayout_write_pagelist,
 	.flush_one		 = filelayout_flush_one,
-	.set_layout              = filelayout_set_layout,
 	.alloc_layout            = filelayout_alloc_layout,
 	.free_layout             = filelayout_free_layout,
 	.alloc_lseg              = filelayout_alloc_lseg,
