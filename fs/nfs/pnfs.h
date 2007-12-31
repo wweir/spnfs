@@ -14,6 +14,7 @@
 
 #include <linux/nfs4_pnfs.h>
 #include <linux/nfs_page.h>
+#include <linux/nfs4_pnfs.h>
 
 #ifdef CONFIG_PNFS
 /* nfs4proc.c */
@@ -25,7 +26,8 @@ extern int nfs4_pnfs_getdeviceinfo(struct inode *inode, u32 dev_id,
 
 /* pnfs.c */
 int pnfs_update_layout(struct inode *ino, struct nfs_open_context *ctx,
-	size_t count, loff_t pos, enum pnfs_iomode access_type);
+	size_t count, loff_t pos, enum pnfs_iomode access_type,
+	struct pnfs_layout_segment **lsegpp);
 
 int pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range);
 int pnfs_return_layout_rpc(struct nfs_server *server, struct nfs4_pnfs_layoutreturn_arg *argp);
