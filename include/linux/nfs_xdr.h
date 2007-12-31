@@ -1045,6 +1045,7 @@ struct nfs_read_data {
 	unsigned long		timestamp;	/* For lease renewal */
 #endif
 #if defined(CONFIG_PNFS)
+	struct pnfs_layout_segment *lseg;
 	const struct rpc_call_ops *call_ops;
 	struct rpc_clnt		*pnfs_client;	/* Holds pNFS device across async calls */
 	int			pnfsflags;
@@ -1077,6 +1078,7 @@ struct nfs_write_data {
 	unsigned long		timestamp;	/* For lease renewal */
 #endif
 #if defined(CONFIG_PNFS)
+	struct pnfs_layout_segment *lseg;
 	const struct rpc_call_ops *call_ops;
 	struct rpc_clnt		*pnfs_client;	/* Holds pNFS device across
 						   async calls */
