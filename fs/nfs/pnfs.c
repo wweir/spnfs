@@ -340,7 +340,15 @@ put_unlock_current_layout(struct nfs_inode *nfsi,
 	BUG_ON_UNLOCKED_LO(lo);
 	BUG_ON(lo->refcount <= 0);
 
-	--lo->refcount;
+	if (--lo->refcount == 0 && list_empty(&lo->segs)) {
+		struct layoutdriver_io_operations *io_ops =
+			PNFS_LD_IO_OPS(lo);
+
+		dprintk("%s: freeing layout %p\n", __FUNCTION__, lo);
+		io_ops->free_layout(lo);
+
+		nfsi->current_layout = NULL;
+	}
 	spin_unlock(&nfsi->lo_lock);
 }
 
@@ -511,8 +519,7 @@ pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range)
 	if (lo == NULL)
 		return 0;
 
-	server->pnfs_curr_ld->ld_io_ops->free_layout(
-		&nfsi->current_layout, &arg.lseg);
+	pnfs_free_layout(lo, &arg.lseg);
 	put_unlock_current_layout(nfsi, lo);
 
 	arg.reclaim = 0;
