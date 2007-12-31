@@ -49,6 +49,8 @@
 #include "delegation.h"
 #include "iostat.h"
 #include "internal.h"
+#include <linux/pnfs_xdr.h>
+#include "pnfs.h"
 
 #define NFSDBG_FACILITY		NFSDBG_CLIENT
 
@@ -703,6 +705,9 @@ error:
 static void nfs_server_set_fsinfo(struct nfs_server *server, struct nfs_fsinfo *fsinfo)
 {
 	unsigned long max_rpc_payload;
+#ifdef CONFIG_PNFS
+	unsigned long dssize;
+#endif
 
 	/* Work out a lot of parameters */
 	if (server->rsize == 0)
@@ -729,6 +734,26 @@ static void nfs_server_set_fsinfo(struct nfs_server *server, struct nfs_fsinfo *
 	if (server->wsize > NFS_MAX_FILE_IO_SIZE)
 		server->wsize = NFS_MAX_FILE_IO_SIZE;
 	server->wpages = (server->wsize + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+#ifdef CONFIG_PNFS
+	/* Save the layout type for use during init of layout driver */
+	server->pnfs_fs_ltype = fsinfo->layoutclass;
+
+	/* Set buffer size for data servers */
+	dssize = pnfs_getiosize(server);
+	if (dssize > 0) {
+		server->ds_rsize = server->ds_wsize =
+			nfs_block_size(dssize, NULL);
+		server->ds_rpages = server->ds_wpages =
+			((server->ds_rsize + PAGE_CACHE_SIZE - 1) >>
+			 PAGE_CACHE_SHIFT);
+	} else {
+		server->ds_wsize = server->wsize;
+		server->ds_rsize = server->rsize;
+		server->ds_rpages = server->rpages;
+		server->ds_wpages = server->wpages;
+	}
+#endif /* CONFIG_PNFS */
+
 	server->wtmult = nfs_block_bits(fsinfo->wtmult, NULL);
 
 	server->dtsize = nfs_block_size(fsinfo->dtpref, NULL);
