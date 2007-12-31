@@ -536,6 +536,64 @@ out:
 	return status;
 }
 
+/*
+ * cmp two layout segments for sorting into layout cache
+ */
+static inline s64
+cmp_layout(struct nfs4_pnfs_layout_segment *l1,
+	   struct nfs4_pnfs_layout_segment *l2)
+{
+	s64 d;
+
+	/* lower offset < higher offset */
+	d = l1->offset - l2->offset;
+	if (d)
+		return d;
+
+	/* read < read/write */
+	d = (l1->iomode == IOMODE_RW) - (l2->iomode == IOMODE_RW);
+	if (d)
+		return d;
+
+	/* longer length < shorter length */
+	return l2->length - l1->length;
+}
+
+static void
+pnfs_insert_layout(struct pnfs_layout_type *lo,
+		   struct pnfs_layout_segment *lseg)
+{
+	struct pnfs_layout_segment *lp;
+	int found = 0;
+
+	dprintk("%s:Begin\n", __FUNCTION__);
+
+	BUG_ON_UNLOCKED_LO(lo);
+	list_for_each_entry (lp, &lo->segs, fi_list) {
+		if (cmp_layout(&lp->range, &lseg->range) > 0)
+			continue;
+		list_add_tail(&lseg->fi_list, &lp->fi_list);
+		dprintk("%s: inserted lseg %p "
+			"iomode %d offset %llu length %llu before "
+			"lp %p iomode %d offset %llu length %llu\n",
+			__FUNCTION__, lseg, lseg->range.iomode,
+			lseg->range.offset, lseg->range.length,
+			lp, lp->range.iomode, lp->range.offset,
+			lp->range.length);
+		found = 1;
+		break;
+	}
+	if (!found) {
+		list_add_tail(&lseg->fi_list, &lo->segs);
+		dprintk("%s: inserted lseg %p "
+			"iomode %d offset %llu length %llu at tail\n",
+			__FUNCTION__, lseg, lseg->range.iomode,
+			lseg->range.offset, lseg->range.length);
+	}
+
+	dprintk("%s:Return\n", __FUNCTION__);
+}
+
 /* DH: Inject layout blob into the I/O module.  This must happen before
  *     the I/O module has its read/write methods called.
  */
