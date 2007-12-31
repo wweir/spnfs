@@ -60,6 +60,7 @@ struct nfs_write_data *nfs_commit_alloc(void)
 	}
 	return p;
 }
+EXPORT_SYMBOL(nfs_commit_alloc);
 
 static void nfs_commit_rcu_free(struct rcu_head *head)
 {
@@ -73,6 +74,7 @@ void nfs_commit_free(struct nfs_write_data *wdata)
 {
 	call_rcu_bh(&wdata->task.u.tk_rcu, nfs_commit_rcu_free);
 }
+EXPORT_SYMBOL(nfs_commit_free);
 
 struct nfs_write_data *nfs_writedata_alloc(unsigned int pagecount)
 {
@@ -984,6 +986,18 @@ static void nfs_pageio_init_write(struct nfs_pageio_descriptor *pgio,
 	else
 		nfs_pageio_init(pgio, inode, nfs_flush_one, wsize, ioflags);
 }
+
+#ifdef CONFIG_PNFS
+void pnfs_writeback_done_norpc(struct rpc_task *task, void *calldata)
+{
+	/* XXX Need to Implement */
+}
+
+void pnfs_commit_done_norpc(struct rpc_task *task, void *calldata)
+{
+	/* XXX Need to Implement */
+}
+#endif /* CONFIG_PNFS */
 
 /*
  * Handle a write reply that flushed part of a page.
