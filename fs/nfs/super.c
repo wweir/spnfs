@@ -60,6 +60,8 @@
 #include "delegation.h"
 #include "iostat.h"
 #include "internal.h"
+#include <linux/pnfs_xdr.h>
+#include "pnfs.h"
 
 #define NFSDBG_FACILITY		NFSDBG_VFS
 
@@ -1890,6 +1892,29 @@ out_no_client_address:
 }
 
 /*
+ * Initialize the pNFS layout driver and setup pNFS related parameters
+ */
+int nfs4_init_pnfs(struct super_block *sb, struct nfs_server *server,
+		   struct nfs_fh *fh)
+{
+	int error = 0;
+
+#if defined(CONFIG_PNFS)
+	struct nfs_client *clp;
+
+	clp = server->nfs_client;
+	switch (clp->cl_minorversion) {
+	case 1:
+		set_pnfs_layoutdriver(sb, fh, server->pnfs_fs_ltype);
+		break;
+	case 0:
+		break;
+	}
+#endif /* CONFIG_PNFS */
+	return error;
+}
+
+/*
  * Get the superblock for an NFS4 mountpoint
  */
 static int nfs4_get_sb(struct file_system_type *fs_type,
@@ -1952,7 +1977,7 @@ static int nfs4_get_sb(struct file_system_type *fs_type,
 		}
 #endif /* CONFIG_NFS_V4_1 */
 		nfs_free_server(server);
-		server = NULL;
+		server = s->s_fs_info;
 	}
 
 	if (!s->s_root) {
@@ -1965,6 +1990,8 @@ static int nfs4_get_sb(struct file_system_type *fs_type,
 		error = PTR_ERR(mntroot);
 		goto error_splat_super;
 	}
+
+	nfs4_init_pnfs(s, server, &mntfh);
 
 	s->s_flags |= MS_ACTIVE;
 	mnt->mnt_sb = s;
