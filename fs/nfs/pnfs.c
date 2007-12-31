@@ -969,7 +969,7 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 {
 	struct nfs_writeargs *args = &wdata->args;
 	struct inode *inode = wdata->inode;
-	int numpages, status = -EIO, pgcount = 0, temp;
+	int numpages, status, pgcount, temp;
 	struct nfs_server *nfss = NFS_SERVER(inode);
 	struct nfs_inode *nfsi = NFS_I(inode);
 
@@ -1064,7 +1064,7 @@ pnfs_readpages(struct nfs_read_data *rdata)
 {
 	struct nfs_readargs *args = &rdata->args;
 	struct inode *inode = rdata->inode;
-	int numpages, status = -EIO, pgcount = 0, temp;
+	int numpages, status, pgcount, temp;
 	struct nfs_server *nfss = NFS_SERVER(inode);
 	struct nfs_inode *nfsi = NFS_I(inode);
 
