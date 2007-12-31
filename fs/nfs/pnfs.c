@@ -511,6 +511,7 @@ alloc_init_layout(struct inode *ino, struct layoutdriver_io_operations *io_ops)
 	}
 
 	lo->refcount = 1;
+	INIT_LIST_HEAD(&lo->segs);
 	lo->roc_iomode = 0;
 	lo->inode = ino;
 	return lo;
