@@ -628,21 +628,31 @@ pnfs_insert_layout(struct pnfs_layout_type *lo,
 /* DH: Inject layout blob into the I/O module.  This must happen before
  *     the I/O module has its read/write methods called.
  */
-static struct pnfs_layout_type *
-pnfs_inject_layout(struct pnfs_layout_type *layid,
-		   struct nfs4_pnfs_layoutget_res *lgr)
+static struct pnfs_layout_segment *
+pnfs_inject_layout(struct pnfs_layout_type *lo,
+		   struct nfs4_pnfs_layoutget_res *lgr,
+		   int take_ref)
 {
-	struct layoutdriver_io_operations *io_ops = PNFS_LD_IO_OPS(layid);
+	struct pnfs_layout_segment *lseg;
 
 	dprintk("%s Begin\n", __func__);
 
-	if (!io_ops->set_layout) {
-		printk(KERN_ERR "%s ERROR! Layout driver lacking pNFS layout ops!!!\n", __func__);
-		return NULL;
+	lseg = PNFS_LD_IO_OPS(lo)->alloc_lseg(lo, lgr);
+	if (!lseg || IS_ERR(lseg)) {
+		if (!lseg)
+			lseg = ERR_PTR(-ENOMEM);
+		printk(KERN_ERR "%s: Could not allocate layout: error %ld\n",
+		       __FUNCTION__, PTR_ERR(lseg));
+		return lseg;
 	}
 
-	dprintk("%s Calling set layout\n", __func__);
-	return io_ops->set_layout(layid, lgr);
+	init_lseg(lo, lseg);
+	if (take_ref)
+		kref_get(&lseg->kref);
+	lseg->range = lgr->lseg;
+	pnfs_insert_layout(lo, lseg);
+	dprintk("%s Return %p\n", __func__, lseg);
+	return lseg;
 }
 
 static struct pnfs_layout_type *
@@ -869,12 +879,12 @@ pnfs_update_layout(struct inode *ino,
 	}
 
 	/* Inject layout blob into I/O device driver */
-	layout_new = pnfs_inject_layout(nfsi->current_layout,
-					&res);
-	if (layout_new == NULL) {
+	lseg = pnfs_inject_layout(layout_new, &res, lsegpp != NULL);
+	if (IS_ERR(lseg)) {
+		result =  PTR_ERR(lseg);
+		lseg = NULL;
 		printk(KERN_ERR "%s: ERROR!  Could not inject layout (%d)\n",
 		       __func__, result);
-		result =  -EIO;
 		goto get_out;
 	}
 
@@ -883,7 +893,6 @@ pnfs_update_layout(struct inode *ino,
 		if (!layout_new->roc_iomode)
 			layout_new->roc_iomode = IOMODE_ANY;
 	}
-	nfsi->current_layout = layout_new;
 
 	result = 0;
 get_out:
