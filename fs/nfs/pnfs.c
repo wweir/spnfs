@@ -796,14 +796,8 @@ pnfs_update_layout(struct inode *ino,
 	arg.lseg.offset = pos;
 	arg.lseg.length = count;
 	/* Check to see if the layout for the given range already exists */
-	if (nfsi->current_layout != NULL &&
-	    (!nfss->pnfs_curr_ld->ld_io_ops->has_layout ||
-	      nfss->pnfs_curr_ld->ld_io_ops->has_layout(
-		nfsi->current_layout, ino, &arg.lseg))) {
-		/* TODO: To make this generic, I would need to compare the extents
-		 * of the existing layout information.
-		 * For now, assume that whole file layouts are always returned.
-		 */
+	lseg = pnfs_has_layout(layout_new, &arg.lseg, lsegpp != NULL);
+	if (lseg) {
 		dprintk("%s: Using cached layout %p for %llu@%llu iomode %d)\n",
 			__func__,
 			nfsi->current_layout,
@@ -811,7 +805,8 @@ pnfs_update_layout(struct inode *ino,
 			arg.lseg.offset,
 			arg.lseg.iomode);
 
-		return 0; /* Already have layout information */
+		result = 0;
+		goto out;
 	}
 
 	/* if get layout already failed once goto out */
