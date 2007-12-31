@@ -767,19 +767,23 @@ pnfs_has_layout(struct pnfs_layout_type *lo,
 
 /* Update the file's layout for the given range and iomode.
  * Layout is retreived from the server if needed.
+ * If lsegpp is given, the appropriate layout segment is referenced and
+ * returned to the caller.
  */
 int
 pnfs_update_layout(struct inode *ino,
 		   struct nfs_open_context *ctx,
 		   size_t count,
 		   loff_t pos,
-		   enum pnfs_iomode iomode)
+		   enum pnfs_iomode iomode,
+		   struct pnfs_layout_segment **lsegpp)
 {
 	struct nfs4_pnfs_layoutget_res res;
 	struct nfs4_pnfs_layoutget_arg arg;
 	struct nfs_inode *nfsi = NFS_I(ino);
 	struct nfs_server *nfss = NFS_SERVER(ino);
 	struct pnfs_layout_type *layout_new;
+	struct pnfs_layout_segment *lseg = NULL;
 	int result = -EIO;
 
 	layout_new = get_lock_alloc_layout(ino, nfss->pnfs_curr_ld->ld_io_ops);
@@ -897,8 +901,10 @@ get_out:
 out:
 	put_unlock_current_layout(nfsi, layout_new);
 ret:
-	dprintk("%s end (err:%d) state 0x%lx\n",
-		__func__, result, nfsi->pnfs_layout_state);
+	dprintk("%s end (err:%d) state 0x%lx lseg %p\n",
+		__func__, result, nfsi->pnfs_layout_state, lseg);
+	if (lsegpp)
+		*lsegpp = lseg;
 	return result;
 }
 
@@ -1055,7 +1061,7 @@ pnfs_pageio_init_read(struct nfs_pageio_descriptor *pgio,
 
 	if (count > 0 && !below_threshold(inode, count, 0)) {
 		status = pnfs_update_layout(inode, ctx, count,
-						loff, IOMODE_READ);
+						loff, IOMODE_READ, NULL);
 		dprintk("%s *rsize %Zd virt update returned %d\n",
 					__func__, *rsize, status);
 		if (status != 0)
@@ -1105,7 +1111,8 @@ pnfs_update_layout_commit(struct inode *inode,
 	status = pnfs_update_layout(inode, nfs_page->wb_context,
 				(size_t)npages * PAGE_SIZE,
 				(loff_t)idx_start * PAGE_SIZE,
-				IOMODE_RW);
+				IOMODE_RW,
+				NULL);
 	dprintk("%s  virt update status %d\n", __func__, status);
 }
 
@@ -1279,7 +1286,8 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 				    args->context,
 				    args->count,
 				    args->offset,
-				    IOMODE_RW);
+				    IOMODE_RW,
+				    NULL);
 	if (status) {
 		status = 1;	/* retry with nfs I/O */
 		goto out;
@@ -1358,7 +1366,8 @@ pnfs_readpages(struct nfs_read_data *rdata)
 				    args->context,
 				    args->count,
 				    args->offset,
-				    IOMODE_READ);
+				    IOMODE_READ,
+				    NULL);
 	if (status) {
 		dprintk("%s: ERROR %d from pnfs_update_layout\n",
 			__func__, status);
