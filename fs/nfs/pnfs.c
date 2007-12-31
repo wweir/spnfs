@@ -465,6 +465,37 @@ get_layout(struct inode *ino,
 	return status;
 }
 
+static inline int
+free_matching_lseg(struct pnfs_layout_segment *lseg,
+		   struct nfs4_pnfs_layout_segment *range)
+{
+	return (range->iomode == IOMODE_ANY ||
+		lseg->range.iomode == range->iomode) &&
+	       lo_seg_intersecting(&lseg->range, range);
+}
+
+static void
+pnfs_free_layout(struct pnfs_layout_type *lo,
+		 struct nfs4_pnfs_layout_segment *range)
+{
+	struct pnfs_layout_segment *lseg, *next;
+	dprintk("%s:Begin\n", __FUNCTION__);
+
+	BUG_ON_UNLOCKED_LO(lo);
+	list_for_each_entry_safe (lseg, next, &lo->segs, fi_list) {
+		if (!free_matching_lseg(lseg, range))
+			continue;
+		dprintk("%s: freeing lseg %p iomode %d "
+			"offset %llu length %lld\n", __FUNCTION__,
+			lseg, lseg->range.iomode, lseg->range.offset,
+			lseg->range.length);
+		list_del(&lseg->fi_list);
+		put_lseg(lseg);
+	}
+
+	dprintk("%s:Return\n", __FUNCTION__);
+}
+
 int
 pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range)
 {
