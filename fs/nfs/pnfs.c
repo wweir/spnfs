@@ -642,6 +642,40 @@ get_lock_alloc_layout(struct inode *ino,
 	return lo;
 }
 
+static inline int
+has_matching_lseg(struct pnfs_layout_segment *lseg,
+		  struct nfs4_pnfs_layout_segment *range)
+{
+	return (range->iomode == IOMODE_READ ||
+		lseg->range.iomode == IOMODE_RW) &&
+	       lo_seg_contained(&lseg->range, range);
+}
+
+/*
+ * lookup range in layout
+ */
+static struct pnfs_layout_segment *
+pnfs_has_layout(struct pnfs_layout_type *lo,
+		struct nfs4_pnfs_layout_segment *range,
+		int take_ref)
+{
+	struct pnfs_layout_segment *lseg, *ret = NULL;
+
+	dprintk("%s:Begin\n", __FUNCTION__);
+
+	BUG_ON_UNLOCKED_LO(lo);
+	list_for_each_entry (lseg, &lo->segs, fi_list) {
+		if (!has_matching_lseg(lseg, range))
+			continue;
+		ret = lseg;
+		if (take_ref)
+			kref_get(&ret->kref);
+	}
+
+	dprintk("%s:Return %p\n", __FUNCTION__, ret);
+	return ret;
+}
+
 /* Update the file's layout for the given range and iomode.
  * Layout is retreived from the server if needed.
  */
