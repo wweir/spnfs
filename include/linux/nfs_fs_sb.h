@@ -131,6 +131,20 @@ struct nfs_server {
 	struct nfs4_session    *session;	/* NFSv4.1 session */
 #endif
 
+#ifdef CONFIG_PNFS
+	u32				pnfs_fs_ltype;/* fs_layouttype attr */
+	struct pnfs_layoutdriver_type  *pnfs_curr_ld; /* Active layout driver */
+	struct pnfs_mount_type         *pnfs_mountid; /* Mount identifier for
+							 layout driver */
+	/* Data server values will equal NFS server values if
+	 * no pNFS layout driver exists for the mountpoint
+	 */
+	unsigned int	ds_rsize;	/* Data server read size */
+	unsigned int	ds_rpages;	/* Data server read size (in pages) */
+	unsigned int	ds_wsize;	/* Data server write size */
+	unsigned int	ds_wpages;	/* Data server write size (in pages) */
+#endif /* CONFIG_PNFS */
+
 	void (*destroy)(struct nfs_server *);
 
 	atomic_t active; /* Keep trace of any activity to this server */
