@@ -587,29 +587,6 @@ pnfs_enabled_sb(struct nfs_server *nfss)
 	return 1;
 }
 
-/* Retrieve and return whether the layout driver wants I/O requests
- * to first travel through NFS I/O processing functions and the page
- * cache.  By default return 1;
- */
-static int
-use_page_cache(struct inode *inode)
-{
-	struct nfs_server *nfss = NFS_SERVER(inode);
-	struct nfs_inode *nfsi = NFS_I(inode);
-	int use_pagecache = 0;
-
-	if (!pnfs_enabled_sb(nfss) ||
-	    !nfss->pnfs_curr_ld->ld_policy_ops ||
-	    !nfss->pnfs_curr_ld->ld_policy_ops->use_pagecache)
-		return 1;
-
-	use_pagecache = nfss->pnfs_curr_ld->ld_policy_ops->use_pagecache(nfsi->current_layout, inode);
-	if (use_pagecache > 0)
-		return 1;
-	else
-		return 0;
-}
-
 size_t
 pnfs_getthreshold(struct inode *inode, int iswrite)
 {
@@ -1176,67 +1153,6 @@ int pnfs_try_to_read_data(struct nfs_read_data *data,
 	}
 }
 
-/*
- * Call the appropriate parallel I/O subsystem read function.
- * If no I/O device driver exists, or one does match the returned
- * fstype, then call regular NFS processing.
- */
-ssize_t
-pnfs_file_read(struct file *filp,
-	       char __user *buf,
-	       size_t count,
-	       loff_t *pos)
-{
-	struct dentry  *dentry = filp->f_dentry;
-	struct inode *inode = dentry->d_inode;
-	ssize_t result = count;
-	struct nfs_inode *nfsi = NFS_I(inode);
-	struct nfs_server *nfss = NFS_SERVER(inode);
-
-	dfprintk(IO, "%s:(%s/%s, %lu@%lu)\n",
-		 __FUNCTION__,
-		 dentry->d_parent->d_name.name,
-		 dentry->d_name.name,
-		 (unsigned long) count,
-		 (unsigned long) *pos);
-
-	/* Using NFS page cache with pNFS */
-	if (use_page_cache(inode))
-		goto fallback;
-
-	/* Small I/O Optimization */
-	if (below_threshold(inode, count, 0)) {
-		dfprintk(IO, "%s: Below Read threshold, using NFSv4 read\n", __FUNCTION__);
-		goto fallback;
-	}
-
-	/* Step 1: Retrieve and set layout if not allready cached*/
-	result = virtual_update_layout(inode,
-				(struct nfs_open_context *)filp->private_data,
-				count,
-				*pos,
-				IOMODE_READ);
-	if (result) {
-		dfprintk(IO, "%s: Could not get layout result=%Zd, using NFSv4 read\n", __FUNCTION__, result);
-		goto fallback;
-	}
-
-	/* Step 2: Call I/O device driver's read function */
-	if (!nfss->pnfs_curr_ld->ld_io_ops &&
-	    nfss->pnfs_curr_ld->ld_io_ops->read) {
-		dfprintk(IO, "%s: No LD read function, using NFSv4 read\n", __FUNCTION__);
-		goto fallback;
-	}
-
-	result = nfss->pnfs_curr_ld->ld_io_ops->read(nfsi->current_layout,
-						     filp, buf, count, pos);
-	dprintk("%s end (err:%Zd)\n", __FUNCTION__, result);
-	return result;
-
-fallback:
-	return do_sync_read(filp, buf, count, pos);
-}
-
 int pnfs_try_to_write_data(struct nfs_write_data *data,
 				const struct rpc_call_ops *call_ops, int how)
 {
@@ -1251,85 +1167,6 @@ int pnfs_try_to_write_data(struct nfs_write_data *data,
 		data->how = how;
 		return pnfs_writepages(data, how);
 	}
-}
-
-/*
- * Call the appropriate parallel I/O subsystem write function.
- * If no I/O device driver exists, or one does match the returned
- * fstype, then call regular NFS processing.
- */
-ssize_t
-pnfs_file_write(struct file *filp,
-		const char __user *buf,
-		size_t count,
-		loff_t *pos)
-{
-	struct dentry  *dentry = filp->f_dentry;
-	struct inode *inode = dentry->d_inode;
-	ssize_t result = count;
-	loff_t pos_orig = *pos;
-	const int isblk = S_ISBLK(inode->i_mode);
-	struct nfs_server *nfss = NFS_SERVER(inode);
-	struct nfs_inode *nfsi = NFS_I(inode);
-
-	dfprintk(IO, "%s:(%s/%s(%ld), %lu@%lu)\n",
-		 __FUNCTION__,
-		 dentry->d_parent->d_name.name,
-		 dentry->d_name.name,
-		 inode->i_ino,
-		 (unsigned long) count,
-		 (unsigned long) *pos);
-
-	/* Step 1: Retrieve and set layout if not allready cached*/
-	result = virtual_update_layout(inode,
-				(struct nfs_open_context *)filp->private_data,
-				count,
-				*pos,
-				IOMODE_RW);
-	if (result) {
-		dfprintk(IO, "%s: Could not get layout result=%Zd, using NFSv4 write\n", __func__, result);
-		goto fallback;
-	}
-
-	/* Using NFS page cache with pNFS */
-	if (use_page_cache(inode))
-		goto fallback;
-
-	/* Small I/O Optimization */
-	if (below_threshold(inode, count, 1)) {
-		dfprintk(IO, "%s: Below write threshold, using NFSv4 write\n", __FUNCTION__);
-		goto fallback;
-	}
-
-	/* Need to adjust write param if this is an append, etc */
-	generic_write_checks(filp, pos, &count, isblk);
-
-	dprintk("%s:Readjusted %lu@%lu)\n", __FUNCTION__,
-		(unsigned long) count, (unsigned long) *pos);
-
-	/* Step 2: Call I/O device driver's write function */
-	if (!nfss->pnfs_curr_ld->ld_io_ops &&
-	    nfss->pnfs_curr_ld->ld_io_ops->write) {
-		dfprintk(IO, "%s: No LD write function, using NFSv4 write\n", __FUNCTION__);
-		goto fallback;
-	}
-
-	result = nfss->pnfs_curr_ld->ld_io_ops->write(nfsi->current_layout,
-						      filp, buf, count, pos);
-
-	/* Update layoutcommit info.
-	 * TODO: This assumes the layout driver wrote synchronously.
-	 * This is fine for PVFS2, the only current layout driver to
-	 * use the read/write interface. */
-	if (result > 0) {
-		pnfs_update_last_write(nfsi, pos_orig, result);
-		pnfs_need_layoutcommit(nfsi, (struct nfs_open_context *)filp->private_data);
-	}
-	dprintk("%s end (err:%Zd)\n", __FUNCTION__, result);
-	return result;
-
-fallback:
-	return do_sync_write(filp, buf, count, pos);
 }
 
 int pnfs_try_to_commit(struct nfs_write_data *data)
@@ -1389,59 +1226,6 @@ pnfs_commit(struct nfs_write_data *data, int sync)
 	result = nfss->pnfs_curr_ld->ld_io_ops->commit(nfsi->current_layout,
 						       data->inode, sync, data);
 
-	dprintk("%s end (err:%d)\n", __FUNCTION__, result);
-	return result;
-}
-
-int
-pnfs_fsync(struct file *file, struct dentry *dentry, int datasync)
-{
-	int result = 0;
-	struct inode *inode = dentry->d_inode;
-	struct nfs_inode *nfsi = NFS_I(inode);
-	struct nfs_server *nfss = NFS_SERVER(inode);
-	dprintk("%s: Begin\n", __FUNCTION__);
-
-	/* pNFS is only for v4
-	 * Only fsync nfs if an outstanding nfs request requires it
-	 * Some problems seem to be happening if ncommit and ndirty
-	 * are both 0 and I still don't call nfs_fsync
-	 */
-	if (use_page_cache(inode)) {
-		dfprintk(IO, "%s: Calling nfs_fsync\n", __FUNCTION__);
-		result = nfs_fsync(file, dentry, datasync);
-		goto out;
-	}
-
-	if (!nfss->pnfs_curr_ld->ld_io_ops->fsync) {
-		dprintk("%s: Layoutdriver lacks fsync function!\n", __FUNCTION__);
-		result = -EIO;
-		goto out;
-	}
-
-	/* Retrieve and set layout if not allready cached.
-	 * This is necessary since read/write may not have necessarily
-	 * been already called.  Just put in any random count and offset.
-	 * TODO: May need special count and offset depending on how file system
-	 * work that actually pay attention to such values.
-	 */
-	result = virtual_update_layout(inode,
-				(struct nfs_open_context *)file->private_data,
-				0,
-				0,
-				IOMODE_RW);
-	if (result) {
-		result = -EIO;
-		goto out;
-	}
-
-	dprintk("%s: Calling layout driver fsync\n", __FUNCTION__);
-	result = nfss->pnfs_curr_ld->ld_io_ops->fsync(nfsi->current_layout,
-						      file,
-						      dentry,
-						      datasync);
-
-out:
 	dprintk("%s end (err:%d)\n", __FUNCTION__, result);
 	return result;
 }
@@ -1661,7 +1445,6 @@ out_unlock:
 /* Callback operations for layout drivers.
  */
 struct pnfs_client_operations pnfs_ops = {
-	.nfs_fsync = nfs_fsync,
 	.nfs_getdevicelist = pnfs_getdevicelist,
 	.nfs_getdeviceinfo = pnfs_getdeviceinfo,
 	.nfs_readlist_complete = pnfs_read_done,
