@@ -664,18 +664,6 @@ nfserr:
 	return NULL;
 }
 
-/* Call nfs fsync function to flush buffers and eventually call
- * the filelayout_write_pagelist and filelayout_commit functions.
- */
-int
-filelayout_fsync(struct pnfs_layout_type *layoutid,
-		struct file *file,
-		struct dentry *dentry,
-		int datasync)
-{
-	return pnfs_callback_ops->nfs_fsync(file, dentry, datasync);
-}
-
 /* TODO: Technically we would need to execute a COMMIT op to each
  * data server on which a page in 'pages' exists.
  * Once we fix this, we will need to invoke the pnfs_commit_complete callback.
@@ -825,14 +813,6 @@ boundary:
 	return (p_stripe == r_stripe);
 }
 
-/* Use the NFSv4 page cache
-*/
-int
-filelayout_use_pagecache(struct pnfs_layout_type *layoutid, struct inode *inode)
-{
-	return 1;
-}
-
 /* Issue a layoutget in the same compound as OPEN
  */
 int
@@ -848,7 +828,6 @@ filelayout_get_io_threshold(struct pnfs_layout_type *layoutid, struct inode *ino
 }
 
 struct layoutdriver_io_operations filelayout_io_operations = {
-	.fsync                   = filelayout_fsync,
 	.commit                  = filelayout_commit,
 	.read_pagelist           = filelayout_read_pagelist,
 	.write_pagelist          = filelayout_write_pagelist,
@@ -864,7 +843,6 @@ struct layoutdriver_policy_operations filelayout_policy_operations = {
 	.get_stripesize        = filelayout_get_stripesize,
 	.gather_across_stripes = filelayout_gather_across_stripes,
 	.pg_test               = filelayout_pg_test,
-	.use_pagecache         = filelayout_use_pagecache,
 	.layoutget_on_open     = filelayout_layoutget_on_open,
 	.get_read_threshold    = filelayout_get_io_threshold,
 	.get_write_threshold   = filelayout_get_io_threshold,
