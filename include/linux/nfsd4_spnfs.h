@@ -43,7 +43,25 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SPNFS_STATUS_FAIL		0x04
 #define SPNFS_STATUS_SUCCESS		0x08
 
+#define SPNFS_TYPE_GETDEVICELIST	0x04
 #define	SPNFS_TYPE_CLOSE		0x08
+
+/* getdevicelist */
+struct spnfs_msg_getdevicelist_args {
+	unsigned long inode;
+};
+
+struct spnfs_getdevicelist_dev {
+	u_int32_t devid;
+	char netid[5];
+	char addr[29];
+};
+
+struct spnfs_msg_getdevicelist_res {
+	int status;
+	int count;
+	struct spnfs_getdevicelist_dev dlist[SPNFS_MAX_DATA_SERVERS];
+};
 
 /* close */
 /* No op for daemon */
@@ -57,10 +75,12 @@ struct spnfs_msg_close_res {
 
 /* bundle args and responses */
 union spnfs_msg_args {
+	struct spnfs_msg_getdevicelist_args     getdevicelist_args;
 	struct spnfs_msg_close_args		close_args;
 };
 
 union spnfs_msg_res {
+	struct spnfs_msg_getdevicelist_res      getdevicelist_res;
 	struct spnfs_msg_close_res		close_res;
 };
 
@@ -83,6 +103,8 @@ struct spnfs {
 	struct mutex		spnfs_lock;       /* Serializes upcalls */
 	struct mutex		spnfs_plock;
 };
+
+int spnfs_getdevicelist(struct super_block *, void *);
 
 int nfsd_spnfs_new(void);
 void nfsd_spnfs_delete(void);
