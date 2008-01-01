@@ -62,6 +62,115 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 extern struct spnfs *global_spnfs;
 
+int
+spnfs_getdevicelist(struct super_block *sb, void *get_dev_list_arg_p)
+{
+	struct spnfs *spnfs = global_spnfs;   /* XXX keep up the pretence */
+	struct spnfs_msg im;
+	union spnfs_msg_res res;
+
+	struct nfsd4_pnfs_getdevlist *gdlp = NULL;
+	struct nfsd4_pnfs_devlist *dlp = NULL, *item = NULL;
+	struct pnfs_filelayout_devaddr *fldap = NULL;
+	int status = 0;
+	int i = 0, count = 0, len = 0;
+	char *strp = NULL;
+
+	im.im_type = SPNFS_TYPE_GETDEVICELIST;
+	im.im_args.getdevicelist_args.inode = sb->s_root->d_inode->i_ino;
+
+	/* call function to queue the msg for upcall */
+	if (spnfs_upcall(spnfs, &im, &res) != 0) {
+		dprintk("failed spnfs upcall: getdevicelist\n");
+		status = -EIO;
+		goto gdevl_cleanup;
+	}
+	count = res.getdevicelist_res.count;
+
+	dlp = kmalloc(count * sizeof(*dlp), GFP_KERNEL);
+	if (!dlp) {
+		status = -ENOMEM;
+		goto gdevl_cleanup;
+	}
+
+	gdlp = (struct nfsd4_pnfs_getdevlist *)get_dev_list_arg_p;
+	gdlp->gd_type = 1L;
+	gdlp->gd_cookie = 0LL;
+	gdlp->gd_verf = 0LL;
+	gdlp->gd_ops = sb->s_export_op;
+	gdlp->gd_devlist_len = res.getdevicelist_res.count;
+	gdlp->gd_devlist = dlp;
+	gdlp->gd_eof = 1;
+
+	item = dlp;
+	for (i = 0; i < count; i++) {
+		/*
+		 * Copy the device ID
+		 */
+		item->dev_id = res.getdevicelist_res.dlist[i].devid;
+
+		/*
+		 * Build the device address
+		 */
+		fldap = kmalloc(sizeof(*fldap), GFP_KERNEL);
+		if (!fldap) {
+			status = -ENOMEM;
+			goto gdevl_cleanup;
+		}
+
+		/*
+		 * Copy the netid into the device address, for example: "tcp"
+		 */
+		strp = res.getdevicelist_res.dlist[i].netid;
+		len = strlen(strp);
+		fldap->r_netid.data = kmalloc(len, GFP_KERNEL);
+		if (fldap->r_netid.data == NULL)
+			goto gdevl_cleanup;
+		memcpy(fldap->r_netid.data,
+			res.getdevicelist_res.dlist[i].netid, len);
+		fldap->r_netid.len = len;
+
+		/*
+		 * Copy the network address into the device address,
+		 * for example: "10.35.9.16.08.01"
+		 */
+		strp = res.getdevicelist_res.dlist[i].addr;
+		len = strlen(strp);
+		fldap->r_addr.data = kmalloc(len, GFP_KERNEL);
+		if (fldap->r_addr.data == NULL)
+			goto gdevl_cleanup;
+		memcpy(fldap->r_addr.data,
+		       res.getdevicelist_res.dlist[i].addr, len);
+		fldap->r_addr.len = len;
+
+		item->dev_addr = fldap;
+
+		/*
+		 * Work on the next devlist item
+		 */
+		item++;
+	}
+
+	return status;
+
+gdevl_cleanup:
+	if (dlp) {
+		item = dlp;
+		for (i = 0; i < count; i++) {
+			fldap = item->dev_addr;
+			if (fldap) {
+				kfree(fldap->r_netid.data);
+				kfree(fldap->r_addr.data);
+			}
+			kfree(fldap);
+			item++;
+		}
+		kfree(dlp);
+	}
+
+	return status;
+}
+
 /* DMXXX: this is only a test function atm.  Unrelated to close. */
 int
 spnfs_close(void)
