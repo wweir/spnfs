@@ -22,8 +22,6 @@ int pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range
 int pnfs_return_layout_rpc(struct nfs_server *server, struct nfs4_pnfs_layoutreturn_arg *argp);
 void set_pnfs_layoutdriver(struct super_block *sb, struct nfs_fh *fh, u32 id);
 void unmount_pnfs_layoutdriver(struct super_block *sb);
-ssize_t pnfs_file_write(struct file *filp, const char __user *buf, size_t count, loff_t *pos);
-ssize_t pnfs_file_read(struct file *filp, char __user *buf, size_t count, loff_t *pos);
 int pnfs_use_read(struct inode *inode, ssize_t count);
 int pnfs_use_ds_io(struct list_head *, struct inode *, int);
 
@@ -32,7 +30,6 @@ int pnfs_writepages(struct nfs_write_data *wdata, int how);
 int pnfs_try_to_write_data(struct nfs_write_data *, const struct rpc_call_ops *, int);
 int pnfs_readpages(struct nfs_read_data *rdata);
 int pnfs_try_to_read_data(struct nfs_read_data *data, const struct rpc_call_ops *call_ops);
-int pnfs_fsync(struct file *file, struct dentry *dentry, int datasync);
 int pnfs_initialize(void);
 void pnfs_uninitialize(void);
 void pnfs_layoutcommit_done(struct pnfs_layoutcommit_data *data, int status);
