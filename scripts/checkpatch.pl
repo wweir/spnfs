@@ -534,7 +534,7 @@ sub annotate_values {
 			$preprocessor = 1;
 			$paren_type[$paren] = 'N';
 
-		} elsif ($cur =~ /^(#\s*(?:ifdef|ifndef|if|else|endif))/o) {
+		} elsif ($cur =~ /^(#\s*(?:ifdef|ifndef|if|else|elif|endif))/o) {
 			print "PRE($1)\n" if ($debug);
 			$preprocessor = 1;
 			$type = 'N';
