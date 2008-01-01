@@ -33,7 +33,6 @@ int pnfs_try_to_write_data(struct nfs_write_data *, const struct rpc_call_ops *,
 int pnfs_readpages(struct nfs_read_data *rdata);
 int pnfs_try_to_read_data(struct nfs_read_data *data, const struct rpc_call_ops *call_ops);
 int pnfs_fsync(struct file *file, struct dentry *dentry, int datasync);
-unsigned int pnfs_getpages(struct inode *inode, int iswrite);
 int pnfs_initialize(void);
 void pnfs_uninitialize(void);
 void pnfs_layoutcommit_done(struct pnfs_layoutcommit_data *data, int status);
