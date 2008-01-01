@@ -171,6 +171,72 @@ gdevl_cleanup:
 	return status;
 }
 
+int
+spnfs_getdeviceinfo(struct super_block *sb, void *p)
+{
+	struct spnfs *spnfs = global_spnfs;
+	struct nfsd4_pnfs_getdevinfo *gdinfo;
+	struct spnfs_msg im;
+	union spnfs_msg_res res;
+	struct pnfs_filelayout_devaddr *fldap = NULL;
+	int len, status;
+	char *strp;
+
+	gdinfo = (struct nfsd4_pnfs_getdevinfo *)p;
+	im.im_type = SPNFS_TYPE_GETDEVICEINFO;
+	im.im_args.getdeviceinfo_args.devid = gdinfo->gd_dev_id;
+	/* call function to queue the msg for upcall */
+	status = spnfs_upcall(spnfs, &im, &res);
+	if (status != 0) {
+		dprintk("%s spnfs upcall failure: %d\n", __FUNCTION__, status);
+		status = -EIO;
+		goto getdeviceinfo_out;
+	}
+	status = res.open_res.status;
+
+	gdinfo->gd_type = 1L;
+	gdinfo->gd_devlist_len = 1L; /* DMXXX why is there a len here? */
+
+	fldap = kmalloc(sizeof(*fldap), GFP_KERNEL);
+	if (!fldap) {
+		status = -ENOMEM;
+		fldap = NULL;
+		goto getdeviceinfo_out;
+	}
+	strp = res.getdeviceinfo_res.dinfo.netid;
+	len = strlen(strp);
+	fldap->r_netid.data = kmalloc(len, GFP_KERNEL);
+	if (fldap->r_netid.data == NULL) {
+		kfree(fldap);
+		status = -ENOMEM;
+		fldap = NULL;
+		goto getdeviceinfo_out;
+	}
+	memcpy(fldap->r_netid.data, res.getdeviceinfo_res.dinfo.netid, len);
+	fldap->r_netid.len = len;
+
+	/*
+	 * Copy the network address into the device address,
+	 * for example: "10.35.9.16.08.01"
+	 */
+	strp = res.getdeviceinfo_res.dinfo.addr;
+	len = strlen(strp);
+	fldap->r_addr.data = kmalloc(len, GFP_KERNEL);
+	if (fldap->r_addr.data == NULL) {
+		kfree(fldap->r_netid.data);
+		kfree(fldap);
+		fldap = NULL;
+		status = -ENOMEM;
+		goto getdeviceinfo_out;
+	}
+	memcpy(fldap->r_addr.data, res.getdeviceinfo_res.dinfo.addr, len);
+	fldap->r_addr.len = len;
+
+getdeviceinfo_out:
+	gdinfo->gd_devaddr = (void *)fldap;
+	return status;
+}
+
 /* DMXXX: this is only a test function atm.  Unrelated to close. */
 int
 spnfs_close(void)
