@@ -445,6 +445,9 @@ static int check_export(struct inode *inode, int flags, unsigned char *uuid)
 		if (!inode->i_sb->s_export_op->get_devicelist)
 			inode->i_sb->s_export_op->get_devicelist =
 				spnfs_getdevicelist;
+		if (!inode->i_sb->s_export_op->get_deviceinfo)
+			inode->i_sb->s_export_op->get_deviceinfo =
+				spnfs_getdeviceinfo;
 	} else
 		dprintk("%s spnfs not in use\n", __FUNCTION__);
 #endif /* CONFIG_PNFSD */
