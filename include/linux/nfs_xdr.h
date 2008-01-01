@@ -1079,7 +1079,8 @@ struct nfs_write_data {
 #endif
 #if defined(CONFIG_PNFS)
 	const struct rpc_call_ops *call_ops;
-	struct rpc_clnt		*pnfs_client;	/* Holds pNFS device across async calls */
+	struct rpc_clnt		*pnfs_client;	/* Holds pNFS device across
+						   async calls */
 	int			pnfsflags;
 	__u64			orig_offset;
 	int			how;		/* for FLUSH_STABLE */
@@ -1090,6 +1091,12 @@ struct nfs_write_data {
 
 struct nfs_access_entry;
 struct nfs_client;
+#if defined(CONFIG_PNFS)
+struct nfs4_pnfs_layoutget;
+struct pnfs_layoutcommit_data;
+struct pnfs_layoutcommit_data;
+struct nfs4_pnfs_layoutreturn;
+#endif /* CONFIG_PNFS */
 
 /*
  * RPC procedure vector for NFSv2/NFSv3 demuxing
@@ -1168,7 +1175,6 @@ struct nfs_rpc_ops {
 	int	(*wpages) (struct inode *);
 	u32	(*boundary) (struct inode *);
 	int	(*pnfs_layoutget)(struct nfs4_pnfs_layoutget *layout);
-	void	(*pnfs_layoutcommit_setup)(struct pnfs_layoutcommit_data *);
 	int	(*pnfs_layoutcommit)  (struct pnfs_layoutcommit_data *);
 	int	(*pnfs_layoutreturn)(struct nfs4_pnfs_layoutreturn *layout);
 	int	(*pagein_one) (struct list_head *head, struct inode *inode);
@@ -1191,6 +1197,7 @@ extern const struct nfs_rpc_ops	nfs_v3_clientops;
 extern const struct nfs_rpc_ops	nfs_v4_clientops;
 extern const struct nfs_rpc_ops	nfs_v40_clientops;
 extern const struct nfs_rpc_ops	nfs_v41_clientops;
+extern const struct nfs_rpc_ops	pnfs_v41_clientops;
 extern const struct nfs_rpc_ops	*nfsv4_minorversion_clientops[];
 extern struct rpc_version *nfs4_minorversions[];
 extern struct rpc_procinfo *nfs4_minorversion_procedures[];
