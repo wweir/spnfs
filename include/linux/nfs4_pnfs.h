@@ -48,16 +48,7 @@ struct layoutdriver_io_operations {
 	int (*flush_one) (struct inode *inode, struct list_head *head, unsigned int npages, size_t count, int how);
 
 
-	/* Functions that do not use the pagecache.
-	 * If use_pagecache == 0, then these functions must be implemented.
-	 */
-	ssize_t (*read) (struct pnfs_layout_type *layoutid, struct file *, char __user *, size_t, loff_t *);
-	ssize_t (*write) (struct pnfs_layout_type *layoutid, struct file *, const char __user *, size_t, loff_t *);
-	ssize_t (*readv) (struct pnfs_layout_type *layoutid, struct file *, const struct iovec *, unsigned long, loff_t *);
-	ssize_t (*writev) (struct pnfs_layout_type *layoutid, struct file *, const struct iovec *, unsigned long, loff_t *);
-
 	/* Consistency ops */
-	int (*fsync) (struct pnfs_layout_type *layoutid, struct file *, struct dentry *, int);
 	/* 2 problems:
 	 * 1) the page list contains nfs_pages, NOT pages
 	 * 2) currently the NFS code doesn't create a page array (as it does with read/write)
@@ -106,11 +97,6 @@ struct layoutdriver_policy_operations {
 	/* Write requests under this value are sent to the NFSv4 server */
 	ssize_t (*get_write_threshold) (struct pnfs_layout_type *, struct inode *);
 
-	/* Use the linux page cache prior to calling layout driver
-	 * read/write functions
-	 */
-	int (*use_pagecache) (struct pnfs_layout_type *, struct inode *);
-
 	/* Should the pNFS client issue a layoutget call in the
 	 * same compound as the OPEN operation?
 	 */
@@ -150,7 +136,6 @@ struct pnfs_devicelist {
  * E.g., getdeviceinfo, I/O callbacks, etc
  */
 struct pnfs_client_operations {
-	int (*nfs_fsync) (struct file *file, struct dentry *dentry, int datasync);
 	int (*nfs_getdevicelist) (struct super_block *sb, struct nfs_fh *fh, struct pnfs_devicelist *devlist);
 	int (*nfs_getdeviceinfo) (struct inode *inode, u32 dev_id, struct pnfs_device *dev);
 
