@@ -349,6 +349,12 @@ getdeviceinfo_out:
 }
 
 int
+spnfs_setattr(void)
+{
+	return 0;
+}
+
+int
 spnfs_open(struct inode *inode, void *p)
 {
 	struct spnfs *spnfs = global_spnfs; /* keep up the pretence */
