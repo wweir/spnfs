@@ -48,6 +48,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SPNFS_TYPE_OPEN			0x07
 #define	SPNFS_TYPE_CLOSE		0x08
 #define SPNFS_TYPE_CREATE		0x09
+#define SPNFS_TYPE_REMOVE		0x0a
 
 /* getdevicelist */
 struct spnfs_msg_getdevicelist_args {
@@ -109,6 +110,15 @@ struct spnfs_msg_create_res {
 };
 */
 
+/* remove */
+struct spnfs_msg_remove_args {
+	unsigned long inode;
+};
+
+struct spnfs_msg_remove_res {
+	int status;
+};
+
 /* bundle args and responses */
 union spnfs_msg_args {
 	struct spnfs_msg_getdevicelist_args     getdevicelist_args;
@@ -118,6 +128,7 @@ union spnfs_msg_args {
 /*
 	struct spnfs_msg_create_args		create_args;
 */
+	struct spnfs_msg_remove_args		remove_args;
 };
 
 union spnfs_msg_res {
@@ -128,6 +139,7 @@ union spnfs_msg_res {
 /*
 	struct spnfs_msg_create_res		create_res;
 */
+	struct spnfs_msg_remove_res		remove_res;
 };
 
 /* a spnfs message, args and response */
@@ -154,6 +166,7 @@ int spnfs_getdevicelist(struct super_block *, void *);
 int spnfs_getdeviceinfo(struct super_block *, void *);
 int spnfs_open(struct inode *, void *);
 int spnfs_get_state(struct inode *, void *, void *);
+int spnfs_remove(unsigned long ino);
 
 int nfsd_spnfs_new(void);
 void nfsd_spnfs_delete(void);
