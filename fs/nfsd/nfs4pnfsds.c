@@ -285,9 +285,15 @@ nfsv4_ds_get_state(struct svc_fh *cfh, stateid_t *stidp)
 
 	dprintk("pNFSD: %s\n", __func__);
 
+/*
+ * labiaga
+ * XXX Ignore caching until we have a real stateid to validate
+ */
+/*
 	dsp = find_pnfs_ds_stateid(stidp);
 	if (dsp)
 		return dsp;
+*/
 	memcpy(&gs.stid, stidp, sizeof(stateid_t));
 	sb = ino->i_sb;
 	if (sb && sb->s_export_op->get_state) {
