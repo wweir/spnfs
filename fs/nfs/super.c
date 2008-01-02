@@ -1906,6 +1906,7 @@ int nfs4_init_pnfs(struct super_block *sb, struct nfs_server *server,
 	switch (clp->cl_minorversion) {
 	case 1:
 		set_pnfs_layoutdriver(sb, fh, server->pnfs_fs_ltype);
+		pnfs_set_ds_iosize(server);
 		break;
 	case 0:
 		break;
