@@ -162,6 +162,12 @@ layoutget_cleanup:
 }
 
 int
+spnfs_layoutcommit(void)
+{
+	return 0;
+}
+
+int
 spnfs_getdevicelist(struct super_block *sb, void *get_dev_list_arg_p)
 {
 	struct spnfs *spnfs = global_spnfs;   /* XXX keep up the pretence */
