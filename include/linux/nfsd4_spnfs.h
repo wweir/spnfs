@@ -45,6 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define SPNFS_TYPE_LAYOUTGET		0x01
 #define SPNFS_TYPE_LAYOUTCOMMIT		0x02
+#define SPNFS_TYPE_LAYOUTRETURN		0x03
 #define SPNFS_TYPE_GETDEVICELIST	0x04
 #define SPNFS_TYPE_GETDEVICEINFO	0x05
 #define SPNFS_TYPE_OPEN			0x07
@@ -84,6 +85,16 @@ struct spnfs_msg_layoutcommit_args {
 struct spnfs_msg_layoutcommit_res {
 	int status;
 };
+
+/* layoutreturn */
+/* No op for the daemon */
+/*
+struct spnfs_msg_layoutreturn_args {
+};
+
+struct spnfs_msg_layoutreturn_res {
+};
+*/
 
 /* getdevicelist */
 struct spnfs_msg_getdevicelist_args {
@@ -158,6 +169,9 @@ struct spnfs_msg_remove_res {
 union spnfs_msg_args {
 	struct spnfs_msg_layoutget_args		layoutget_args;
 	struct spnfs_msg_layoutcommit_args	layoutcommit_args;
+/*
+	struct spnfs_msg_layoutreturn_args	layoutreturn_args;
+*/
 	struct spnfs_msg_getdevicelist_args     getdevicelist_args;
 	struct spnfs_msg_getdeviceinfo_args     getdeviceinfo_args;
 	struct spnfs_msg_open_args		open_args;
@@ -171,6 +185,9 @@ union spnfs_msg_args {
 union spnfs_msg_res {
 	struct spnfs_msg_layoutget_res		layoutget_res;
 	struct spnfs_msg_layoutcommit_res	layoutcommit_res;
+/*
+	struct spnfs_msg_layoutreturn_res	layoutreturn_res;
+*/
 	struct spnfs_msg_getdevicelist_res      getdevicelist_res;
 	struct spnfs_msg_getdeviceinfo_res      getdeviceinfo_res;
 	struct spnfs_msg_open_res		open_res;
@@ -204,6 +221,7 @@ struct spnfs {
 int spnfs_layout_type(void);
 int spnfs_layoutget(struct inode *, void *);
 int spnfs_layoutcommit(void);
+int spnfs_layoutreturn(struct inode *, void *);
 int spnfs_getdevicelist(struct super_block *, void *);
 int spnfs_getdeviceinfo(struct super_block *, void *);
 int spnfs_open(struct inode *, void *);
