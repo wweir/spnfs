@@ -48,6 +48,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SPNFS_TYPE_LAYOUTRETURN		0x03
 #define SPNFS_TYPE_GETDEVICELIST	0x04
 #define SPNFS_TYPE_GETDEVICEINFO	0x05
+#define SPNFS_TYPE_SETATTR		0x06
 #define SPNFS_TYPE_OPEN			0x07
 #define	SPNFS_TYPE_CLOSE		0x08
 #define SPNFS_TYPE_CREATE		0x09
@@ -123,6 +124,16 @@ struct spnfs_msg_getdeviceinfo_res {
 	struct spnfs_getdevicelist_dev dinfo;
 };
 
+/* setattr */
+struct spnfs_msg_setattr_args {
+	unsigned long inode;
+	int file_size;
+};
+
+struct spnfs_msg_setattr_res {
+	int status;
+};
+
 /* open */
 struct spnfs_msg_open_args {
 	unsigned long inode;
@@ -174,6 +185,7 @@ union spnfs_msg_args {
 */
 	struct spnfs_msg_getdevicelist_args     getdevicelist_args;
 	struct spnfs_msg_getdeviceinfo_args     getdeviceinfo_args;
+	struct spnfs_msg_setattr_args		setattr_args;
 	struct spnfs_msg_open_args		open_args;
 	struct spnfs_msg_close_args		close_args;
 /*
@@ -190,6 +202,7 @@ union spnfs_msg_res {
 */
 	struct spnfs_msg_getdevicelist_res      getdevicelist_res;
 	struct spnfs_msg_getdeviceinfo_res      getdeviceinfo_res;
+	struct spnfs_msg_setattr_res		setattr_res;
 	struct spnfs_msg_open_res		open_res;
 	struct spnfs_msg_close_res		close_res;
 /*
@@ -224,6 +237,7 @@ int spnfs_layoutcommit(void);
 int spnfs_layoutreturn(struct inode *, void *);
 int spnfs_getdevicelist(struct super_block *, void *);
 int spnfs_getdeviceinfo(struct super_block *, void *);
+int spnfs_setattr(void);
 int spnfs_open(struct inode *, void *);
 int spnfs_get_state(struct inode *, void *, void *);
 int spnfs_remove(unsigned long ino);
