@@ -442,6 +442,9 @@ static int check_export(struct inode *inode, int flags, unsigned char *uuid)
 	 */
 	if (spnfs_enabled()) {
 		dprintk("set spnfs export structure...\n");
+		if (!inode->i_sb->s_export_op->layout_type)
+			inode->i_sb->s_export_op->layout_type =
+				spnfs_layout_type;
 		if (!inode->i_sb->s_export_op->get_devicelist)
 			inode->i_sb->s_export_op->get_devicelist =
 				spnfs_getdevicelist;
@@ -451,6 +454,9 @@ static int check_export(struct inode *inode, int flags, unsigned char *uuid)
 		if (!inode->i_sb->s_export_op->propagate_open)
 			inode->i_sb->s_export_op->propagate_open =
 				spnfs_open;
+		if (!inode->i_sb->s_export_op->layout_get)
+			inode->i_sb->s_export_op->layout_get =
+				spnfs_layoutget;
 	} else
 		dprintk("%s spnfs not in use\n", __FUNCTION__);
 	/*
