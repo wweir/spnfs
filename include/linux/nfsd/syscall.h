@@ -37,6 +37,7 @@
 /*#define NFSCTL_GETFH		6	/ * get an fh by ino DISCARDED */
 #define NFSCTL_GETFD		7	/* get an fh by path (used by mountd) */
 #define	NFSCTL_GETFS		8	/* get an fh by path with max FH len */
+#define	NFSCTL_FD2FH		9	/* get a fh from a fd */
 
 /* SVC */
 struct nfsctl_svc {
@@ -79,6 +80,11 @@ struct nfsctl_fsparm {
 	int			gd_maxlen;
 };
 
+/* FD2FH */
+struct nfsctl_fd2fh {
+	int			fd;
+};
+
 /*
  * This is the argument union.
  */
@@ -90,6 +96,7 @@ struct nfsctl_arg {
 		struct nfsctl_export	u_export;
 		struct nfsctl_fdparm	u_getfd;
 		struct nfsctl_fsparm	u_getfs;
+		struct nfsctl_fd2fh	u_fd2fh;
 		/*
 		 * The following dummy member is needed to preserve binary compatibility
 		 * on platforms where alignof(void*)>alignof(int).  It's needed because
@@ -103,6 +110,7 @@ struct nfsctl_arg {
 #define ca_export	u.u_export
 #define ca_getfd	u.u_getfd
 #define	ca_getfs	u.u_getfs
+#define	ca_fd2fh	u.u_fd2fh
 };
 
 union nfsctl_res {
