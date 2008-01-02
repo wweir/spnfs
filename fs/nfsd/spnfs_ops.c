@@ -168,6 +168,12 @@ spnfs_layoutcommit(void)
 }
 
 int
+spnfs_layoutreturn(struct inode *inode, void *pnfs_layout_return_p)
+{
+	return 0;
+}
+
+int
 spnfs_getdevicelist(struct super_block *sb, void *get_dev_list_arg_p)
 {
 	struct spnfs *spnfs = global_spnfs;   /* XXX keep up the pretence */
