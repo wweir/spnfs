@@ -63,6 +63,105 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 extern struct spnfs *global_spnfs;
 
 int
+spnfs_layout_type(void)
+{
+	return LAYOUT_NFSV4_FILES;
+}
+
+int
+spnfs_layoutget(struct inode *inode, void *pnfs_layout_get_p)
+{
+	struct spnfs *spnfs = global_spnfs; /* keep up the pretence */
+	struct spnfs_msg im;
+	union spnfs_msg_res res;
+	struct nfsd4_pnfs_layoutget *lgp =
+		(struct nfsd4_pnfs_layoutget *)pnfs_layout_get_p;
+	struct nfsd4_pnfs_filelayout *flp = NULL;
+	struct nfsd4_pnfs_layoutlist *lp = NULL;
+	int status = 0, i;
+
+	im.im_type = SPNFS_TYPE_LAYOUTGET;
+	im.im_args.layoutget_args.inode = inode->i_ino;
+
+	/* call function to queue the msg for upcall */
+	if (spnfs_upcall(spnfs, &im, &res) != 0) {
+		dprintk("failed spnfs upcall: layoutget\n");
+		status = -EIO;
+		goto layoutget_cleanup;
+	}
+	status = res.layoutget_res.status;
+	if (status != 0)
+		goto layoutget_cleanup;
+
+	lgp->lg_return_on_close = 0;
+	flp = kmalloc(sizeof(*flp), GFP_KERNEL);
+	if (!flp)
+		goto layoutget_cleanup;
+	lgp->lg_layout = flp;
+	flp->lg_stripe_type = res.layoutget_res.stripe_type;
+	flp->lg_commit_through_mds = 0;
+	flp->lg_stripe_unit =  res.layoutget_res.stripe_size;
+	/*
+	 * XXX Should I get the size through a geattr instead?
+	 *     or is this size guaranteed to be valid?
+	 */
+	flp->lg_file_size =  inode->i_size;
+	flp->lg_indexlen = 0;	/* XXX Does not support stripe indices */
+	flp->lg_llistlen = res.layoutget_res.layout_count;
+	lgp->lg_seg.length = NFS4_LENGTH_EOF;
+	lp = kmalloc(flp->lg_llistlen * sizeof(*lp), GFP_KERNEL);
+	if (!lp) {
+		status = -ENOMEM;
+		goto layoutget_cleanup;
+	}
+	flp->lg_llist = lp;
+	for (i = 0; i < res.layoutget_res.layout_count; i++) {
+		/*
+		 *
+		 */
+#if 0
+		lp->dev_layout_type = lgp->lg_type; /* XXX Should ask daemon */
+#endif
+		lp->dev_id = res.layoutget_res.flist[i].dev_id;
+		lp->dev_index = res.layoutget_res.flist[i].dev_index;
+/*
+		lp->fhp = kmalloc(sizeof(*lp->fhp), GFP_KERNEL);
+		if (lp->fhp == NULL) {
+			status = -ENOMEM;
+			goto layoutget_cleanup;
+		}
+		lp->fhp->fh_size = res.layoutget_res.flist[i].fh_len;
+		memcpy(lp->fhp->fh_base.fh_pad,
+		       (void *)res.layoutget_res.flist[i].fh_val, 128);
+*/
+		lp->dev_fh.fh_size = res.layoutget_res.flist[i].fh_len;
+		memcpy(lp->dev_fh.fh_base.fh_pad,
+		       (void *)res.layoutget_res.flist[i].fh_val, 128);
+		lp++;
+	}
+
+	return status;
+
+layoutget_cleanup:
+	if (flp) {
+		if (flp->lg_llist) {
+/*
+			lp = flp->lg_llist;
+			for (i = 0; i < flp->lg_llistlen; i++) {
+				if (lp->fhp)
+					kfree(lp->fhp);
+				lp++;
+			}
+*/
+			kfree(flp->lg_llist);
+		}
+		kfree(flp);
+	}
+
+	return status;
+}
+
+int
 spnfs_getdevicelist(struct super_block *sb, void *get_dev_list_arg_p)
 {
 	struct spnfs *spnfs = global_spnfs;   /* XXX keep up the pretence */
