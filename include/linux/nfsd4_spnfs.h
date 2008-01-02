@@ -53,6 +53,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define	SPNFS_TYPE_CLOSE		0x08
 #define SPNFS_TYPE_CREATE		0x09
 #define SPNFS_TYPE_REMOVE		0x0a
+#define SPNFS_TYPE_COMMIT		0x0b
 
 #define	SPNFS_MAX_DATA_SERVERS		2
 #define	SPNFS_MAX_LAYOUT		8
@@ -176,6 +177,17 @@ struct spnfs_msg_remove_res {
 	int status;
 };
 
+/* commit */
+/*
+struct spnfs_msg_commit_args {
+	int x;
+};
+
+struct spnfs_msg_commit_res {
+	int y;
+};
+*/
+
 /* bundle args and responses */
 union spnfs_msg_args {
 	struct spnfs_msg_layoutget_args		layoutget_args;
@@ -192,6 +204,9 @@ union spnfs_msg_args {
 	struct spnfs_msg_create_args		create_args;
 */
 	struct spnfs_msg_remove_args		remove_args;
+/*
+	struct spnfs_msg_commit_args		commit_args;
+*/
 };
 
 union spnfs_msg_res {
@@ -209,6 +224,9 @@ union spnfs_msg_res {
 	struct spnfs_msg_create_res		create_res;
 */
 	struct spnfs_msg_remove_res		remove_res;
+/*
+	struct spnfs_msg_commit_res		commit_res;
+*/
 };
 
 /* a spnfs message, args and response */
