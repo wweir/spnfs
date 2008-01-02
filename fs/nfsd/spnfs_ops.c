@@ -287,4 +287,14 @@ spnfs_close(void)
 	return 0;
 }
 
+/*
+ * Return the state for this object.
+ * At this time simply return 0 to indicate success and use the existing state
+ */
+int
+spnfs_get_state(struct inode *inode, void *fh, void *state)
+{
+	return 0;
+}
+
 #endif /* CONFIG_PNFSD */
