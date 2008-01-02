@@ -135,6 +135,7 @@ struct spnfs {
 int spnfs_getdevicelist(struct super_block *, void *);
 int spnfs_getdeviceinfo(struct super_block *, void *);
 int spnfs_open(struct inode *, void *);
+int spnfs_get_state(struct inode *, void *, void *);
 
 int nfsd_spnfs_new(void);
 void nfsd_spnfs_delete(void);
