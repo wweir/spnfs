@@ -51,6 +51,10 @@
 #include <linux/workqueue.h>
 #include <linux/sunrpc/rpc_pipe_fs.h>
 
+#include <linux/nfs_fs.h>
+
+#include <linux/nfsd4_spnfs.h>
+
 #define	NFSDDBG_FACILITY		NFSDDBG_PROC
 
 static ssize_t   spnfs_pipe_upcall(struct file *, struct rpc_pipe_msg *,
@@ -58,6 +62,68 @@ static ssize_t   spnfs_pipe_upcall(struct file *, struct rpc_pipe_msg *,
 static ssize_t   spnfs_pipe_downcall(struct file *, const char __user *,
 		     size_t);
 static void      spnfs_pipe_destroy_msg(struct rpc_pipe_msg *);
+
+static struct rpc_pipe_ops spnfs_upcall_ops = {
+	.upcall		= spnfs_pipe_upcall,
+	.downcall	= spnfs_pipe_downcall,
+	.destroy_msg	= spnfs_pipe_destroy_msg,
+};
+
+/* evil global variable */
+struct spnfs *global_spnfs;
+/*
+ * Used by spnfs_enabled()
+ * Tracks if the subsystem has been initialized at some point.  It doesn't
+ * matter if it's not currently initialized.
+ */
+static int spnfs_enabled_at_some_point;
+
+/* call this to start the ball rolling */
+/* code it like we're going to avoid the global variable in the future */
+int
+nfsd_spnfs_new(void)
+{
+	struct spnfs *spnfs;
+
+	if (global_spnfs != NULL)
+		return -EEXIST;
+
+	spnfs = kzalloc(sizeof(*spnfs), GFP_KERNEL);
+	if (spnfs == NULL)
+		return -ENOMEM;
+
+	snprintf(spnfs->spnfs_path, sizeof(spnfs->spnfs_path),
+	    "%s/spnfs", "/nfs");
+
+	spnfs->spnfs_dentry = rpc_mkpipe_compat(spnfs->spnfs_path,
+	    spnfs, &spnfs_upcall_ops, 0);
+	if (IS_ERR(spnfs->spnfs_dentry)) {
+		kfree(spnfs);
+		return -EPIPE;
+	}
+
+	mutex_init(&spnfs->spnfs_lock);
+	mutex_init(&spnfs->spnfs_plock);
+	init_waitqueue_head(&spnfs->spnfs_wq);
+
+	global_spnfs = spnfs;
+	spnfs_enabled_at_some_point = 1;
+
+	return 0;
+}
+
+/* again, code it like we're going to remove the global variable */
+void
+nfsd_spnfs_delete(void)
+{
+	struct spnfs *spnfs = global_spnfs;
+
+	if (!spnfs)
+		return;
+	rpc_unlink(spnfs->spnfs_dentry);
+	global_spnfs = NULL;
+	kfree(spnfs);
+}
 
 /* RPC pipefs upcall/downcall routines */
 /* looks like this code is invoked by the rpc_pipe code */
@@ -141,4 +207,67 @@ spnfs_pipe_destroy_msg(struct rpc_pipe_msg *msg)
 	im->im_status = SPNFS_STATUS_FAIL;  /* DMXXX */
 	wake_up(&spnfs->spnfs_wq);
 	mutex_unlock(&spnfs->spnfs_plock);
+}
+
+/* generic upcall.  called by functions in spnfs_ops.c  */
+int
+spnfs_upcall(struct spnfs *spnfs, struct spnfs_msg *upmsg,
+		union spnfs_msg_res *res)
+{
+	struct rpc_pipe_msg msg;
+	struct spnfs_msg *im;
+	DECLARE_WAITQUEUE(wq, current);
+	int ret = -EIO;
+	int rval;
+
+	im = &spnfs->spnfs_im;
+
+	mutex_lock(&spnfs->spnfs_lock);
+	mutex_lock(&spnfs->spnfs_plock);
+
+	memset(im, 0, sizeof(*im));
+	memcpy(im, upmsg, sizeof(*upmsg));
+
+	memset(&msg, 0, sizeof(msg));
+	msg.data = im;
+	msg.len = sizeof(*im);
+
+	add_wait_queue(&spnfs->spnfs_wq, &wq);
+	rval = rpc_queue_upcall(spnfs->spnfs_dentry->d_inode, &msg);
+	if (rval < 0) {
+		remove_wait_queue(&spnfs->spnfs_wq, &wq);
+		goto out;
+	}
+
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	mutex_unlock(&spnfs->spnfs_plock);
+	schedule();
+	current->state = TASK_RUNNING;
+	remove_wait_queue(&spnfs->spnfs_wq, &wq);
+	mutex_lock(&spnfs->spnfs_plock);
+
+	if (im->im_status & SPNFS_STATUS_SUCCESS) {
+		/* copy our result from the upcall */
+		memcpy(res, &im->im_res, sizeof(*res));
+		ret = 0;
+	}
+
+out:
+	memset(im, 0, sizeof(*im));
+	mutex_unlock(&spnfs->spnfs_plock);
+	mutex_unlock(&spnfs->spnfs_lock);
+	return(ret);
+}
+
+/*
+ * This is used to determine if the spnfsd daemon has been started at
+ * least once since the system came up.  This is used to by the export
+ * mechanism to decide if spnfs is in use.
+ *
+ * Returns non-zero if the spnfsd has initialized the communication pipe
+ * at least once.
+ */
+int spnfs_enabled(void)
+{
+	return spnfs_enabled_at_some_point;
 }
