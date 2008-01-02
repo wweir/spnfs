@@ -333,4 +333,19 @@ spnfs_get_state(struct inode *inode, void *fh, void *state)
 	return 0;
 }
 
+/*
+ * Return the filehandle for the specified file descriptor
+ */
+struct nfs_fh *
+spnfs_getfh(int fd)
+{
+	struct file *file;
+
+	file = fget(fd);
+	if (file == NULL)
+		return NULL;
+
+	return(NFS_FH(file->f_dentry->d_inode));
+}
+
 #endif /* CONFIG_PNFSD */
