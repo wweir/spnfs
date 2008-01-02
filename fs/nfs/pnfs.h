@@ -56,27 +56,7 @@ int pnfs_wpages(struct inode *);
 void pnfs_readpage_result_norpc(struct rpc_task *task, void *calldata);
 void pnfs_writeback_done_norpc(struct rpc_task *, void *);
 void pnfs_commit_done_norpc(struct rpc_task *, void *);
-void pnfs_set_ds_rsize(struct inode *, struct nfs_open_context *, struct list_head *, loff_t, size_t *, struct nfs_pageio_descriptor *);
-
-
-/*
- * Determine the number of bytes of data the page contains
- */
-static inline
-unsigned int pnfs_page_length(struct page *page, struct inode *inode)
-{
-	loff_t i_size = i_size_read(inode);
-
-	if (i_size > 0) {
-		pgoff_t end_index = (i_size - 1) >> PAGE_CACHE_SHIFT;
-
-		if (page->index < end_index)
-			return PAGE_CACHE_SIZE;
-		if (page->index == end_index)
-			return ((i_size - 1) & ~PAGE_CACHE_MASK) + 1;
-	}
-	return 0;
-}
+void pnfs_set_ds_rsize(struct inode *, struct nfs_open_context *, struct list_head *, unsigned long, loff_t, size_t *, struct nfs_pageio_descriptor *);
 
 #define PNFS_EXISTS_LDIO_OP(opname) (nfss->pnfs_curr_ld && \
 				     nfss->pnfs_curr_ld->ld_io_ops && \
