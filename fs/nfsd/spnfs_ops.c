@@ -294,6 +294,36 @@ spnfs_create(void)
 }
 
 /*
+ * Invokes the spnfsd with the inode number of the object to remove.
+ * The file has already been removed on the MDS, so all the spnsfd
+ * daemon does is remove the stripes.
+ * Returns 0 on success otherwise error code
+ */
+int
+spnfs_remove(unsigned long ino)
+{
+	struct spnfs *spnfs = global_spnfs; /* keep up the pretence */
+	struct spnfs_msg im;
+	union spnfs_msg_res res;
+	int status = 0;
+
+	im.im_type = SPNFS_TYPE_REMOVE;
+	im.im_args.remove_args.inode = ino;
+
+	/* call function to queue the msg for upcall */
+	status = spnfs_upcall(spnfs, &im, &res);
+	if (status != 0) {
+		dprintk("%s spnfs upcall failure: %d\n", __FUNCTION__, status);
+		status = -EIO;
+		goto remove_out;
+	}
+	status = res.remove_res.status;
+
+remove_out:
+	return status;
+}
+
+/*
  * Return the state for this object.
  * At this time simply return 0 to indicate success and use the existing state
  */
