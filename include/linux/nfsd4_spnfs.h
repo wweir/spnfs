@@ -43,12 +43,36 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SPNFS_STATUS_FAIL		0x04
 #define SPNFS_STATUS_SUCCESS		0x08
 
+#define SPNFS_TYPE_LAYOUTGET		0x01
 #define SPNFS_TYPE_GETDEVICELIST	0x04
 #define SPNFS_TYPE_GETDEVICEINFO	0x05
 #define SPNFS_TYPE_OPEN			0x07
 #define	SPNFS_TYPE_CLOSE		0x08
 #define SPNFS_TYPE_CREATE		0x09
 #define SPNFS_TYPE_REMOVE		0x0a
+
+#define	SPNFS_MAX_DATA_SERVERS		2
+#define	SPNFS_MAX_LAYOUT		8
+
+/* layout */
+struct spnfs_msg_layoutget_args {
+	unsigned long inode;
+};
+
+struct spnfs_filelayout_list {
+	u_int32_t       dev_id;
+	u_int32_t       dev_index;
+	u_int32_t       fh_len;
+	unsigned char   fh_val[128]; /* DMXXX fix this const */
+};
+
+struct spnfs_msg_layoutget_res {
+	int status;
+	u_int64_t stripe_size;
+	u_int32_t stripe_type;
+	u_int32_t layout_count;
+	struct spnfs_filelayout_list flist[SPNFS_MAX_LAYOUT];
+};
 
 /* getdevicelist */
 struct spnfs_msg_getdevicelist_args {
@@ -121,6 +145,7 @@ struct spnfs_msg_remove_res {
 
 /* bundle args and responses */
 union spnfs_msg_args {
+	struct spnfs_msg_layoutget_args		layoutget_args;
 	struct spnfs_msg_getdevicelist_args     getdevicelist_args;
 	struct spnfs_msg_getdeviceinfo_args     getdeviceinfo_args;
 	struct spnfs_msg_open_args		open_args;
@@ -132,6 +157,7 @@ union spnfs_msg_args {
 };
 
 union spnfs_msg_res {
+	struct spnfs_msg_layoutget_res		layoutget_res;
 	struct spnfs_msg_getdevicelist_res      getdevicelist_res;
 	struct spnfs_msg_getdeviceinfo_res      getdeviceinfo_res;
 	struct spnfs_msg_open_res		open_res;
@@ -162,6 +188,8 @@ struct spnfs {
 	struct mutex		spnfs_plock;
 };
 
+int spnfs_layout_type(void);
+int spnfs_layoutget(struct inode *, void *);
 int spnfs_getdevicelist(struct super_block *, void *);
 int spnfs_getdeviceinfo(struct super_block *, void *);
 int spnfs_open(struct inode *, void *);
