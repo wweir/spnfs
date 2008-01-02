@@ -661,19 +661,20 @@ out:
  */
 void
 pnfs_set_ds_rsize(struct inode *inode,
-		 struct nfs_open_context *ctx,
-		 struct list_head *pages,
-		 loff_t offset,
-		 size_t *rsize,
-		 struct nfs_pageio_descriptor *pgio)
+		  struct nfs_open_context *ctx,
+		  struct list_head *pages,
+		  unsigned long nr_pages,
+		  loff_t offset,
+		  size_t *rsize,
+		  struct nfs_pageio_descriptor *pgio)
 {
 	struct nfs_server *nfss = NFS_SERVER(inode);
-	struct page *page;
-	size_t count = 0;
+	loff_t end_offset, i_size;
+	size_t count;
 	int status = 0;
 
-	dprintk("--> %s inode %p ctx %p pages %p offset %lu\n",
-		__func__, inode, ctx, pages, (unsigned long)offset);
+	dprintk("--> %s inode %p ctx %p pages %p nr_pages %lu offset %lu\n",
+		__func__, inode, ctx, pages, nr_pages,(unsigned long)offset);
 
 	pgio->pg_boundary = 0;
 	pgio->pg_test = 0;
@@ -682,8 +683,11 @@ pnfs_set_ds_rsize(struct inode *inode,
 		return;
 
 	/* Calculate the total read-ahead count */
-	list_for_each_entry(page, pages, lru)
-		count += pnfs_page_length(page, inode);
+	end_offset = (offset & PAGE_CACHE_MASK) + nr_pages * PAGE_CACHE_SIZE;
+	i_size = i_size_read(inode);
+	if (end_offset > i_size)
+		end_offset = i_size;
+	count = end_offset - offset;
 
 	dprintk("%s count %ld\n", __func__,(long int)count);
 
