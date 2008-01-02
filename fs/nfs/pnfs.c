@@ -46,6 +46,8 @@
 #include <linux/pnfs_xdr.h>
 #include <linux/nfs4_pnfs.h>
 
+#include "internal.h"
+
 #include "nfs4_fs.h"
 #include "pnfs.h"
 
@@ -829,6 +831,26 @@ pnfs_getiosize(struct nfs_server *server)
 		return 0;
 
 	return ld->ld_policy_ops->get_blocksize(mounttype);
+}
+
+void
+pnfs_set_ds_iosize(struct nfs_server *server)
+{
+	unsigned dssize = pnfs_getiosize(server);
+
+	/* Set buffer size for data servers */
+	if (dssize > 0) {
+		server->ds_rsize = server->ds_wsize =
+			nfs_block_size(dssize, NULL);
+		server->ds_rpages = server->ds_wpages =
+			(server->ds_rsize + PAGE_CACHE_SIZE - 1) >>
+			PAGE_CACHE_SHIFT;
+	} else {
+		server->ds_wsize = server->wsize;
+		server->ds_rsize = server->rsize;
+		server->ds_rpages = server->rpages;
+		server->ds_wpages = server->wpages;
+	}
 }
 
 /* Invoked by all non-NFSv4 I/O layout drivers to mark pages for commit

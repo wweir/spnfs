@@ -48,6 +48,7 @@ int pnfs_enabled_sb(struct nfs_server *nfss);
 int pnfs_use_nfsv4_wproto(struct inode *inode, ssize_t count);
 int pnfs_use_nfsv4_rproto(struct inode *inode, ssize_t count);
 unsigned int pnfs_getiosize(struct nfs_server *server);
+void pnfs_set_ds_iosize(struct nfs_server *server);
 int pnfs_commit(struct inode *inode, struct list_head *head, int sync, struct nfs_write_data *data);
 int pnfs_try_to_commit(struct inode *, struct nfs_write_data *, struct list_head *, int);
 int pnfs_wsize(struct inode *, unsigned int, struct nfs_write_data *);
