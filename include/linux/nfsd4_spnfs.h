@@ -47,6 +47,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define SPNFS_TYPE_GETDEVICEINFO	0x05
 #define SPNFS_TYPE_OPEN			0x07
 #define	SPNFS_TYPE_CLOSE		0x08
+#define SPNFS_TYPE_CREATE		0x09
 
 /* getdevicelist */
 struct spnfs_msg_getdevicelist_args {
@@ -97,12 +98,26 @@ struct spnfs_msg_close_res {
 	int y;
 };
 
+/* create */
+/*
+struct spnfs_msg_create_args {
+	int x;
+};
+
+struct spnfs_msg_create_res {
+	int y;
+};
+*/
+
 /* bundle args and responses */
 union spnfs_msg_args {
 	struct spnfs_msg_getdevicelist_args     getdevicelist_args;
 	struct spnfs_msg_getdeviceinfo_args     getdeviceinfo_args;
 	struct spnfs_msg_open_args		open_args;
 	struct spnfs_msg_close_args		close_args;
+/*
+	struct spnfs_msg_create_args		create_args;
+*/
 };
 
 union spnfs_msg_res {
@@ -110,6 +125,9 @@ union spnfs_msg_res {
 	struct spnfs_msg_getdeviceinfo_res      getdeviceinfo_res;
 	struct spnfs_msg_open_res		open_res;
 	struct spnfs_msg_close_res		close_res;
+/*
+	struct spnfs_msg_create_res		create_res;
+*/
 };
 
 /* a spnfs message, args and response */
