@@ -2142,6 +2142,7 @@ static struct rpc_xprt *xs_setup_tcp(struct xprt_create *args)
 #if defined(CONFIG_NFSD_V4_1)
 	if (args->svsk) {
 		/* backchannel */
+		xprt_set_bound(xprt);
 		INIT_DELAYED_WORK(&transport->connect_worker,
 				  bc_connect_worker);
 		xprt->bind_timeout = 0;
