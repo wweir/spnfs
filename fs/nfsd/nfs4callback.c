@@ -626,7 +626,7 @@ nfsd41_probe_callback(struct nfs4_client *clp)
 	addr.sin_addr.s_addr = htonl(0);
 
 	/* Initialize rpc_program */
-	program->name = "nfs4_cb";
+	program->name = "nfs41_cb";
 	program->number = cb->cb_prog = NFS4_CB_PROGRAM;
 	program->nrvers = ARRAY_SIZE(nfs_cb_version);
 	program->version = nfs_cb_version;
