@@ -250,10 +250,17 @@ struct pnfs_client_operations*
 pnfs_register_layoutdriver(struct pnfs_layoutdriver_type *ld_type)
 {
 	struct pnfs_module *pnfs_mod;
+	struct layoutdriver_io_operations *io_ops = ld_type->ld_io_ops;
 
 	if (!pnfs_initialized) {
 		printk(KERN_ERR "%s Registration failure. "
 		       "pNFS not initialized.\n", __func__);
+		return NULL;
+	}
+
+	if (!io_ops || !io_ops->alloc_layout || !io_ops->free_layout) {
+		printk(KERN_ERR "%s Layout driver must provide "
+		       "alloc_layout and free_layout.\n", __FUNCTION__);
 		return NULL;
 	}
 
