@@ -57,7 +57,7 @@ module_param_call(callback_tcpport, param_set_port, param_get_int,
 /*
  * This is the callback kernel thread.
  */
-static void nfs_callback_svc(struct svc_rqst *rqstp)
+static void nfs4_callback_svc(struct svc_rqst *rqstp)
 {
 	int err;
 
@@ -104,10 +104,29 @@ static void nfs_callback_svc(struct svc_rqst *rqstp)
 	module_put_and_exit(0);
 }
 
+
+/*
+ * Bring up the NFSv4 callback service
+ */
+int nfs4_callback_up(struct svc_serv *serv)
+{
+	int ret = 0;
+
+	ret = svc_makesock(serv, IPPROTO_TCP, nfs_callback_set_tcpport,
+							SVC_SOCK_ANONYMOUS);
+	if (ret < 0)
+		return ret;
+	nfs_callback_tcpport = ret;
+	dprintk("Callback port = 0x%x\n", nfs_callback_tcpport);
+	ret = svc_create_thread(nfs4_callback_svc, serv);
+
+	return ret;
+}
+
 /*
  * Bring up the server process if it is not already up.
  */
-int nfs_callback_up(void)
+int nfs_callback_up(int minorversion, void *args)
 {
 	struct svc_serv *serv;
 	int ret = 0;
@@ -123,14 +142,11 @@ int nfs_callback_up(void)
 	if (!serv)
 		goto out_err;
 
-	ret = svc_makesock(serv, IPPROTO_TCP, nfs_callback_set_tcpport,
-							SVC_SOCK_ANONYMOUS);
-	if (ret <= 0)
-		goto out_destroy;
-	nfs_callback_tcpport = ret;
-	dprintk("Callback port = 0x%x\n", nfs_callback_tcpport);
-
-	ret = svc_create_thread(nfs_callback_svc, serv);
+	switch (minorversion) {
+	case 0:
+		ret = nfs4_callback_up(serv);
+		break;
+	}
 	if (ret < 0)
 		goto out_destroy;
 	nfs_callback_info.serv = serv;
