@@ -15,6 +15,9 @@
 #include <linux/nfs_fs.h>
 #include <linux/mutex.h>
 #include <linux/freezer.h>
+#if defined(CONFIG_NFS_V4_1)
+#include <linux/sunrpc/bc_xprt.h>
+#endif
 
 #include <net/inet_sock.h>
 
@@ -23,6 +26,11 @@
 #include "internal.h"
 
 #define NFSDBG_FACILITY NFSDBG_CALLBACK
+/*
+ * Callbacks are expected to not cause substantial latency,
+ * so we limit their concurrency to 1.
+ */
+#define	NFS41_BC_MIN_CALLBACKS 1
 
 struct nfs_callback_data {
 	unsigned int users;
@@ -104,6 +112,62 @@ static void nfs4_callback_svc(struct svc_rqst *rqstp)
 	module_put_and_exit(0);
 }
 
+#if defined(CONFIG_NFS_V4_1)
+
+/*
+ * The callback service for NFSv4.1 callbacks
+ */
+static void nfs41_callback_svc(struct svc_rqst *rqstp)
+{
+	struct svc_serv *serv = rqstp->rq_server;
+	struct list_head *entry;
+	struct rpc_rqst *req;
+
+	DEFINE_WAIT(wq);
+
+	__module_get(THIS_MODULE);
+
+	lock_kernel();
+
+	nfs_callback_info.pid = current->pid;
+	daemonize("nfsv41-svc");
+	/* Process request with signals blocked, but allow SIGKILL.  */
+	allow_signal(SIGKILL);
+
+	complete(&nfs_callback_info.started);
+
+	for (;;) {
+		if (signalled()) {
+			if (nfs_callback_info.users == 0)
+				break;
+			flush_signals(current);
+		}
+
+		prepare_to_wait(&serv->sv_cb_waitq, &wq, TASK_INTERRUPTIBLE);
+		spin_lock_bh(&serv->sv_cb_lock);
+		if (!list_empty(&serv->sv_cb_list)) {
+			entry = serv->sv_cb_list.next;
+			list_del(entry);
+			spin_unlock_bh(&serv->sv_cb_lock);
+			req = list_entry(entry, struct rpc_rqst, rq_list);
+			dprintk("Need to invoke bc_process() here\n");
+			dprintk("Freeing the bc_request for now\n");
+			xprt_free_bc_request(req);
+		} else {
+			spin_unlock_bh(&serv->sv_cb_lock);
+			schedule();
+		}
+		finish_wait(&serv->sv_cb_waitq, &wq);
+	}
+
+	svc_exit_thread(rqstp);
+	nfs_callback_info.pid = 0;
+	complete(&nfs_callback_info.stopped);
+	unlock_kernel();
+	module_put_and_exit(0);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 
 /*
  * Bring up the NFSv4 callback service
@@ -123,6 +187,28 @@ int nfs4_callback_up(struct svc_serv *serv)
 	return ret;
 }
 
+#if defined(CONFIG_NFS_V4_1)
+/*
+ * Bring up the NFSv4.1 callback service
+ */
+int nfs41_callback_up(struct svc_serv *serv, struct rpc_xprt *xprt)
+{
+	int ret;
+
+	xprt->serv = serv;
+	ret = xprt_setup_backchannel(xprt, NFS41_BC_MIN_CALLBACKS);
+	if (ret < 0)
+		return ret;
+
+	INIT_LIST_HEAD(&serv->sv_cb_list);
+	spin_lock_init(&serv->sv_cb_lock);
+	init_waitqueue_head(&serv->sv_cb_waitq);
+	ret = svc_create_thread(nfs41_callback_svc, serv);
+
+	return ret;
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Bring up the server process if it is not already up.
  */
@@ -130,6 +216,9 @@ int nfs_callback_up(int minorversion, void *args)
 {
 	struct svc_serv *serv;
 	int ret = 0;
+#if defined(CONFIG_NFS_V4_1)
+	struct rpc_xprt *xprt = (struct rpc_xprt *)args;
+#endif
 
 	lock_kernel();
 	mutex_lock(&nfs_callback_mutex);
@@ -146,6 +235,11 @@ int nfs_callback_up(int minorversion, void *args)
 	case 0:
 		ret = nfs4_callback_up(serv);
 		break;
+#if defined(CONFIG_NFS_V4_1)
+	case 1:
+		ret = nfs41_callback_up(serv, xprt);
+		break;
+#endif /* CONFIG_NFS_V4_1 */
 	}
 	if (ret < 0)
 		goto out_destroy;
