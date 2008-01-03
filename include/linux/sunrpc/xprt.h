@@ -170,7 +170,12 @@ struct rpc_xprt {
 	struct rpc_task *	snd_task;	/* Task blocked in send */
 #if defined(CONFIG_NFSD_V4_1)
 	struct svc_sock	       *svsk;           /* If this is a callback xprt */
-#endif
+#endif /* CONFIG_NFSD_V4_1 */
+#if defined(CONFIG_NFS_V4_1)
+	struct svc_serv		*serv;		/* The RPC service which will process the callback request */
+	unsigned long		bc_flags;	/* Backchannel flags */
+	struct rpc_rqst		*bc_rpc_rqst;	/* Preallocated backchannel rpc_rqst */
+#endif /* CONFIG_NFS_V4_1 */
 	struct list_head	recv;
 
 	struct {
@@ -188,6 +193,13 @@ struct rpc_xprt {
 
 	char *			address_strings[RPC_DISPLAY_MAX];
 };
+
+#if defined(CONFIG_NFS_V4_1)
+/*
+ * Backchannel flags
+ */
+#define	RPC_BC_PREALLOC_IN_USE	0x0001	/* Preallocated backchannel buffers in use */
+#endif /* CONFIG_NFS_V4_1 */
 
 struct xprt_create {
 	int			ident;		/* XPRT_TRANSPORT identifier */
