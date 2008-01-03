@@ -242,6 +242,8 @@ static int nfs41_sequence_done(struct nfs_client *clp,
 	struct nfs4_slot *slot;
 
 	BUG_ON(clp == NULL);
+	BUG_ON(session == NULL);
+	BUG_ON(res == NULL);
 
 	tbl = &session->fore_channel.slot_table;
 	slot = res->sr_slot;
@@ -260,6 +262,7 @@ static int nfs41_sequence_done(struct nfs_client *clp,
 	case -NFS4ERR_OP_NOT_IN_SESSION:
 		break;
 	default:
+		BUG_ON(slot == NULL);
 		++slot->seq_nr;
 		/*
 		 * The sequence call was successful,
