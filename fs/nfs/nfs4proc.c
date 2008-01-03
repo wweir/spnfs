@@ -4747,7 +4747,7 @@ int _nfs4_proc_create_session(struct nfs_client *clp, struct nfs4_session *sessi
 	int status;
 
 	nfs4_init_channel_attrs(clp, &args.fc_attrs, &args.bc_attrs);
-	args.flags = (SESSION4_PERSIST);
+	args.flags = (SESSION4_PERSIST | SESSION4_BACK_CHAN);
 
 	status = rpc_call_sync(clnt, &msg, 0);
 
