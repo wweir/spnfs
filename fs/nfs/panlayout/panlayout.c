@@ -412,8 +412,14 @@ out:
 static struct pnfs_mount_type *
 panlayout_initialize_mountpoint(struct super_block *sb, struct nfs_fh *fh)
 {
-	struct pnfs_mount_type *mt = NULL;
+	struct pnfs_mount_type *mt;
 
+	if (!panfs_shim_ready()) {
+		printk(KERN_INFO "%s: panfs_shim not ready\n", __func__);
+		return NULL;
+	}
+
+	mt = kzalloc(sizeof(*mt), GFP_KERNEL);
 	dprintk("%s: Return %p\n", __func__, mt);
 	return mt;
 }
@@ -425,7 +431,8 @@ static int
 panlayout_uninitialize_mountpoint(struct pnfs_mount_type *mt)
 {
 	dprintk("%s: Begin %p\n", __func__, mt);
-	return -EIO;
+	kfree(mt);
+	return 0;
 }
 
 static struct layoutdriver_io_operations panlayout_io_operations = {
