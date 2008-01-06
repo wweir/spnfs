@@ -150,8 +150,8 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 			default: goto out;
 			}
 #if defined(CONFIG_PNFSD)
-			if  (fh->fh_fsid_type >= max_fsid_type) /* pNFS */
-				fsid_type = fh->fh_fsid_type - max_fsid_type;
+			if  (fh->fh_fsid_type >= FSID_MAX) /* pNFS */
+				fsid_type = fh->fh_fsid_type - FSID_MAX;
 			else
 #endif /* CONFIG_PNFSD */
 				fsid_type = fh->fh_fsid_type;
