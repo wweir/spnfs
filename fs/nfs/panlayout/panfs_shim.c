@@ -303,6 +303,42 @@ panfs_shim_free_layout(void *p)
 	kfree(p);
 }
 
+/*
+ * I/O routines
+ */
+int
+panfs_shim_alloc_io_state(struct panlayout_io_state **outp)
+{
+	void *p;
+
+	dprintk("%s: allocating io_state\n", __func__);
+	p = kzalloc(sizeof(struct panfs_shim_io_state), GFP_KERNEL);
+	if (!p)
+		return -ENOMEM;
+
+	*outp = p;
+	return 0;
+}
+
+/*
+ * Free an I/O state
+ */
+void
+panfs_shim_free_io_state(struct panlayout_io_state *pl_state)
+{
+	struct panfs_shim_io_state *state = (void *)pl_state;
+	int i;
+
+	dprintk("%s: freeing io_state\n", __func__);
+	for (i = 0; i < state->nr_pages; i++)
+		kunmap(state->pages[i]);
+
+	if (state->ucreds)
+		panfs_export_ops->ucreds_put(state->ucreds);
+	kfree(state->sg_list);
+	kfree(pl_state);
+}
+
 int
 panfs_shim_register(struct panfs_export_operations *ops)
 {
