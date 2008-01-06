@@ -130,6 +130,39 @@ panlayout_free_lseg(struct pnfs_layout_segment *lseg)
  * I/O Operations
  */
 
+static struct panlayout_io_state *
+panlayout_alloc_io_state(void)
+{
+	struct panlayout_io_state *p;
+	dprintk("%s: allocating io_state\n", __func__);
+	if (panfs_shim_alloc_io_state(&p))
+		return NULL;
+	return p;
+}
+
+static void
+panlayout_free_io_state(struct panlayout_io_state *state)
+{
+	dprintk("%s: freeing io_state\n", __func__);
+	if (unlikely(!state))
+		return;
+
+	panfs_shim_free_io_state(state);
+}
+
+/*
+ * I/O done
+ *
+ * Dereference a layout segment and decrement io in-progress counter
+ * Free layout segment is ref count reached zero
+ */
+static void
+panlayout_iodone(struct panlayout_io_state *state)
+{
+	dprintk("%s: state %p\n", __func__, state);
+	panlayout_free_io_state(state);
+}
+
 /*
  * Commit data remotely on OSDs
  */
