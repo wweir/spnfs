@@ -138,7 +138,7 @@ panlayout_commit(struct pnfs_layout_type *pnfslay,
 		 int sync,
 		 struct nfs_write_data *data)
 {
-	int status = -EIO;
+	int status = 0;
 	dprintk("%s: Return %d\n", __func__, status);
 	return status;
 }
