@@ -178,6 +178,47 @@ panlayout_commit(struct pnfs_layout_type *pnfslay,
 	return status;
 }
 
+void
+panlayout_read_done(struct panlayout_io_state *state)
+{
+	int status = state->status;
+	int eof = state->eof;
+	struct nfs_read_data *rdata;
+
+	dprintk("%s: Begin status=%d eof=%d\n", __func__, status, eof);
+	rdata = state->rpcdata;
+	rdata->task.tk_status = status;
+	if (status >= 0) {
+		rdata->res.count = status;
+		rdata->res.eof = eof;
+	}
+	panlayout_iodone(state);
+	/* must not use state after this point */
+
+	if (!(rdata->pnfsflags & PNFS_ISSYNC))
+		pnfs_client_ops->nfs_readlist_complete(rdata);
+}
+
+static inline u64
+end_offset(u64 start, u64 len)
+{
+	u64 end;
+
+	end = start + len;
+	return end >= start ? end: NFS4_LENGTH_EOF;
+}
+
+/* last octet in a range */
+static inline u64
+last_byte_offset(u64 start, u64 len)
+{
+	u64 end;
+
+	BUG_ON(!len);
+	end = start + len;
+	return end > start ? end - 1: NFS4_LENGTH_EOF;
+}
+
 /*
  * Perform sync or async reads.
  */
@@ -190,8 +231,49 @@ panlayout_read_pagelist(struct pnfs_layout_type *pnfs_layout_type,
 			size_t count,
 			struct nfs_read_data *rdata)
 {
-	int status = -EIO;
-	dprintk("%s: Return %d\n", __func__, status);
+	struct inode *inode = PNFS_INODE(pnfs_layout_type);
+	struct pnfs_layout_segment *lseg = rdata->lseg;
+	struct panlayout_io_state *state = NULL;
+	ssize_t status = 0;
+	loff_t eof;
+	u64 lseg_end_offset;
+
+	dprintk("%s: Begin inode %p offset %llu count %d\n",
+		__func__, inode, offset, (int)count);
+
+	eof = i_size_read(inode);
+	if (unlikely(offset + count > eof)) {
+		if (offset >= eof) {
+			status = 0;
+			rdata->res.count = 0;
+			rdata->res.eof = 1;
+			goto out;
+		}
+		count = eof - offset;
+	}
+
+	BUG_ON(offset < lseg->range.offset);
+	lseg_end_offset = end_offset(lseg->range.offset, lseg->range.length);
+	BUG_ON(offset >= lseg_end_offset);
+
+	if (offset + count > lseg_end_offset)
+		count = lseg_end_offset - offset;
+
+	state = panlayout_alloc_io_state();
+	if (unlikely(!state)) {
+		status = -ENOMEM;
+		goto out;
+	}
+
+	state->lseg = lseg;
+	state->rpcdata = rdata;
+	state->eof = offset + count >= eof;
+
+	status = panfs_shim_read_pagelist(state, pages, pgbase,
+					  nr_pages, offset, count,
+					  rdata->pnfsflags & PNFS_ISSYNC);
+ out:
+	dprintk("%s: Return status %Zd\n", __func__, status);
 	return status;
 }
 
