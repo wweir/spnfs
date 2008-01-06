@@ -277,6 +277,34 @@ panlayout_read_pagelist(struct pnfs_layout_type *pnfs_layout_type,
 	return status;
 }
 
+void
+panlayout_write_done(struct panlayout_io_state *state)
+{
+	struct nfs_write_data *wdata;
+
+	dprintk("%s: Begin\n", __func__);
+	wdata = state->rpcdata;
+	wdata->task.tk_status = state->status;
+	if (state->status >= 0) {
+		struct panlayout *panlay = PNFS_LD_DATA(wdata->lseg->layout);
+
+		wdata->res.count = state->status;
+		wdata->verf.committed = state->committed;
+		atomic64_add(state->delta_space_used,
+			     &panlay->delta_space_used);
+		dprintk("%s: Return status %d committed %d space_used %lld\n",
+			__func__, wdata->task.tk_status,
+			wdata->verf.committed, state->delta_space_used);
+	} else
+		dprintk("%s: Return status %d\n",
+			__func__, wdata->task.tk_status);
+	panlayout_iodone(state);
+	/* must not use state after this point */
+
+	if (!(wdata->pnfsflags & PNFS_ISSYNC))
+		pnfs_client_ops->nfs_writelist_complete(wdata);
+}
+
 /*
  * Perform sync or async writes.
  */
@@ -290,8 +318,35 @@ panlayout_write_pagelist(struct pnfs_layout_type *pnfs_layout_type,
 			 int stable,
 			 struct nfs_write_data *wdata)
 {
-	int status = -EIO;
-	dprintk("%s: Return %d\n", __func__, status);
+	struct inode *inode = PNFS_INODE(pnfs_layout_type);
+	struct pnfs_layout_segment *lseg;
+	struct panlayout_io_state *state = NULL;
+	ssize_t status = 0;
+	u64 lseg_end_offset;
+
+	dprintk("%s: Begin inode %p offset %llu count %d\n",
+		__func__, inode, offset, (int)count);
+
+	lseg = wdata->lseg;
+	BUG_ON(offset < lseg->range.offset);
+	lseg_end_offset = end_offset(lseg->range.offset, lseg->range.length);
+	BUG_ON(offset + count > lseg_end_offset);
+
+	state = panlayout_alloc_io_state();
+	if (unlikely(!state)) {
+		status = -ENOMEM;
+		goto out;
+	}
+
+	state->lseg = lseg;
+	state->rpcdata = wdata;
+
+	status = panfs_shim_write_pagelist(state, pages, pgbase,
+					   nr_pages, offset, count,
+					   wdata->pnfsflags & PNFS_ISSYNC,
+					   stable);
+ out:
+	dprintk("%s: Return status %Zd\n", __func__, status);
 	return status;
 }
 
