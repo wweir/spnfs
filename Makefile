@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 25
-EXTRAVERSION = -rc9-pnfs
+EXTRAVERSION = -rc9-panlayout
 NAME = Funky Weasel is Jiggy wit it
 
 # *DOCUMENTATION*
