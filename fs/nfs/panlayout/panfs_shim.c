@@ -339,6 +339,46 @@ panfs_shim_free_io_state(struct panlayout_io_state *pl_state)
 	kfree(pl_state);
 }
 
+static pan_sg_entry_t *
+panfs_shim_pages_to_sg(
+	struct page **pages,
+	unsigned int pgbase,
+	unsigned nr_pages,
+	size_t count)
+{
+	int i, n;
+	pan_sg_entry_t *sg;
+
+	dprintk("%s pgbase %u nr_pages %u count %d "
+		"pg0 %p flags 0x%x index %Lu\n",
+		__func__, pgbase, nr_pages, (int)count, pages[0],
+		(unsigned)pages[0]->flags, (__u64)pages[0]->index);
+
+	sg = kmalloc(nr_pages * sizeof(*sg), GFP_KERNEL);
+	if (sg == NULL)
+		return NULL;
+
+	for (i = 0; i < nr_pages; i++) {
+		sg[i].buffer = (char *)kmap(pages[i]) + pgbase;
+		n = PAGE_SIZE - pgbase;
+		pgbase = 0;
+		if (n > count)
+			n = count;
+		sg[i].chunk_size = n;
+		count -= n;
+		if (likely(count)) {
+			sg[i].next = &sg[i+1];
+		} else {
+			/* we're done */
+			sg[i].next = NULL;
+			break;
+		}
+	}
+	BUG_ON(count);
+
+	return sg;
+}
+
 int
 panfs_shim_register(struct panfs_export_operations *ops)
 {
