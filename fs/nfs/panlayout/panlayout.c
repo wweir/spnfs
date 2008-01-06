@@ -516,13 +516,20 @@ panlayout_gather_across_stripes(struct pnfs_mount_type *mountid)
 	return status;
 }
 
+#define PANLAYOUT_DEF_STRIPE_UNIT    (64*1024)
+#define PANLAYOUT_DEF_STRIPE_WIDTH   9
+#define PANLAYOUT_MAX_STRIPE_WIDTH   11
+#define PANLAYOUT_MAX_GATHER_STRIPES 8
+
 /*
  * Get the max [rw]size
  */
 static ssize_t
 panlayout_get_blocksize(struct pnfs_mount_type *mountid)
 {
-	ssize_t sz = -1;
+	ssize_t sz = (PANLAYOUT_MAX_STRIPE_WIDTH-1) *
+		      PANLAYOUT_DEF_STRIPE_UNIT *
+		      PANLAYOUT_MAX_GATHER_STRIPES;
 	dprintk("%s: Return %Zd\n", __func__, sz);
 	return sz;
 }
