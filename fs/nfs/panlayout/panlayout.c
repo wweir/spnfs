@@ -37,12 +37,20 @@
  *
  */
 
+#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/nfs_fs.h>
 
 #include "panlayout.h"
 #include "pnfs_osd_xdr.h"
 
 #define NFSDBG_FACILITY         NFSDBG_PNFS
+
+MODULE_DESCRIPTION("pNFS Layout Driver for Panasas OSDs");
+MODULE_AUTHOR("Benny Halevy <bhalevy@panasas.com>");
+MODULE_LICENSE("GPL");
+
+static struct pnfs_client_operations *pnfs_client_ops;
 
 /*
  * Create a panlayout layout structure for the given inode and return it.
@@ -346,7 +354,7 @@ panlayout_layoutget_on_open(struct pnfs_mount_type *mountid)
 static int
 panlayout_layoutret_on_setattr(struct pnfs_mount_type *mountid)
 {
-	int status = -1;
+	int status = 1;
 	dprintk("%s: Return %d\n", __func__, status);
 	return status;
 }
@@ -360,3 +368,30 @@ static struct layoutdriver_policy_operations panlayout_policy_operations = {
 	.layoutget_on_open     = panlayout_layoutget_on_open,
 	.layoutret_on_setattr  = panlayout_layoutret_on_setattr,
 };
+
+static struct pnfs_layoutdriver_type panlayout_type = {
+	.id = PNFS_LAYOUT_PANOSD,
+	.name = "PNFS_LAYOUT_PANOSD",
+	.ld_io_ops = &panlayout_io_operations,
+	.ld_policy_ops = &panlayout_policy_operations,
+};
+
+static int __init
+panlayout_init(void)
+{
+	pnfs_client_ops = pnfs_register_layoutdriver(&panlayout_type);
+	printk(KERN_INFO "%s: Registered Panasas OSD pNFS Layout Driver\n",
+	       __func__);
+	return 0;
+}
+
+static void __exit
+panlayout_exit(void)
+{
+	pnfs_unregister_layoutdriver(&panlayout_type);
+	printk(KERN_INFO "%s: Unregistered Panasas OSD pNFS Layout Driver\n",
+	       __func__);
+}
+
+module_init(panlayout_init);
+module_exit(panlayout_exit);
