@@ -379,6 +379,94 @@ panfs_shim_pages_to_sg(
 	return sg;
 }
 
+/*
+ * Callback function for async writes
+ */
+static void
+panfs_shim_write_done(
+	void *arg1,
+	void *arg2,
+	pan_sam_write_res_t *res_p,
+	pan_status_t rc)
+{
+	struct panfs_shim_io_state *state = arg1;
+
+	dprintk("%s: Begin\n", __func__);
+	if (!res_p)
+		res_p = &state->u.write.res;
+	if (rc == PAN_SUCCESS)
+		rc = res_p->result;
+	if (rc == PAN_SUCCESS) {
+		state->pl_state.committed = NFS_FILE_SYNC;
+		state->pl_state.status = res_p->length;
+		BUG_ON(state->pl_state.status < 0);
+		BUG_ON((pan_stor_len_t)state->pl_state.status !=
+		       state->u.write.res.length);
+	} else {
+		state->pl_state.status = -panfs_export_ops->convert_rc(rc);
+		dprintk("%s: pan_sam_write rc %u: status %d\n",
+			__func__, rc, state->pl_state.status);
+	}
+	dprintk("%s: Return status %d rc %d\n", __func__,
+		state->pl_state.status, rc);
+	panlayout_write_done(&state->pl_state);
+}
+
+ssize_t
+panfs_shim_write_pagelist(
+	void *pl_state,
+	struct page **pages,
+	unsigned pgbase,
+	unsigned nr_pages,
+	loff_t offset,
+	size_t count,
+	int sync,
+	int stable /* unused, PanOSD writes are stable */)
+{
+	struct panfs_shim_io_state *state = pl_state;
+	struct panlayout_segment *lseg = LSEG_LD_DATA(state->pl_state.lseg);
+	pan_sm_map_cap_t *mcs = (pan_sm_map_cap_t *)lseg->panfs_internal;
+	ssize_t status = 0;
+	pan_status_t rc = PAN_SUCCESS;
+
+	dprintk("%s: Begin\n", __func__);
+
+	BUG_ON(pgbase != offset % PAGE_SIZE);
+	state->sg_list = panfs_shim_pages_to_sg(pages, pgbase, nr_pages, count);
+	if (unlikely(!state->sg_list)) {
+		status = -ENOMEM;
+		goto err;
+	}
+	state->pages = pages;
+	state->nr_pages = nr_pages;
+
+	state->obj_sec.min_security = 0;
+	state->obj_sec.map_ccaps = mcs;
+
+	rc = panfs_export_ops->ucreds_get(&state->ucreds);
+	if (unlikely(rc)) {
+		status = -EACCES;
+		goto err;
+	}
+
+	state->u.write.args.obj_id = mcs->full_map.map_hdr.obj_id;
+	state->u.write.args.offset = offset;
+	rc = panfs_export_ops->sam_write(PAN_SAM_ACCESS_NONE,
+					 &state->u.write.args,
+					 &state->obj_sec,
+					 state->sg_list,
+					 state->ucreds,
+					 sync ? NULL : panfs_shim_write_done,
+					 state,
+					 NULL,
+					 &state->u.write.res);
+	if (rc != PAN_ERR_IN_PROGRESS)
+		panfs_shim_write_done(state, NULL, &state->u.write.res, rc);
+ err:
+	dprintk("%s: Return %Zd\n", __func__, status);
+	return status;
+}
+
 int
 panfs_shim_register(struct panfs_export_operations *ops)
 {
