@@ -294,6 +294,15 @@ err:
 	return status;
 }
 
+/*
+ * Free a Panasas map and caps type
+ */
+void
+panfs_shim_free_layout(void *p)
+{
+	kfree(p);
+}
+
 int
 panfs_shim_register(struct panfs_export_operations *ops)
 {
