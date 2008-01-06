@@ -459,7 +459,45 @@ static struct layoutdriver_io_operations panlayout_io_operations = {
 ssize_t
 panlayout_get_stripesize(struct pnfs_layout_type *pnfslay)
 {
-	ssize_t maxsz = -1;
+	ssize_t sz, maxsz = -1;
+	struct pnfs_layout_segment *lseg;
+
+	dprintk("%s: Begin\n", __func__);
+
+	list_for_each_entry(lseg, &pnfslay->segs, fi_list) {
+		int n = 0;
+		struct panlayout_segment *panlseg = LSEG_LD_DATA(lseg);
+		struct pnfs_osd_layout *lo =
+			(struct pnfs_osd_layout *)panlseg->pnfs_osd_layout;
+		struct pnfs_osd_data_map *map = &lo->map;
+
+		switch (map->raid_algorithm) {
+		case PNFS_OSD_RAID_0:
+			n = lo->num_comps;
+			break;
+
+		case PNFS_OSD_RAID_4:
+		case PNFS_OSD_RAID_5:
+			n = map->group_width;
+			if (n == 0)
+				n = lo->num_comps;
+			n -= 1;
+			break;
+
+		case PNFS_OSD_RAID_PQ:
+			n = map->group_width;
+			if (n == 0)
+				n = lo->num_comps;
+			n -= 2;
+			break;
+
+		default:
+			BUG_ON(1);
+		}
+		sz = map->stripe_unit * n;
+		if (sz > maxsz)
+			maxsz = sz;
+	}
 	dprintk("%s: Return %Zd\n", __func__, maxsz);
 	return maxsz;
 }
