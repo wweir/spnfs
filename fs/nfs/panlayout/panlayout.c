@@ -552,7 +552,7 @@ panlayout_get_io_threshold(struct pnfs_layout_type *layoutid,
 static int
 panlayout_layoutget_on_open(struct pnfs_mount_type *mountid)
 {
-	int status = -1;
+	int status = 1;
 	dprintk("%s: Return %d\n", __func__, status);
 	return status;
 }
