@@ -164,6 +164,7 @@ enum nfsd_fsid {
 	FSID_UUID8,
 	FSID_UUID16,
 	FSID_UUID16_INUM,
+	FSID_MAX
 };
 
 enum fsid_source {
@@ -243,8 +244,6 @@ static inline int key_len(int type)
 	default: return 0;
 	}
 }
-/* The above type must not exceed max_fsid_type */
-#define max_fsid_type 5
 
 /*
  * Shorthand for dprintk()'s
