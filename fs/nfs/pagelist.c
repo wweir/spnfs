@@ -260,7 +260,7 @@ static int nfs_can_coalesce_requests(struct nfs_page *prev,
 	if (prev->wb_pgbase + prev->wb_bytes != PAGE_CACHE_SIZE)
 		return 0;
 #ifdef CONFIG_PNFS
-	if (pgio->pg_test && (pgio->pg_test(pgio->pg_boundary, prev, req) == 0))
+	if (pgio->pg_test && (pgio->pg_test(pgio, prev, req) == 0))
 		return 0;
 #endif /* CONFIG_PNFS */
 	return 1;
