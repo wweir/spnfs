@@ -12,6 +12,7 @@
 #ifndef FS_NFS_NFS4FILELAYOUT_H
 #define FS_NFS_NFS4FILELAYOUT_H
 
+#include <linux/kref.h>
 #include <linux/nfs4_pnfs.h>
 #include <linux/nfs4_session.h>
 #include <linux/pnfs_xdr.h>
@@ -72,7 +73,7 @@ struct nfs4_pnfs_devlist {
 struct nfs4_pnfs_dserver {
 	struct nfs_fh        *fh;
 	struct nfs4_pnfs_dev *dev;
-	u32 dev_id;
+	struct kref           ref;
 };
 
 struct nfs4_filelayout {
