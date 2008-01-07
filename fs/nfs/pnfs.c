@@ -613,6 +613,32 @@ check:
 }
 
 void
+readahead_range(struct inode *inode, struct list_head *pages, loff_t *offset,
+		size_t *count)
+{
+	struct page *first, *last;
+	loff_t foff, i_size = i_size_read(inode);
+	pgoff_t end_index = (i_size - 1) >> PAGE_CACHE_SHIFT;
+	size_t range;
+
+
+	first = list_entry((pages)->prev, struct page, lru);
+	last = list_entry((pages)->next, struct page, lru);
+
+	foff = first->index << PAGE_CACHE_SHIFT;
+
+	range = (last->index - first->index) * PAGE_CACHE_SIZE;
+	if (last->index == end_index)
+		range += ((i_size - 1) & ~PAGE_CACHE_MASK) + 1;
+	else
+		range += PAGE_CACHE_SIZE;
+	dprintk("%s foff %lu, range %Zu\n", __func__, (unsigned long)foff,
+		range);
+	*offset = foff;
+	*count = range;
+}
+
+void
 pnfs_set_pg_test(struct inode *inode, struct nfs_pageio_descriptor *pgio)
 {
 	struct pnfs_layout_type *laytype;
@@ -662,53 +688,39 @@ out:
  * rsize is already set by caller to MDS rsize.
  */
 void
-pnfs_set_ds_rsize(struct inode *inode,
+pnfs_pageio_init_read(struct nfs_pageio_descriptor *pgio,
+		  struct inode *inode,
 		  struct nfs_open_context *ctx,
 		  struct list_head *pages,
-		  unsigned long nr_pages,
-		  loff_t offset,
-		  size_t *rsize,
-		  struct nfs_pageio_descriptor *pgio)
+		  size_t *rsize)
 {
 	struct nfs_server *nfss = NFS_SERVER(inode);
-	loff_t end_offset, i_size;
-	size_t count;
+	size_t count = 0;
+	loff_t loff;
 	int status = 0;
 
-	dprintk("--> %s inode %p ctx %p pages %p nr_pages %lu offset %lu\n",
-		__func__, inode, ctx, pages, nr_pages,(unsigned long)offset);
-
 	pgio->pg_boundary = 0;
-	pgio->pg_test = 0;
+	pgio->pg_test = NULL;
 
 	if (!pnfs_enabled_sb(nfss))
 		return;
 
 	/* Calculate the total read-ahead count */
-	end_offset = (offset & PAGE_CACHE_MASK) + nr_pages * PAGE_CACHE_SIZE;
-	i_size = i_size_read(inode);
-	if (end_offset > i_size)
-		end_offset = i_size;
-	count = end_offset - offset;
+	readahead_range(inode, pages, &loff, &count);
 
-	dprintk("%s count %ld\n", __func__,(long int)count);
-
-
-	status = virtual_update_layout(inode, ctx, count,
-						offset, IOMODE_READ);
-	dprintk("%s *rsize %Zd virt update returned %d\n",
+	if (count > 0 && !below_threshold(inode, count, 0)) {
+		status = virtual_update_layout(inode, ctx, count,
+						loff, IOMODE_READ);
+		dprintk("%s *rsize %Zd virt update returned %d\n",
 					__func__, *rsize, status);
+		if (status != 0)
+			return;
 
-	if (status == 0 && count > 0 && !below_threshold(inode, count, 0))
 		*rsize = NFS_SERVER(inode)->ds_rsize;
-
-	/* boundary set => gather pages by stripe => need pg_test */
-	pgio->pg_boundary = pnfs_getboundary(inode);
-	if (pgio->pg_boundary)
-		pnfs_set_pg_test(inode, pgio);
-
-	dprintk("<-- %s pg_boundary %d, pg_test %p\n", __func__,
-			pgio->pg_boundary, pgio->pg_test);
+		pgio->pg_boundary = pnfs_getboundary(inode);
+		if (pgio->pg_boundary)
+			pnfs_set_pg_test(inode, pgio);
+	}
 }
 
 
