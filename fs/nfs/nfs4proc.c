@@ -3086,6 +3086,23 @@ static void nfs4_proc_commit_setup(struct nfs_write_data *data, struct rpc_messa
 	msg->rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_COMMIT];
 }
 
+#if defined(CONFIG_PNFS)
+/*
+ * pNFS does not send a getattr on write.
+ */
+static void pnfs4_proc_write_setup(struct nfs_write_data *data,
+				   struct rpc_message *msg)
+{
+	struct nfs_server *server = NFS_SERVER(data->inode);
+
+	data->args.bitmask = server->attr_bitmask;
+	data->res.server = server;
+	data->timestamp   = jiffies;
+
+	msg->rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_PNFS_WRITE];
+}
+#endif /* CONFIG_PNFS */
+
 /*
  * nfs4_proc_async_renew(): This is not one of the nfs_rpc_ops; it is a special
  * standalone procedure for queueing an asynchronous RENEW.
@@ -5340,7 +5357,7 @@ const struct nfs_rpc_ops pnfs_v41_clientops = {
 	.decode_dirent	= nfs4_decode_dirent,
 	.read_setup	= nfs4_proc_read_setup,
 	.read_done	= pnfs4_read_done,
-	.write_setup	= nfs4_proc_write_setup,
+	.write_setup	= pnfs4_proc_write_setup,
 	.write_done	= pnfs4_write_done,
 	.commit_setup	= nfs4_proc_commit_setup,
 	.commit_done	= nfs4_commit_done,
