@@ -943,15 +943,6 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 		goto out;
 	}
 
-	if (!nfss->pnfs_curr_ld->ld_io_ops ||
-	    !nfss->pnfs_curr_ld->ld_io_ops->write_pagelist) {
-		printk(KERN_ERR
-		       "%s: ERROR, no layout driver write operation\n",
-		       __func__);
-		status = 1;
-		goto out;
-	}
-
 	/* Determine number of pages
 	 */
 	pgcount = args->pgbase + args->count;
@@ -1097,8 +1088,8 @@ int _pnfs_try_to_read_data(struct nfs_read_data *data,
 	}
 }
 
-int pnfs_try_to_write_data(struct nfs_write_data *data,
-				const struct rpc_call_ops *call_ops, int how)
+int _pnfs_try_to_write_data(struct nfs_write_data *data,
+			    const struct rpc_call_ops *call_ops, int how)
 {
 	struct inode *ino = data->inode;
 	struct nfs_server *nfss = NFS_SERVER(ino);
