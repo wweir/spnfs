@@ -45,6 +45,8 @@ struct layoutdriver_io_operations {
 	 */
 	ssize_t (*read_pagelist) (struct pnfs_layout_type *layoutid, struct inode *, struct page **pages, unsigned int pgbase, unsigned nr_pages, loff_t offset, size_t count, struct nfs_read_data *nfs_data);
 	ssize_t (*write_pagelist) (struct pnfs_layout_type *layoutid, struct inode *, struct page **pages, unsigned int pgbase, unsigned nr_pages, loff_t offset, size_t count, int sync, struct nfs_write_data *nfs_data);
+	int (*flush_one) (struct inode *inode, struct list_head *head, unsigned int npages, size_t count, int how);
+
 
 	/* Consistency ops */
 	/* 2 problems:
