@@ -72,6 +72,7 @@ extern struct nfs_write_data *nfs_commit_alloc(void);
 extern void nfs_commit_free(struct nfs_write_data *p);
 extern void nfs_initiate_write(struct nfs_write_data *, struct rpc_clnt *, const struct rpc_call_ops *, int);
 extern void nfs_initiate_read(struct nfs_read_data *data, struct rpc_clnt *clnt, const struct rpc_call_ops *call_ops);
+extern void nfs_initiate_commit(struct nfs_write_data *, struct rpc_clnt *, int);
 extern void nfs_read_validate(struct rpc_task *task, void *calldata);
 extern void nfs_readdata_release(void *data);
 extern void nfs_write_validate(struct rpc_task *task, void *calldata);
@@ -516,7 +517,7 @@ filelayout_fsync(struct pnfs_layout_type *layoutid,
  * Once we fix this, we will need to invoke the pnfs_commit_complete callback.
  */
 int
-filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino, struct list_head *pages, int sync, struct nfs_write_data *data)
+filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino, int sync, struct nfs_write_data *data)
 {
 	struct nfs_write_data   *dsdata = NULL;
 	struct pnfs_layout_type *laytype;
@@ -538,13 +539,13 @@ filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino, struct l
 
 	if (nfslay->commit_through_mds) {
 		dprintk("%s data %p commit through mds\n", __FUNCTION__, data);
-		nfs_commit_rpcsetup(data, sync);
-		nfs_execute_write(data);
-		return 0;
+		return 1;
 	}
+
 	dev = nfs4_pnfs_device_item_get(ino, nfslay->dev_id);
 	fdev = &dev->stripe_devs[0];
 
+	/* Gather pages per DS - Isn't this already done in nfs_pageio_init?*/
 	for (i = 0; i < nfslay->num_fh; i++) {
 		/* just try the first data server for the index..*/
 		ds = fdev->ds_list[0];
@@ -581,14 +582,12 @@ filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino, struct l
 		}
 		first = nfs_list_entry(dsdata->pages.next);
 
-		dprintk("%s call nfs_commit_rpcsetup i %d devid %d\n",
+		dprintk("%s call nfs_initiate_commit i %d devid %d\n",
 			__FUNCTION__, i, nfslay->dev_id);
 
 		dsdata->pnfs_client = ds->ds_clp->cl_rpcclient;
 		dsdata->ds_nfs_client =  ds->ds_clp;
 		dserver.dev = fdev;
-
-		nfs_commit_rpcsetup(dsdata, sync);
 
 		/* TODO: Is the FH different from NFS_FH(data->inode)?
 		 * (set in nfs_commit_rpcsetup)
@@ -596,7 +595,8 @@ filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino, struct l
 		dserver.fh = &nfslay->fh_array[i];
 		dsdata->args.fh = dserver.fh;
 
-		nfs_execute_write(dsdata);
+		nfs_initiate_commit(dsdata, dsdata->pnfs_client, sync);
+
 		dsdata = NULL;
 		fdev++;
 	}
