@@ -472,13 +472,6 @@ static void nfs_readpage_set_pages_uptodate(struct nfs_read_data *data)
 		SetPageUptodate(*pages);
 }
 
-#ifdef CONFIG_PNFS
-void pnfs_readpage_result_norpc(struct rpc_task *task, void *calldata)
-{
-	/* XXX Need to implement */
-}
-#endif
-
 /*
  * This is the callback from RPC telling us whether a reply was
  * received or some error occurred (timeout or socket shutdown).
