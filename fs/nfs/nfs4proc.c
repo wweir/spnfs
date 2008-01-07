@@ -2138,8 +2138,21 @@ static int
 pnfs4_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 		    struct iattr *sattr)
 {
-	/* XXX Need to implement */
-	return -1;
+	struct inode *inode = dentry->d_inode;
+	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs_inode *nfsi = NFS_I(inode);
+
+	if (pnfs_enabled_sb(server) && nfsi->current_layout) {
+		struct pnfs_layoutdriver_type *ld = server->pnfs_curr_ld;
+		struct layoutdriver_policy_operations *p_ops = ld->ld_policy_ops;
+
+		if (p_ops && p_ops->layoutret_on_setattr) {
+			if (nfsi->layoutcommit_ctx)
+				pnfs_layoutcommit_inode(inode, 0);
+			pnfs_return_layout(inode, NULL);
+		}
+	}
+	return nfs4_proc_setattr(dentry, fattr, sattr);
 }
 #endif /* CONFIG_PNFS */
 
@@ -5328,7 +5341,7 @@ const struct nfs_rpc_ops nfs_v40_clientops = {
 	.file_ops	= &nfs_file_operations,
 	.getroot	= nfs4_proc_get_root,
 	.getattr	= nfs4_proc_getattr,
-	.setattr	= nfs4_proc_setattr,
+	.setattr	= pnfs4_proc_setattr,
 	.lookupfh	= nfs4_proc_lookupfh,
 	.lookup		= nfs4_proc_lookup,
 	.access		= nfs4_proc_access,
