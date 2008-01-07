@@ -841,6 +841,7 @@ static int nfs_write_rpcsetup(struct nfs_page *req,
 		int how)
 {
 	struct inode *inode = req->wb_context->path.dentry->d_inode;
+	int ret;
 
 	/* Set up the RPC argument and reply structs
 	 * NB: take care not to mess about with data->commit et al. */
@@ -866,6 +867,10 @@ static int nfs_write_rpcsetup(struct nfs_page *req,
 	data->res.count   = count;
 	data->res.verf    = &data->verf;
 	nfs_fattr_init(&data->fattr);
+
+	ret = pnfs_try_to_write_data(data, call_ops, how);
+	if (ret <= 0)
+		return ret;
 
 	return nfs_initiate_write(data, NFS_CLIENT(inode), call_ops, how);
 }

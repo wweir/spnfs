@@ -36,7 +36,7 @@ int pnfs_use_ds_io(struct list_head *, struct inode *, int);
 
 int pnfs_use_write(struct inode *inode, ssize_t count);
 int pnfs_writepages(struct nfs_write_data *wdata, int how);
-int pnfs_try_to_write_data(struct nfs_write_data *, const struct rpc_call_ops *, int);
+int _pnfs_try_to_write_data(struct nfs_write_data *, const struct rpc_call_ops *, int);
 int pnfs_readpages(struct nfs_read_data *rdata);
 int _pnfs_try_to_read_data(struct nfs_read_data *data, const struct rpc_call_ops *call_ops);
 unsigned int pnfs_getboundary(struct inode *inode);
@@ -83,10 +83,31 @@ static inline int pnfs_try_to_read_data(struct nfs_read_data *data,
 	return 1;
 }
 
+static inline int pnfs_try_to_write_data(struct nfs_write_data *data,
+					 const struct rpc_call_ops *call_ops,
+					 int how)
+{
+	struct inode *inode = data->inode;
+	struct nfs_server *nfss = NFS_SERVER(inode);
+
+	/* FIXME: write_pagelist should probably be mandated */
+	if (PNFS_EXISTS_LDIO_OP(write_pagelist))
+		return _pnfs_try_to_write_data(data, call_ops, how);
+
+	return 1;
+}
+
 #else  /* CONFIG_PNFS */
 
 static inline int pnfs_try_to_read_data(struct nfs_read_data *data,
 					const struct rpc_call_ops *call_ops)
+{
+	return 1;
+}
+
+static inline int pnfs_try_to_write_data(struct nfs_write_data *data,
+					 const struct rpc_call_ops *call_ops,
+					 int how)
 {
 	return 1;
 }
