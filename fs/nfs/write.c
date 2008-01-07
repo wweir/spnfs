@@ -999,11 +999,6 @@ static void nfs_pageio_init_write(struct nfs_pageio_descriptor *pgio,
 }
 
 #ifdef CONFIG_PNFS
-void pnfs_writeback_done_norpc(struct rpc_task *task, void *calldata)
-{
-	printk("%s XXX Need to Implement\n", __func__);
-}
-
 void pnfs_commit_done_norpc(struct rpc_task *task, void *calldata)
 {
 	printk("%s XXX Need to Implement\n", __func__);
