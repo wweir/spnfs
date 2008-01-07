@@ -1115,21 +1115,20 @@ int _pnfs_try_to_write_data(struct nfs_write_data *data,
 	}
 }
 
-int pnfs_try_to_commit(struct inode *inode, struct nfs_write_data *data, struct list_head *head, int how)
+int _pnfs_try_to_commit(struct nfs_write_data *data,
+			struct list_head *head, int how)
 {
+	struct inode *inode = data->inode;
 	int status;
 
-	dprintk("%s:Begin\n", __func__);
 	if (!pnfs_use_write(inode, -1)) {
-		dprintk("%s:End not using pnfs\n", __func__);
+		dprintk("%s: Not using pNFS I/O\n", __func__);
 		return 1;
 	} else {
 		/* data->call_ops already set in nfs_commit_rpcsetup */
-		dprintk("%s Utilizing pNFS I/O\n", __func__);
+		dprintk("%s: Utilizing pNFS I/O\n", __func__);
 		status = pnfs_commit(inode, head, how, data);
-		if (status < 0)
-			return status;
-		return 0;
+		return status;
 	}
 }
 
@@ -1164,8 +1163,7 @@ pnfs_commit(struct inode *inode,
 	 * OR no layout have been retrieved,
 	 * use standard NFSv4 commit
 	 */
-	if (!nfsi->current_layout ||
-	    !nfss->pnfs_curr_ld->ld_io_ops->commit) {
+	if (!nfsi->current_layout) {
 		/* TODO: This doesn't match o_direct commit
 		 * processing.  We need to align regular
 		 * and o_direct commit processing.
