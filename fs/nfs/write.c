@@ -1056,6 +1056,11 @@ void nfs_write_validate(struct rpc_task *task, void *calldata)
 
 	setup_sequence = NFS_PROTO(data->inode)->validate_sequence_args;
 
+#ifdef CONFIG_PNFS
+	if (data->ds_nfs_client)
+		session = data->ds_nfs_client->cl_ds_session;
+#endif /* CONFIG_PNFS */
+
 	if (!setup_sequence || !setup_sequence(session,
 						&data->args.seq_args,
 						&data->res.seq_res,
@@ -1609,6 +1614,7 @@ void nfs_destroy_writepagecache(void)
 }
 
 EXPORT_SYMBOL(nfs_execute_write);
+EXPORT_SYMBOL(nfs_write_validate);
 EXPORT_SYMBOL(nfs_writedata_release);
 EXPORT_SYMBOL(nfs_flush_task_priority);
 EXPORT_SYMBOL(nfs_commit_rpcsetup);
