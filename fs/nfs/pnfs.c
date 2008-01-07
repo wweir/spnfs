@@ -61,8 +61,8 @@ extern int nfs4_pnfs_getdevicelist(struct nfs_fh *fh, struct nfs_server *server,
 				   struct pnfs_devicelist *devlist);
 extern int nfs4_pnfs_getdeviceinfo(struct inode *inode, u32 dev_id,
 				   struct pnfs_device *res);
-extern void nfs_execute_write(struct nfs_write_data *data);
-extern void nfs_commit_rpcsetup(struct nfs_write_data *data, int sync);
+extern void nfs_initiate_commit(struct nfs_write_data *data,
+				struct rpc_clnt *clnt, int how);
 
 struct pnfs_client_operations pnfs_ops;
 
@@ -1284,17 +1284,14 @@ int pnfs_try_to_commit(struct inode *inode, struct nfs_write_data *data, struct 
 {
 	int status;
 
-	dprintk("%s:Begin\n", __FUNCTION__);
 	if (!pnfs_use_write(inode, -1)) {
-		dprintk("%s:End not using pnfs\n", __FUNCTION__);
+		dprintk("%s: Not using pNFS I/O\n", __func__);
 		return 1;
 	} else {
 		/* data->call_ops already set in nfs_commit_rpcsetup */
-		dprintk("%s Utilizing pNFS I/O\n", __FUNCTION__);
+		dprintk("%s Utilizing pNFS I/O\n", __func__);
 		status = pnfs_commit(inode, head, how, data);
-		if (status < 0)
-			return status;
-		return 0;
+		return status;
 	}
 }
 
@@ -1335,9 +1332,9 @@ pnfs_commit(struct inode *inode,
 		 * processing.  We need to align regular
 		 * and o_direct commit processing.
 		 */
-		nfs_commit_rpcsetup(data, sync);
-		nfs_execute_write(data);
-		return 0;
+		dprintk("%s: Not using pNFS\n",__func__);
+		nfs_initiate_commit(data, NFS_CLIENT(inode), sync);
+		return 1;
 	}
 
 	dprintk("%s: Calling layout driver commit\n", __FUNCTION__);

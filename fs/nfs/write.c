@@ -1252,6 +1252,27 @@ void nfs_commit_release(void *wdata)
 	nfs_commit_free(wdata);
 }
 
+void nfs_initiate_commit(struct nfs_write_data *data,
+			struct rpc_clnt *clnt,
+			int how)
+{
+	struct inode *inode = data->inode;
+	int flags;
+
+	/* Set up the initial task struct.  */
+	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
+	rpc_init_task(&data->task, clnt, flags, &nfs_commit_ops, data);
+
+	NFS_PROTO(inode)->commit_setup(data, how);
+
+	data->task.tk_priority = flush_task_priority(how);
+	data->task.tk_cookie = (unsigned long)inode;
+
+	dprintk("NFS: %5u initiated commit call\n", data->task.tk_pid);
+
+	nfs_execute_write(data);
+}
+
 /*
  * Set up the argument/result storage required for the RPC call.
  */
@@ -1261,7 +1282,6 @@ void nfs_commit_rpcsetup(struct list_head *head,
 {
 	struct nfs_page		*first;
 	struct inode		*inode;
-	int flags;
 
 	/* Set up the RPC argument and reply structs
 	 * NB: take care not to mess about with data->commit et al. */
@@ -1282,15 +1302,13 @@ void nfs_commit_rpcsetup(struct list_head *head,
 	data->res.verf    = &data->verf;
 	nfs_fattr_init(&data->fattr);
 
-	/* Set up the initial task struct.  */
-	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
-	rpc_init_task(&data->task, NFS_CLIENT(inode), flags, &nfs_commit_ops, data);
-	NFS_PROTO(inode)->commit_setup(data, how);
+#ifdef CONFIG_PNFS
+	data->args.context = first->wb_context;  /* used by commit done */
 
-	data->task.tk_priority = flush_task_priority(how);
-	data->task.tk_cookie = (unsigned long)inode;
-	
-	dprintk("NFS: %5u initiated commit call\n", data->task.tk_pid);
+	if ((data->error = pnfs_try_to_commit(inode, data, head, how)) <= 0)
+		return;
+#endif /* CONFIG_PNFS */
+	nfs_initiate_commit(data, NFS_CLIENT(inode), how);
 }
 
 /*
@@ -1309,8 +1327,11 @@ nfs_commit_list(struct inode *inode, struct list_head *head, int how)
 
 	/* Set up the argument struct */
 	nfs_commit_rpcsetup(head, data, how);
+#ifdef CONFIG_PNFS
+	if (data->error)
+		return data->error;
+#endif /* CONFIG_PNFS */
 
-	nfs_execute_write(data);
 	return 0;
  out_bad:
 	while (!list_empty(head)) {
@@ -1651,5 +1672,6 @@ EXPORT_SYMBOL(nfs_writedata_release);
 EXPORT_SYMBOL(nfs_flush_task_priority);
 EXPORT_SYMBOL(nfs_commit_rpcsetup);
 EXPORT_SYMBOL(nfs_initiate_write);
+EXPORT_SYMBOL(nfs_initiate_commit);
 EXPORT_SYMBOL(nfs_commit_alloc);
 EXPORT_SYMBOL(nfs_commit_free);
