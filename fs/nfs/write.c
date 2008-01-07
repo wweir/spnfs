@@ -936,7 +936,8 @@ out_bad:
  * This is the case if nfs_updatepage detects a conflicting request
  * that has been written but not committed.
  */
-static int nfs_flush_one(struct inode *inode, struct list_head *head, unsigned int npages, size_t count, int how)
+int nfs_flush_one(struct inode *inode, struct list_head *head,
+		  unsigned int npages, size_t count, int how)
 {
 	struct nfs_page		*req;
 	struct page		**pages;
@@ -988,7 +989,11 @@ static void nfs_pageio_init_write(struct nfs_pageio_descriptor *pgio,
 	if (wsize < PAGE_CACHE_SIZE)
 		nfs_pageio_init(pgio, inode, nfs_flush_multi, wsize, ioflags);
 	else
+#ifdef CONFIG_PNFS
+		nfs_pageio_init(pgio, inode, pnfs_flush_one, wsize, ioflags);
+#else
 		nfs_pageio_init(pgio, inode, nfs_flush_one, wsize, ioflags);
+#endif /* CONFIG_PNFS */
 }
 
 #ifdef CONFIG_PNFS
@@ -1667,6 +1672,7 @@ EXPORT_SYMBOL(nfs_execute_write);
 EXPORT_SYMBOL(nfs_write_validate);
 EXPORT_SYMBOL(nfs_writedata_release);
 EXPORT_SYMBOL(nfs_flush_task_priority);
+EXPORT_SYMBOL(nfs_flush_one);
 EXPORT_SYMBOL(nfs_commit_rpcsetup);
 EXPORT_SYMBOL(nfs_initiate_write);
 EXPORT_SYMBOL(nfs_initiate_commit);
