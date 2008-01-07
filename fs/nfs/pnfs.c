@@ -939,6 +939,22 @@ pnfs_writeback_done(struct nfs_write_data *data, ssize_t status)
 	data->call_ops->rpc_release(data);
 }
 
+int
+pnfs_flush_one(struct inode *inode, struct list_head *head,
+	       unsigned int npages, size_t count, int how)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	struct layoutdriver_io_operations *io_ops;
+
+	if (nfsi->current_layout != NULL &&
+	    (nfss->pnfs_curr_ld->ld_io_ops->flush_one)) {
+		io_ops = nfss->pnfs_curr_ld->ld_io_ops;
+		return io_ops->flush_one(inode, head, npages, count, how);
+	} else
+		return nfs_flush_one(inode, head, npages, count, how);
+}
+
 /*
  * Call the appropriate parallel I/O subsystem write function.
  * If no I/O device driver exists, or one does match the returned
