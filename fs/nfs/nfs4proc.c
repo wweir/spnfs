@@ -3080,6 +3080,44 @@ static int pnfs4_write_done(struct rpc_task *task, struct nfs_write_data *data)
 	}
 	return 0;
 }
+
+/*
+ * rpc_call_done callback for a write to the MDS or to a filelayout Data Server
+ */
+static int pnfs4_commit_done(struct rpc_task *task, struct nfs_write_data *data)
+{
+	struct nfs_server *mds_svr = NFS_SERVER(data->inode);
+	struct nfs4_session *session = mds_svr->session;
+	struct nfs_client *client = mds_svr->nfs_client;
+
+	dprintk("--> %s task->tk_status %d\n", __func__, task->tk_status);
+
+	/* Is this a DS session */
+	if (data->ds_nfs_client) {
+		dprintk("%s DS read\n", __func__);
+		session = data->ds_nfs_client->cl_ds_session;
+		client = NULL; /* do not update mds lease...*/
+	}
+
+	nfs41_sequence_done(client, session, &data->res.seq_res,
+			    task->tk_status);
+
+	if (nfs4_async_handle_error(task, mds_svr, client) == -EAGAIN) {
+		rpc_restart_call(task);
+		return -EAGAIN;
+	}
+
+	if (task->tk_status >= 0) {
+		/* Update inode if commit to MDS */
+		if (!data->ds_nfs_client)
+			nfs_refresh_inode(data->inode, data->res.fattr);
+
+		/* Mark for LAYOUTCOMMIT */
+		pnfs_need_layoutcommit(NFS_I(data->inode), data->args.context);
+	}
+	dprintk("<-- %s\n", __func__);
+	return 0;
+}
 #endif /* CONFIG_PNFS */
 
 static void nfs4_proc_read_setup(struct nfs_read_data *data)
@@ -3194,7 +3232,7 @@ static void nfs4_proc_commit_setup(struct nfs_write_data *data, int how)
 		.rpc_argp = &data->args,
 		.rpc_resp = &data->res,
 		.rpc_cred = data->cred,
-	};	
+	};
 	struct nfs_server *server = NFS_SERVER(data->inode);
 	
 	data->args.bitmask = server->attr_bitmask;
@@ -3204,11 +3242,6 @@ static void nfs4_proc_commit_setup(struct nfs_write_data *data, int how)
 }
 
 #ifdef CONFIG_PNFS
-static void pnfs4_proc_commit_setup(struct nfs_write_data *data, int how)
-{
-	/* XXX Need to Implement */
-}
-
 /*
  * pNFS does not send a getattr on write.
  */
@@ -5538,7 +5571,7 @@ const struct nfs_rpc_ops pnfs_v41_clientops = {
 	.write_setup	= pnfs4_proc_write_setup,
 	.write_done	= pnfs4_write_done,
 	.commit_setup	= nfs4_proc_commit_setup,
-	.commit_done	= nfs4_commit_done,
+	.commit_done	= pnfs4_commit_done,
 	.file_open      = nfs_open,
 	.file_release   = nfs_release,
 	.lock		= nfs4_proc_lock,
