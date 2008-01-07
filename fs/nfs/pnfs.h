@@ -54,6 +54,7 @@ void pnfs_commit_done_norpc(struct rpc_task *, void *);
 void pnfs_pageio_init_read(struct nfs_pageio_descriptor *, struct inode *, struct nfs_open_context *, struct list_head *, size_t *);
 void pnfs_pageio_init_write(struct nfs_pageio_descriptor *, struct inode *);
 void pnfs_update_layout_commit(struct inode *, struct list_head *, pgoff_t, unsigned int);
+int pnfs_flush_one(struct inode *, struct list_head *, unsigned int, size_t, int);
 
 #define PNFS_EXISTS_LDIO_OP(opname) (nfss->pnfs_curr_ld && \
 				     nfss->pnfs_curr_ld->ld_io_ops && \

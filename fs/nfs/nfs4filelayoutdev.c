@@ -251,7 +251,7 @@ out_put:
 }
 
 /* Assumes lock is held */
-static int
+int
 unhash_ds(struct nfs4_pnfs_ds *ds)
 {
 
