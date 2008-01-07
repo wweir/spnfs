@@ -492,8 +492,7 @@ nfserr:
  */
 int
 filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino,
-		  struct list_head *pages, int sync,
-		  struct nfs_write_data *data)
+		  int sync, struct nfs_write_data *data)
 {
 	struct nfs_write_data   *dsdata = NULL;
 	struct pnfs_layout_type *laytype;
@@ -517,9 +516,11 @@ filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino,
 		dprintk("%s data %p commit through mds\n", __func__, data);
 		return 1;
 	}
+
 	dev = nfs4_pnfs_device_item_get(ino, nfslay->dev_id);
 	fdev = &dev->stripe_devs[0];
 
+	/* Gather pages per DS - Isn't this already done in nfs_pageio_init?*/
 	for (i = 0; i < nfslay->num_fh; i++) {
 		/* just try the first data server for the index..*/
 		ds = fdev->ds_list[0];
@@ -556,7 +557,7 @@ filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino,
 		}
 		first = nfs_list_entry(dsdata->pages.next);
 
-		dprintk("%s call nfs_commit_rpcsetup i %d devid %d\n",
+		dprintk("%s call nfs_initiate_commit i %d devid %d\n",
 			__func__, i, nfslay->dev_id);
 
 		dsdata->pnfs_client = ds->ds_clp->cl_rpcclient;
