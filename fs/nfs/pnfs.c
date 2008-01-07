@@ -607,6 +607,29 @@ use_page_cache(struct inode *inode)
 		return 0;
 }
 
+size_t
+pnfs_getthreshold(struct inode *inode, int iswrite)
+{
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	struct nfs_inode *nfsi = NFS_I(inode);
+	ssize_t threshold = 0;
+
+	if (!pnfs_enabled_sb(nfss) ||
+	    !nfss->pnfs_curr_ld->ld_policy_ops)
+		goto out;
+
+	if (iswrite && nfss->pnfs_curr_ld->ld_policy_ops->get_write_threshold) {
+		threshold = nfss->pnfs_curr_ld->ld_policy_ops->get_write_threshold(nfsi->current_layout, inode);
+		goto out;
+	}
+
+	if (!iswrite && nfss->pnfs_curr_ld->ld_policy_ops->get_read_threshold) {
+		threshold = nfss->pnfs_curr_ld->ld_policy_ops->get_read_threshold(nfsi->current_layout, inode);
+	}
+out:
+	return threshold;
+}
+
 /*
  * Ask the layout driver for the request size at which pNFS should be used
  * or standard NFSv4 I/O.  Writing directly to the NFSv4 server can
@@ -616,26 +639,9 @@ use_page_cache(struct inode *inode)
 static int
 below_threshold(struct inode *inode, size_t req_size, int iswrite)
 {
-	struct nfs_server *nfss = NFS_SERVER(inode);
-	struct nfs_inode *nfsi = NFS_I(inode);
-	ssize_t threshold = -1;
-
-	if (!pnfs_enabled_sb(nfss) ||
-	    !nfss->pnfs_curr_ld->ld_policy_ops)
-		return 0;
-
-	if (iswrite && nfss->pnfs_curr_ld->ld_policy_ops->get_write_threshold) {
-		threshold = nfss->pnfs_curr_ld->ld_policy_ops->get_write_threshold(nfsi->current_layout, inode);
-		dprintk("%s wthresh: %Zd\n", __FUNCTION__, threshold);
-		goto check;
-	}
-
-	if (!iswrite && nfss->pnfs_curr_ld->ld_policy_ops->get_read_threshold) {
-		threshold = nfss->pnfs_curr_ld->ld_policy_ops->get_read_threshold(nfsi->current_layout, inode);
-		dprintk("%s rthresh: %Zd\n", __FUNCTION__, threshold);
-	}
-
-check:
+	ssize_t threshold;
+ 
+	threshold = pnfs_getthreshold(inode, iswrite);
 	if ((ssize_t)req_size <= threshold)
 		return 1;
 	else
@@ -699,6 +705,8 @@ pnfs_pageio_init_read(struct nfs_pageio_descriptor *pgio,
 	loff_t loff;
 	int status = 0;
 
+	pgio->pg_threshold = 0;
+	pgio->pg_iswrite = 0;
 	pgio->pg_boundary = 0;
 	pgio->pg_test = NULL;
 
@@ -723,6 +731,14 @@ pnfs_pageio_init_read(struct nfs_pageio_descriptor *pgio,
 	}
 }
 
+void
+pnfs_pageio_init_write(struct nfs_pageio_descriptor *pgio, struct inode * inode)
+{
+	pgio->pg_iswrite = 1;
+	pgio->pg_threshold = pnfs_getthreshold(inode, 1);
+	pgio->pg_boundary = pnfs_getboundary(inode);
+	pnfs_set_pg_test(inode, pgio);
+}
 
 /* This is utilized in the paging system to determine if
  * it should use the NFSv4 or pNFS read path.
