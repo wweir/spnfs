@@ -887,7 +887,12 @@ pnfs_set_ds_iosize(struct nfs_server *server)
 	}
 }
 
-/* Invoked by all non-NFSv4 I/O layout drivers to mark pages for commit
+/* Post-write completion function.  Invoked by non RPC layout drivers
+ * to clean up write pages.
+ *
+ * NOTE: callers must set data->pnfsflags PNFS_NO_RPC
+ * so that the NFS cleanup routines perform only the page cache
+ * cleanup.
  */
 static void
 pnfs_writeback_done(struct nfs_write_data *data, ssize_t status)
@@ -902,7 +907,9 @@ pnfs_writeback_done(struct nfs_write_data *data, ssize_t status)
 	/* Status is the number of bytes written or an error code */
 	data->task.tk_status = status;
 	data->res.count = status;
-	pnfs_writeback_done_norpc(&data->task, data);
+
+	/* call the NFS cleanup routines. */
+	data->call_ops->rpc_call_done(&data->task, data);
 	data->call_ops->rpc_release(data);
 }
 
