@@ -751,6 +751,14 @@ static int nfs4_stat_to_errno(int);
 					decode_sequence_maxsz + \
 					decode_putfh_maxsz + \
 					decode_pnfs_layoutreturn_maxsz)
+#define NFS41_enc_pnfs_write_sz		(compound_encode_hdr_maxsz + \
+					encode_sequence_maxsz +\
+					encode_putfh_maxsz + \
+					encode_write_maxsz)
+#define NFS41_dec_pnfs_write_sz 	(compound_decode_hdr_maxsz + \
+					decode_sequence_maxsz + \
+					decode_putfh_maxsz + \
+					decode_write_maxsz)
 #endif /* CONFIG_PNFS */
 
 static struct {
@@ -3348,6 +3356,31 @@ static int nfs41_xdr_enc_pnfs_layoutreturn(struct rpc_rqst *req, uint32_t *p,
 	if (status)
 		goto out;
 	status = encode_pnfs_layoutreturn(&xdr, args);
+out:
+	return status;
+}
+
+/*
+ * Encode a PNFS WRITE request
+ */
+static int nfs41_xdr_enc_pnfs_write(struct rpc_rqst *req, uint32_t *p,
+				    struct nfs_writeargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+	status = encode_sequence(&xdr, &args->seq_args);
+	if (status)
+		goto out;
+	status = encode_putfh(&xdr, args->fh);
+	if (status)
+		goto out;
+	status = encode_write(&xdr, args);
 out:
 	return status;
 }
@@ -7374,6 +7407,33 @@ out:
 	return status;
 }
 
+/*
+ * Decode PNFS WRITE response
+ */
+static int nfs41_xdr_dec_pnfs_write(struct rpc_rqst *rqstp, uint32_t *p,
+				    struct nfs_writeres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = decode_putfh(&xdr);
+	if (status)
+		goto out;
+	status = decode_write(&xdr, res);
+	if (!status)
+		status = res->count;
+out:
+	return status;
+}
+
 #endif /* CONFIG_PNFS */
 
 __be32 *nfs4_decode_dirent(__be32 *p, struct nfs_entry *entry, int plus)
@@ -7593,6 +7653,7 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(PNFS_GETDEVICEINFO, enc_pnfs_getdeviceinfo, dec_pnfs_getdeviceinfo, 1),
   PROC(PNFS_LAYOUTGET,	enc_pnfs_layoutget,	dec_pnfs_layoutget, 1),
   PROC(PNFS_LAYOUTRETURN, enc_pnfs_layoutreturn,  dec_pnfs_layoutreturn, 1),
+  PROC(PNFS_WRITE, enc_pnfs_write,  dec_pnfs_write, 1),
 #endif /* CONFIG_PNFS */
 };
 #endif /* CONFIG_NFS_V4_1 */
