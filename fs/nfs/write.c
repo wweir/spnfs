@@ -1461,6 +1461,9 @@ long nfs_sync_mapping_wait(struct address_space *mapping, struct writeback_contr
 		}
 		pages += nfs_scan_commit(inode, &head, 0, 0);
 		spin_unlock(&inode->i_lock);
+#ifdef CONFIG_PNFS
+		pnfs_update_layout_commit(inode, &head, idx_start, npages);
+#endif /* CONFIG_PNFS */
 		ret = nfs_commit_list(inode, &head, how);
 		spin_lock(&inode->i_lock);
 
