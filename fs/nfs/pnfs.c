@@ -487,7 +487,8 @@ pnfs_free_layout(struct pnfs_layout_type *lo,
 		 struct nfs4_pnfs_layout_segment *range)
 {
 	struct pnfs_layout_segment *lseg, *next;
-	dprintk("%s:Begin\n", __FUNCTION__);
+	dprintk("%s:Begin lo %p offset %llu length %lld iomode %d\n",
+		__func__, lo, range->offset, range->length, range->iomode);
 
 	BUG_ON_UNLOCKED_LO(lo);
 	list_for_each_entry_safe (lseg, next, &lo->segs, fi_list) {
