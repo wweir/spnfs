@@ -1141,8 +1141,7 @@ int _pnfs_try_to_write_data(struct nfs_write_data *data,
 	}
 }
 
-int _pnfs_try_to_commit(struct nfs_write_data *data,
-			struct list_head *head, int how)
+int _pnfs_try_to_commit(struct nfs_write_data *data)
 {
 	struct inode *inode = data->inode;
 	int status;
@@ -1151,9 +1150,9 @@ int _pnfs_try_to_commit(struct nfs_write_data *data,
 		dprintk("%s: Not using pNFS I/O\n", __func__);
 		return 1;
 	} else {
-		/* data->call_ops already set in nfs_commit_rpcsetup */
+		/* data->call_ops and data->how set in nfs_commit_rpcsetup */
 		dprintk("%s: Utilizing pNFS I/O\n", __func__);
-		status = pnfs_commit(inode, head, how, data);
+		status = pnfs_commit(data, data->how);
 		return status;
 	}
 }
@@ -1175,14 +1174,11 @@ pnfs_commit_done(struct nfs_write_data *data, ssize_t status)
 }
 
 int
-pnfs_commit(struct inode *inode,
-	    struct list_head *head,
-	    int sync,
-	    struct nfs_write_data *data)
+pnfs_commit(struct nfs_write_data *data, int sync)
 {
 	int result = 0;
-	struct nfs_inode *nfsi = NFS_I(inode);
-	struct nfs_server *nfss = NFS_SERVER(inode);
+	struct nfs_inode *nfsi = NFS_I(data->inode);
+	struct nfs_server *nfss = NFS_SERVER(data->inode);
 	dprintk("%s: Begin\n", __func__);
 
 	/* If the layout driver doesn't define its own commit function
@@ -1200,7 +1196,7 @@ pnfs_commit(struct inode *inode,
 
 	dprintk("%s: Calling layout driver commit\n", __func__);
 	result = nfss->pnfs_curr_ld->ld_io_ops->commit(nfsi->current_layout,
-						       inode, head, sync, data);
+						       data->inode, sync, data);
 
 	dprintk("%s end (err:%d)\n", __func__, result);
 	return result;
