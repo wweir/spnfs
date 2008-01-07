@@ -57,7 +57,7 @@ int pnfs_wpages(struct inode *);
 void pnfs_readpage_result_norpc(struct rpc_task *task, void *calldata);
 void pnfs_writeback_done_norpc(struct rpc_task *, void *);
 void pnfs_commit_done_norpc(struct rpc_task *, void *);
-void pnfs_set_ds_rsize(struct inode *, struct nfs_open_context *, struct list_head *, unsigned long, loff_t, size_t *, struct nfs_pageio_descriptor *);
+void pnfs_pageio_init_read(struct nfs_pageio_descriptor *, struct inode *, struct nfs_open_context *, struct list_head *, size_t *);
 
 #define PNFS_EXISTS_LDIO_OP(opname) (nfss->pnfs_curr_ld && \
 				     nfss->pnfs_curr_ld->ld_io_ops && \
