@@ -231,7 +231,9 @@ struct rpc_call_ops filelayout_read_call_ops = {
 };
 
 struct rpc_call_ops filelayout_write_call_ops = {
+	.rpc_call_validate_args = nfs_write_validate,
 	.rpc_call_done = filelayout_write_call_done,
+	.rpc_release = nfs_writedata_release,
 };
 
 /* Perform sync or async reads.
@@ -354,14 +356,14 @@ ssize_t filelayout_write_pagelist(
 					count,
 					&dserver);
 	if (status) {
-		dprintk("NFS_FILELAYOUT: %s failed to get dataserver\n",
-			__func__);
+		dprintk("%s failed to get dataserver\n", __func__);
+		data->ds_nfs_client = NULL;
 		return -EIO;
 	} else {
 		/* just try the first data server for the index.. */
 		ds = dserver.dev->ds_list[0];
 		data->pnfs_client = ds->ds_clp->cl_rpcclient;
-		data->session = ds->ds_clp->cl_ds_session;
+		data->ds_nfs_client = ds->ds_clp;
 		data->args.fh = dserver.fh;
 	}
 	dprintk("%s set wb_devip: wb_devport %x:%hu\n", __func__,
@@ -376,17 +378,15 @@ ssize_t filelayout_write_pagelist(
 	/* Now get the file offset on the dserver
 	 * Set the write offset to this offset, and
 	 * save the original offset in orig_offset
+	 * the offset will be reset in the call_ops->rpc_call_done() routine.
 	 */
 	data->args.offset = filelayout_get_dserver_offset(offset, nfslay);
 	data->orig_offset = offset;
 
-	/* Perform an asynchronous read */
+	/* Perform an asynchronous write */
 	BUG_ON(data->pnfsflags & PNFS_ISSYNC);
 	nfs_initiate_write(data, data->pnfs_client,
 			&filelayout_write_call_ops, sync);
-	/* In the case of aync writes, the offset will be reset in the
-	 * call_ops->rpc_call_done() routine
-	 */
 
 	return 0;
 }
@@ -560,7 +560,7 @@ filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino,
 			__func__, i, nfslay->dev_id);
 
 		dsdata->pnfs_client = ds->ds_clp->cl_rpcclient;
-		dsdata->session =  ds->ds_clp->cl_ds_session;
+		dsdata->ds_nfs_client =  ds->ds_clp;
 		dserver.dev = fdev;
 
 		/* TODO: Is the FH different from NFS_FH(data->inode)?
