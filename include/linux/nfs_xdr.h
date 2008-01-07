@@ -1083,7 +1083,7 @@ struct nfs_write_data {
 	int			pnfsflags;
 	__u64			orig_offset;
 	int			how;		/* for FLUSH_STABLE */
-	struct nfs4_session	*session;
+	struct nfs_client	*ds_nfs_client;
 #endif /* CONFIG_PNFS */
 	struct page		*page_array[NFS_PAGEVEC_SIZE];
 };
