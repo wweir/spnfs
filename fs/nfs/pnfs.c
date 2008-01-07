@@ -547,7 +547,7 @@ virtual_update_layout(struct inode *ino,
 	}
 
 	if (res.return_on_close) {
-		layout_new->roc_iomode = res.lseg.iomode;
+		layout_new->roc_iomode |= res.lseg.iomode;
 		if (!layout_new->roc_iomode)
 			layout_new->roc_iomode = IOMODE_ANY;
 	}
