@@ -115,6 +115,7 @@ void nfs_writedata_release(void *wdata)
 {
 	nfs_writedata_free(wdata);
 }
+EXPORT_SYMBOL(nfs_writedata_release);
 
 static void nfs_context_set_write_error(struct nfs_open_context *ctx, int error)
 {
@@ -1059,11 +1060,17 @@ int nfs_write_validate(struct rpc_task *task, void *calldata)
 	struct nfs_server *server = NFS_SERVER(data->inode);
 	struct nfs4_session *session = server->session;
 
+#ifdef CONFIG_PNFS
+	if (data->ds_nfs_client)
+		session = data->ds_nfs_client->cl_ds_session;
+#endif /* CONFIG_PNFS */
+
 	return nfs41_call_validate_seq_args(server, session,
 					    &data->args.seq_args,
 					    &data->res.seq_res,
 					    1, task);
 }
+EXPORT_SYMBOL(nfs_write_validate);
 #endif /* CONFIG_NFS_V4_1 */
 
 static const struct rpc_call_ops nfs_write_partial_ops = {
