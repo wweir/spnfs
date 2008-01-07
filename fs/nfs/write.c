@@ -50,6 +50,10 @@ static const struct rpc_call_ops nfs_commit_ops;
 static struct kmem_cache *nfs_wdata_cachep;
 static mempool_t *nfs_wdata_mempool;
 static mempool_t *nfs_commit_mempool;
+void nfs_initiate_write(struct nfs_write_data *data,
+			struct rpc_clnt *clnt,
+			const struct rpc_call_ops *call_ops,
+			int how);
 
 struct nfs_write_data *nfs_commit_alloc(void)
 {
@@ -773,14 +777,14 @@ static inline int flush_task_priority(int how)
 /*
  * Set up the argument/result storage required for the RPC call.
  */
-static void nfs_write_rpcsetup(struct nfs_page *req,
+static int nfs_write_rpcsetup(struct nfs_page *req,
 		struct nfs_write_data *data,
 		const struct rpc_call_ops *call_ops,
 		unsigned int count, unsigned int offset,
 		int how)
 {
 	struct inode		*inode;
-	int flags;
+	int ret = 0;
 
 	/* Set up the RPC argument and reply structs
 	 * NB: take care not to mess about with data->commit et al. */
@@ -801,21 +805,13 @@ static void nfs_write_rpcsetup(struct nfs_page *req,
 	data->res.verf    = &data->verf;
 	nfs_fattr_init(&data->fattr);
 
-	/* Set up the initial task struct.  */
-	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
-	rpc_init_task(&data->task, NFS_CLIENT(inode), flags, call_ops, data);
-	NFS_PROTO(inode)->write_setup(data, how);
+#ifdef CONFIG_PNFS
+	if ((ret = pnfs_try_to_write_data(data, call_ops, how)) <= 0)
+		return ret;
+#endif /* CONFIG_PNFS */
 
-	data->task.tk_priority = flush_task_priority(how);
-	data->task.tk_cookie = (unsigned long)inode;
-
-	dprintk("NFS: %5u initiated write call "
-		"(req %s/%Ld, %u bytes @ offset %Lu)\n",
-		data->task.tk_pid,
-		inode->i_sb->s_id,
-		(long long)NFS_FILEID(inode),
-		count,
-		(unsigned long long)data->args.offset);
+	nfs_initiate_write(data, NFS_CLIENT(inode), call_ops, how);
+	return ret;
 }
 
 inline int nfs_flush_task_priority(int how)
@@ -878,6 +874,7 @@ static int nfs_flush_multi(struct inode *inode, struct list_head *head, unsigned
 	unsigned int offset;
 	int requests = 0;
 	LIST_HEAD(list);
+	int ret = 0;
 
 	nfs_list_remove_request(req);
 
@@ -905,11 +902,14 @@ static int nfs_flush_multi(struct inode *inode, struct list_head *head, unsigned
 
 		if (nbytes < wsize)
 			wsize = nbytes;
-		nfs_write_rpcsetup(req, data, &nfs_write_partial_ops,
+		ret = nfs_write_rpcsetup(req, data, &nfs_write_partial_ops,
 				   wsize, offset, how);
+#ifdef CONFIG_PNFS
+		if (ret < 0)
+			return ret;
+#endif /* CONFIG_PNFS */
 		offset += wsize;
 		nbytes -= wsize;
-		nfs_execute_write(data);
 	} while (nbytes != 0);
 
 	return 0;
@@ -939,6 +939,7 @@ static int nfs_flush_one(struct inode *inode, struct list_head *head, unsigned i
 	struct nfs_page		*req;
 	struct page		**pages;
 	struct nfs_write_data	*data;
+	int ret = 0;
 
 	data = nfs_writedata_alloc(npages);
 	if (!data)
@@ -955,9 +956,12 @@ static int nfs_flush_one(struct inode *inode, struct list_head *head, unsigned i
 	req = nfs_list_entry(data->pages.next);
 
 	/* Set up the argument struct */
-	nfs_write_rpcsetup(req, data, &nfs_write_full_ops, count, 0, how);
+	ret = nfs_write_rpcsetup(req, data, &nfs_write_full_ops, count, 0, how);
+#ifdef CONFIG_PNFS
+        if (ret < 0)
+                return ret;
+#endif /* CONFIG_PNFS */
 
-	nfs_execute_write(data);
 	return 0;
  out_bad:
 	while (!list_empty(head)) {
