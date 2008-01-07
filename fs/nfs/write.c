@@ -1305,8 +1305,10 @@ int nfs_commit_rpcsetup(struct list_head *head,
 
 #ifdef CONFIG_PNFS
 	data->args.context = first->wb_context;  /* used by commit done */
+	data->call_ops = &nfs_commit_ops;
+	data->how = how;
 
-	if ((ret = pnfs_try_to_commit(inode, data, head, how)) <= 0)
+	if ((ret = pnfs_try_to_commit(data)) <= 0)
 		return ret;
 #endif /* CONFIG_PNFS */
 	nfs_initiate_commit(data, NFS_CLIENT(inode), how);
