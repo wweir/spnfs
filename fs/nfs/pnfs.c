@@ -63,6 +63,8 @@ extern int nfs4_pnfs_getdeviceinfo(struct inode *inode, u32 dev_id,
 				   struct pnfs_device *res);
 extern void nfs_initiate_commit(struct nfs_write_data *data,
 				struct rpc_clnt *clnt, int how);
+extern int nfs_flush_one(struct inode *inode, struct list_head *head,
+				unsigned int npages, size_t count, int how);
 
 struct pnfs_client_operations pnfs_ops;
 
@@ -956,6 +958,22 @@ pnfs_writeback_done(struct nfs_write_data *data, ssize_t status)
 	/* call the NFS cleanup routines. */
 	data->call_ops->rpc_call_done(&data->task, data);
 	data->call_ops->rpc_release(data);
+}
+
+int
+pnfs_flush_one(struct inode *inode, struct list_head *head,
+	       unsigned int npages, size_t count, int how)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	struct layoutdriver_io_operations *io_ops;
+
+	if (nfsi->current_layout != NULL &&
+	    (nfss->pnfs_curr_ld->ld_io_ops->flush_one)) {
+		io_ops = nfss->pnfs_curr_ld->ld_io_ops;
+		return io_ops->flush_one(inode, head, npages, count, how);
+	} else
+		return nfs_flush_one(inode, head, npages, count, how);
 }
 
 /*
