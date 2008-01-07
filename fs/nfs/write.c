@@ -1275,6 +1275,7 @@ int nfs_commit_rpcsetup(struct list_head *head,
 {
 	struct nfs_page *first = nfs_list_entry(head->next);
 	struct inode *inode = first->wb_context->path.dentry->d_inode;
+	int ret;
 
 	/* Set up the RPC argument and reply structs
 	 * NB: take care not to mess about with data->commit et al. */
@@ -1292,6 +1293,11 @@ int nfs_commit_rpcsetup(struct list_head *head,
 	data->res.fattr   = &data->fattr;
 	data->res.verf    = &data->verf;
 	nfs_fattr_init(&data->fattr);
+
+	data->args.context = first->wb_context;  /* used by commit done */
+	ret = pnfs_try_to_commit(data, head, how);
+	if (ret <= 0)
+		return ret;
 
 	return nfs_initiate_commit(data, NFS_CLIENT(inode), how);
 }
