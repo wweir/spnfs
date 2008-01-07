@@ -1403,39 +1403,6 @@ struct pnfs_client_operations pnfs_ops = {
 	.nfs_commit_complete = pnfs_commit_done,
 };
 
-int
-pnfs_wsize(struct inode *inode, unsigned int count, struct nfs_write_data *wdata)
-{
-	if (count >= 0 && below_threshold(inode, count, 1))
-		return NFS_SERVER(inode)->wsize;
-
-	return NFS_SERVER(inode)->ds_wsize;
-}
-
-/*
- * pnfs_rpages, pnfs_wpages.
- *
- * TODO:  We have a chicken and egg problem since
- * at the point that we call the pnfs_rpages or pnfs_wpages,
- *  we don't know the size of the request, and so
- * we can't determine if we are using pNFS or NFSv4, so we
- * can't determine if we should use the ds_wpages or the w_pages
- * value.  Ensure that if you are setting your blocksize (wsize) larger
- * than what the MDS can support, you set your write threshold to
- * a maximum value of the MDS wsize.
- */
-int
-pnfs_rpages(struct inode *inode)
-{
-	return NFS_SERVER(inode)->ds_rpages;
-}
-
-int
-pnfs_wpages(struct inode *inode)
-{
-	return NFS_SERVER(inode)->ds_wpages;
-}
-
 EXPORT_SYMBOL(pnfs_unregister_layoutdriver);
 EXPORT_SYMBOL(pnfs_register_layoutdriver);
 
