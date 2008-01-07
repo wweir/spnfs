@@ -1222,6 +1222,16 @@ pnfs_file_write(struct file *filp,
 		 (unsigned long) count,
 		 (unsigned long) *pos);
 
+	/* Step 1: Retrieve and set layout if not allready cached*/
+	if ((result = virtual_update_layout(inode,
+					    (struct nfs_open_context *)filp->private_data,
+					    count,
+					    *pos,
+					    IOMODE_RW))) {
+		dfprintk(IO, "%s: Could not get layout result=%Zd, using NFSv4 write\n",__FUNCTION__, result);
+		goto fallback;
+	}
+
 	/* Using NFS page cache with pNFS */
 	if (use_page_cache(inode))
 		goto fallback;
@@ -1237,17 +1247,6 @@ pnfs_file_write(struct file *filp,
 
 	dprintk("%s:Readjusted %lu@%lu)\n", __FUNCTION__,
 		(unsigned long) count, (unsigned long) *pos);
-
-	/* Step 1: Retrieve and set layout if not allready cached */
-	result = virtual_update_layout(inode,
-				(struct nfs_open_context *)filp->private_data,
-				count,
-				*pos,
-				IOMODE_RW);
-	if (result) {
-		dfprintk(IO, "%s: Could not get layout result=%Zd, using NFSv4 write\n", __FUNCTION__, result);
-		goto fallback;
-	}
 
 	/* Step 2: Call I/O device driver's write function */
 	if (!nfss->pnfs_curr_ld->ld_io_ops &&
