@@ -1166,10 +1166,6 @@ struct nfs_rpc_ops {
 	void 	(*increment_lock_seqid)(int status, struct nfs_seqid *seqid);
 	u64	(*nfs4_clientid)(struct nfs_client *);
 #if defined(CONFIG_PNFS)
-	int	(*rsize) (struct inode *, unsigned int, struct nfs_read_data *);
-	int	(*wsize) (struct inode *, unsigned int, struct nfs_write_data *);
-	int	(*rpages) (struct inode *);
-	int	(*wpages) (struct inode *);
 	int	(*pnfs_layoutget)(struct nfs4_pnfs_layoutget *layout);
 	int	(*pnfs_layoutcommit)  (struct pnfs_layoutcommit_data *);
 	int	(*pnfs_layoutreturn)(struct nfs4_pnfs_layoutreturn *layout);
