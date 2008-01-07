@@ -1276,12 +1276,13 @@ void nfs_initiate_commit(struct nfs_write_data *data,
 /*
  * Set up the argument/result storage required for the RPC call.
  */
-void nfs_commit_rpcsetup(struct list_head *head,
+int nfs_commit_rpcsetup(struct list_head *head,
 		struct nfs_write_data *data,
 		int how)
 {
 	struct nfs_page		*first;
 	struct inode		*inode;
+	int ret = 0;
 
 	/* Set up the RPC argument and reply structs
 	 * NB: take care not to mess about with data->commit et al. */
@@ -1305,10 +1306,11 @@ void nfs_commit_rpcsetup(struct list_head *head,
 #ifdef CONFIG_PNFS
 	data->args.context = first->wb_context;  /* used by commit done */
 
-	if ((data->error = pnfs_try_to_commit(inode, data, head, how)) <= 0)
-		return;
+	if ((ret = pnfs_try_to_commit(inode, data, head, how)) <= 0)
+		return ret;
 #endif /* CONFIG_PNFS */
 	nfs_initiate_commit(data, NFS_CLIENT(inode), how);
+	return ret;
 }
 
 /*
@@ -1319,6 +1321,7 @@ nfs_commit_list(struct inode *inode, struct list_head *head, int how)
 {
 	struct nfs_write_data	*data;
 	struct nfs_page         *req;
+	int ret;
 
 	data = nfs_commit_alloc();
 
@@ -1326,10 +1329,10 @@ nfs_commit_list(struct inode *inode, struct list_head *head, int how)
 		goto out_bad;
 
 	/* Set up the argument struct */
-	nfs_commit_rpcsetup(head, data, how);
+	ret = nfs_commit_rpcsetup(head, data, how);
 #ifdef CONFIG_PNFS
-	if (data->error)
-		return data->error;
+	if (ret < 0)
+		return ret;
 #endif /* CONFIG_PNFS */
 
 	return 0;
@@ -1473,6 +1476,9 @@ long nfs_sync_mapping_wait(struct address_space *mapping, struct writeback_contr
 		}
 		pages += nfs_scan_commit(inode, &head, 0, 0);
 		spin_unlock(&inode->i_lock);
+#ifdef CONFIG_PNFS
+		pnfs_update_layout_commit(inode, &head, idx_start, npages);
+#endif /* CONFIG_PNFS */
 		ret = nfs_commit_list(inode, &head, how);
 		spin_lock(&inode->i_lock);
 
