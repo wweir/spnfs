@@ -47,6 +47,7 @@ struct nfs_page {
 #ifdef CONFIG_PNFS
 	unsigned int		wb_devip;	/* pNFS data server IP addr */
 	unsigned int		wb_devport;	/* pNFS data server port */
+	void			*wb_private;
 #endif
 };
 
