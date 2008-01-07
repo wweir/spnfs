@@ -1009,11 +1009,6 @@ pnfs_writeback_done_update(struct nfs_write_data *data)
 		pnfs_need_layoutcommit(nfsi, argp->context);
 }
 
-void pnfs_writeback_done_norpc(struct rpc_task *task, void *calldata)
-{
-	printk("%s XXX Need to Implement\n", __func__);
-}
-
 void pnfs_commit_done_norpc(struct rpc_task *task, void *calldata)
 {
 	printk("%s XXX Need to Implement\n", __func__);
@@ -1045,7 +1040,11 @@ static void nfs_writeback_done_partial(struct rpc_task *task, void *calldata)
 		goto out;
 	}
 
+#ifdef CONFIG_PNFS
+	if (!(data->pnfsflags & PNFS_NO_RPC) && nfs_write_need_commit(data)) {
+#else
 	if (nfs_write_need_commit(data)) {
+#endif /* CONFIG_PNFS */
 		struct inode *inode = page->mapping->host;
 
 		spin_lock(&inode->i_lock);
@@ -1214,7 +1213,11 @@ int nfs_writeback_done(struct rpc_task *task, struct nfs_write_data *data)
 		nfs_inc_stats(data->inode, NFSIOS_SHORTWRITE);
 
 		/* Has the server at least made some progress? */
+#ifdef CONFIG_PNFS
+		if (resp->count != 0 && !(data->pnfsflags & PNFS_NO_RPC)) {
+#else
 		if (resp->count != 0) {
+#endif /* CONFIG_PNFS */
 			/* Was this an NFSv2 write or an NFSv3 stable write? */
 			if (resp->verf->committed != NFS_UNSTABLE) {
 				/* Resend from where the server left off */
