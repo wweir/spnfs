@@ -1295,7 +1295,9 @@ int nfs_commit_rpcsetup(struct list_head *head,
 	nfs_fattr_init(&data->fattr);
 
 	data->args.context = first->wb_context;  /* used by commit done */
-	ret = pnfs_try_to_commit(data, head, how);
+	data->call_ops = &nfs_commit_ops;
+	data->how = how;
+	ret = pnfs_try_to_commit(data);
 	if (ret <= 0)
 		return ret;
 
