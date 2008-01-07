@@ -14,6 +14,8 @@
 
 #if defined(CONFIG_PNFS)
 
+#include <linux/nfs_page.h>
+
 #define NFS4_PNFS_DEV_MAXCOUNT 16
 #define NFS4_PNFS_DEV_MAXSIZE 128
 
@@ -79,7 +81,7 @@ struct layoutdriver_policy_operations {
 	int (*gather_across_stripes) (struct pnfs_mount_type *mountid);
 
 	/* test for nfs page cache coalescing */
-	int (*pg_test)(int, struct nfs_page *, struct nfs_page *);
+	int (*pg_test)(struct nfs_pageio_descriptor *, struct nfs_page *, struct nfs_page *);
 
 	/* Retreive the block size of the file system.  If gather_across_stripes == 1,
 	 * then the file system will gather requests into the block size.
