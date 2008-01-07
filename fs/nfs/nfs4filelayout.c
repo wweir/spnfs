@@ -609,16 +609,17 @@ filelayout_gather_across_stripes(struct pnfs_mount_type *mountid)
  * return 0 :  pref and req on different stripe.
  */
 int
-filelayout_pg_test(int boundary, struct nfs_page *prev, struct nfs_page *req)
+filelayout_pg_test(struct nfs_pageio_descriptor *pgio, struct nfs_page *prev,
+		   struct nfs_page *req)
 {
 	u32 p_stripe, r_stripe;
 
-	if (boundary == 0)
+	if (pgio->pg_boundary == 0)
 		return 1;
 	p_stripe = prev->wb_index << PAGE_CACHE_SHIFT;
-	do_div(p_stripe, boundary);
+	do_div(p_stripe, pgio->pg_boundary);
 	r_stripe = req->wb_index << PAGE_CACHE_SHIFT;
-	do_div(r_stripe, boundary);
+	do_div(r_stripe, pgio->pg_boundary);
 
 	return (p_stripe == r_stripe);
 }
