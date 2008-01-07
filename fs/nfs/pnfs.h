@@ -56,6 +56,7 @@ void pnfs_readpage_result_norpc(struct rpc_task *task, void *calldata);
 void pnfs_writeback_done_norpc(struct rpc_task *, void *);
 void pnfs_commit_done_norpc(struct rpc_task *, void *);
 void pnfs_pageio_init_read(struct nfs_pageio_descriptor *, struct inode *, struct nfs_open_context *, struct list_head *, size_t *);
+void pnfs_pageio_init_write(struct nfs_pageio_descriptor *, struct inode *);
 
 #endif /* CONFIG_PNFS */
 
