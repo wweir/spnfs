@@ -23,6 +23,7 @@
 #include <asm/uaccess.h>
 #if defined(CONFIG_PNFS)
 #include <linux/module.h>
+#include "pnfs.h"
 #endif
 
 #include "delegation.h"
@@ -975,8 +976,7 @@ static void nfs_pageio_init_write(struct nfs_pageio_descriptor *pgio,
 	int wsize = NFS_SERVER(inode)->wsize;
 
 #ifdef CONFIG_PNFS
-	pgio->pg_boundary = 0;
-	pgio->pg_test = NULL;
+	pnfs_pageio_init_write(pgio, inode);
 #endif /* CONFIG_PNFS */
 
 	if (wsize < PAGE_CACHE_SIZE)
