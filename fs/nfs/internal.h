@@ -216,6 +216,8 @@ extern int nfs_initiate_write(struct nfs_write_data *data,
 extern int nfs_write_validate(struct rpc_task *task, void *calldata);
 extern int nfs_initiate_commit(struct nfs_write_data *data,
 			       struct rpc_clnt *clnt, int how);
+extern int nfs_flush_one(struct inode *inode, struct list_head *head,
+			 unsigned int npages, size_t count, int how);
 
 /*
  * Determine the device name as a string
