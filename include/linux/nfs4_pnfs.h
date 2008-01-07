@@ -51,7 +51,7 @@ struct layoutdriver_io_operations {
 	 * 1) the page list contains nfs_pages, NOT pages
 	 * 2) currently the NFS code doesn't create a page array (as it does with read/write)
 	 */
-	int (*commit) (struct pnfs_layout_type *layoutid, struct inode *, struct list_head *, int sync, struct nfs_write_data *nfs_data);
+	int (*commit) (struct pnfs_layout_type *layoutid, struct inode *, int sync, struct nfs_write_data *nfs_data);
 
 	/* Layout information. For each inode, alloc_layout is executed once to retrieve an
 	 * inode specific layout structure.  Each subsequent layoutget operation results in

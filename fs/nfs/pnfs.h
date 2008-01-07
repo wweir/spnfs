@@ -48,8 +48,8 @@ int pnfs_use_nfsv4_wproto(struct inode *inode, ssize_t count);
 int pnfs_use_nfsv4_rproto(struct inode *inode, ssize_t count);
 unsigned int pnfs_getiosize(struct nfs_server *server);
 void pnfs_set_ds_iosize(struct nfs_server *server);
-int pnfs_commit(struct inode *inode, struct list_head *head, int sync, struct nfs_write_data *data);
-int _pnfs_try_to_commit(struct nfs_write_data *, struct list_head *, int);
+int pnfs_commit(struct nfs_write_data *data, int sync);
+int _pnfs_try_to_commit(struct nfs_write_data *);
 void pnfs_commit_done_norpc(struct rpc_task *, void *);
 void pnfs_pageio_init_read(struct nfs_pageio_descriptor *, struct inode *, struct nfs_open_context *, struct list_head *, size_t *);
 void pnfs_pageio_init_write(struct nfs_pageio_descriptor *, struct inode *);
@@ -89,8 +89,7 @@ static inline int pnfs_try_to_write_data(struct nfs_write_data *data,
 	return 1;
 }
 
-static inline int pnfs_try_to_commit(struct nfs_write_data *data,
-				     struct list_head *head, int how)
+static inline int pnfs_try_to_commit(struct nfs_write_data *data)
 {
 	struct inode *inode = data->inode;
 	struct nfs_server *nfss = NFS_SERVER(inode);
@@ -100,7 +99,7 @@ static inline int pnfs_try_to_commit(struct nfs_write_data *data,
 	   the commit method MUST be defined by the LD */
 	/* FIXME: write_pagelist should probably be mandated */
 	if (PNFS_EXISTS_LDIO_OP(write_pagelist))
-		return _pnfs_try_to_commit(data, head, how);
+		return _pnfs_try_to_commit(data);
 
 	return 1;
 }
@@ -120,8 +119,7 @@ static inline int pnfs_try_to_write_data(struct nfs_write_data *data,
 	return 1;
 }
 
-static inline int pnfs_try_to_commit(struct nfs_write_data *data,
-				     struct list_head *head, int how)
+static inline int pnfs_try_to_commit(struct nfs_write_data *data)
 {
 	return 1;
 }
