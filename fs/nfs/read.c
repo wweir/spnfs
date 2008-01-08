@@ -432,26 +432,21 @@ static void nfs_readpage_result_partial(struct rpc_task *task, void *calldata)
 }
 
 #if defined(CONFIG_NFS_V4_1)
-void nfs_read_validate(struct rpc_task *task, void *calldata)
+int nfs_read_validate(struct rpc_task *task, void *calldata)
 {
 	struct nfs_read_data *data = calldata;
 	struct nfs_server *server = data->args.server;
 	struct nfs4_session *session = server->session;
-	int (*setup_sequence)(struct nfs4_session *,
-				void *, void *, int, struct rpc_task *);
-
-	setup_sequence = server->nfs_client->rpc_ops->validate_sequence_args;
 
 #ifdef CONFIG_PNFS
 	if (data->ds_nfs_client)
 		session = data->ds_nfs_client->cl_ds_session;
 #endif /* CONFIG_PNFS */
 
-	if (!setup_sequence || !setup_sequence(session,
-						&data->args.seq_args,
-						&data->res.seq_res,
-						0, task))
-		rpc_start_call(task);
+	return nfs41_call_validate_seq_args(server, session,
+					    &data->args.seq_args,
+					    &data->res.seq_res,
+					    0, task);
 }
 #endif /* CONFIG_NFS_V4_1 */
 
