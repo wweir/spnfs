@@ -29,6 +29,7 @@
 #include "delegation.h"
 #include "internal.h"
 #include "iostat.h"
+#include "nfs4_fs.h"
 
 #define NFSDBG_FACILITY		NFSDBG_PAGECACHE
 
@@ -1070,26 +1071,21 @@ out:
 }
 
 #if defined(CONFIG_NFS_V4_1)
-void nfs_write_validate(struct rpc_task *task, void *calldata)
+int nfs_write_validate(struct rpc_task *task, void *calldata)
 {
 	struct nfs_write_data *data = calldata;
 	struct nfs_server *server = NFS_SERVER(data->inode);
 	struct nfs4_session *session = server->session;
-	int (*setup_sequence)(struct nfs4_session *,
-				void *, void *, int, struct rpc_task *);
-
-	setup_sequence = NFS_PROTO(data->inode)->validate_sequence_args;
 
 #ifdef CONFIG_PNFS
 	if (data->ds_nfs_client)
 		session = data->ds_nfs_client->cl_ds_session;
 #endif /* CONFIG_PNFS */
 
-	if (!setup_sequence || !setup_sequence(session,
-						&data->args.seq_args,
-						&data->res.seq_res,
-						1, task))
-		rpc_start_call(task);
+	return nfs41_call_validate_seq_args(server, session,
+					    &data->args.seq_args,
+					    &data->res.seq_res,
+					    1, task);
 }
 #endif /* CONFIG_NFS_V4_1 */
 

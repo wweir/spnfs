@@ -430,8 +430,10 @@ static int nfs4_setup_sequence(struct nfs_client *clp,
 	switch (clp->cl_minorversion) {
 	case 1:
 		ret = nfs41_recover_expired_session(task, clp, session);
-		if (ret)
+		if (ret) {
+			memset(res, 0, sizeof(*res));
 			break;
+		}
 		ret = nfs41_setup_sequence(session, args,
 				res, cache_reply, task);
 		break;
@@ -447,6 +449,23 @@ static int nfs4_setup_sequence(struct nfs_client *clp,
 
 	dprintk("<-- %s status=%d\n", __func__, ret);
 	return ret;
+}
+
+int nfs41_call_validate_seq_args(struct nfs_server *server,
+				 struct nfs4_session *session,
+				 void *args,
+				 void *res,
+				 int cache_this,
+				 struct rpc_task *task)
+{
+	int (*setup_sequence)(struct nfs4_session *,
+				void *, void *, int, struct rpc_task *);
+
+	setup_sequence = server->nfs_client->rpc_ops->validate_sequence_args;
+	if (!setup_sequence)
+		return 0;
+
+	return setup_sequence(session, args, res, cache_this, task);
 }
 
 static int nfs41_validate_state(struct nfs_server *server)
@@ -488,18 +507,15 @@ void nfs41_call_sync_prepare(struct rpc_task *task, void *calldata)
 	rpc_call_setup(task, data->msg, 0);
 }
 
-void nfs41_call_sync_validate_args(struct rpc_task *task, void *calldata)
+static int nfs41_call_sync_validate_args(struct rpc_task *task, void *calldata)
 {
-	int ret;
 	struct nfs41_call_sync_data *data = calldata;
 
 	dprintk("--> %s data->server->session %p\n", __func__,
 		data->server->session);
-	ret = nfs4_setup_sequence(data->server->nfs_client,
-				data->server->session, data->seq_args,
-				data->seq_res, data->cache_reply, task);
-	if (ret != -EAGAIN)
-		rpc_start_call(task);
+	return nfs4_setup_sequence(data->server->nfs_client,
+				   data->server->session, data->seq_args,
+				   data->seq_res, data->cache_reply, task);
 }
 
 void nfs41_call_sync_done(struct rpc_task *task, void *calldata)
@@ -1285,20 +1301,16 @@ out_free:
 }
 
 #if defined(CONFIG_NFS_V4_1)
-static void nfs4_open_validate(struct rpc_task *task, void *data)
+static int nfs4_open_validate(struct rpc_task *task, void *data)
 {
-	int ret;
 	struct nfs_server *server;
 	struct nfs4_opendata *odata = (struct nfs4_opendata *)data;
 
 	server = odata->o_arg.server;
-	ret = nfs4_setup_sequence(server->nfs_client,
+	return nfs4_setup_sequence(server->nfs_client,
 		server->session,
 		&odata->o_arg.seq_args,
 		&odata->o_res.seq_res, 1, task);
-
-	if (ret != -EAGAIN)
-		rpc_start_call(task);
 }
 #endif /* CONFIG_NFS_V4_1 */
 
@@ -1694,22 +1706,18 @@ static void nfs4_close_prepare(struct rpc_task *task, void *data)
 }
 
 #if defined(CONFIG_NFS_V4_1)
-void nfs4_close_validate(struct rpc_task *task, void *data)
+static int nfs4_close_validate(struct rpc_task *task, void *data)
 {
-	int ret;
 	struct nfs4_closedata *cdata;
 	struct nfs_server *server;
 
 	cdata = (struct nfs4_closedata *)data;
 	server = NFS_SERVER(cdata->inode);
 
-	ret = nfs4_setup_sequence(server->nfs_client,
+	return nfs4_setup_sequence(server->nfs_client,
 		server->session,
 		&cdata->arg.seq_args,
 		&cdata->res.seq_res, 1, task);
-
-	if (ret != -EAGAIN)
-		rpc_start_call(task);
 }
 #endif /* CONFIG_NFS_V4_1 */
 
@@ -3860,22 +3868,18 @@ static void nfs4_delegreturn_release(void *calldata)
 }
 
 #if defined(CONFIG_NFS_V4_1)
-void nfs4_delegreturn_validate(struct rpc_task *task, void *data)
+static int nfs4_delegreturn_validate(struct rpc_task *task, void *data)
 {
-	int ret;
 	struct nfs_server *server;
 	struct nfs4_delegreturndata *d_data;
 
 	d_data = (struct nfs4_delegreturndata *)data;
 	server = d_data->res.server;
 
-	ret = nfs4_setup_sequence(server->nfs_client,
+	return nfs4_setup_sequence(server->nfs_client,
 		server->session,
 		&d_data->args.seq_args,
 		&d_data->res.seq_res, 1, task);
-
-	if (ret != -EAGAIN)
-		rpc_start_call(task);
 }
 #endif /* CONFIG_NFS_V4_1 */
 
@@ -4123,20 +4127,15 @@ static void nfs4_locku_prepare(struct rpc_task *task, void *data)
 }
 
 #if defined(CONFIG_NFS_V4_1)
-void nfs4_locku_validate(struct rpc_task *task, void *data)
+static int nfs4_locku_validate(struct rpc_task *task, void *data)
 {
-	int ret;
 	struct nfs4_unlockdata *calldata = data;
 	struct nfs_server *server = calldata->server;
 
-
-	ret = nfs4_setup_sequence(server->nfs_client,
+	return nfs4_setup_sequence(server->nfs_client,
 		server->session,
 		&calldata->arg.seq_args,
 		&calldata->res.seq_res, 1, task);
-
-	if (ret != -EAGAIN)
-		rpc_start_call(task);
 }
 #endif /* CONFIG_NFS_V4_1 */
 
@@ -4342,19 +4341,15 @@ static void nfs4_lock_release(void *calldata)
 }
 
 #if defined(CONFIG_NFS_V4_1)
-void nfs4_lock_validate(struct rpc_task *task, void *data)
+static int nfs4_lock_validate(struct rpc_task *task, void *data)
 {
-	int ret;
 	struct nfs4_lockdata *ldata = (struct nfs4_lockdata *)data;
 	struct nfs_server *server = ldata->server;
 
-	ret = nfs4_setup_sequence(server->nfs_client,
+	return nfs4_setup_sequence(server->nfs_client,
 		server->session,
 		&ldata->arg.seq_args,
 		&ldata->res.seq_res, 1, task);
-
-	if (ret != -EAGAIN)
-		rpc_start_call(task);
 }
 #endif /* CONFIG_NFS_V4_1 */
 
@@ -5162,9 +5157,8 @@ void nfs41_sequence_call_done(struct rpc_task *task, void *data)
 	dprintk("<-- %s\n", __func__);
 }
 
-static void nfs41_sequence_validate(struct rpc_task *task, void *data)
+static int nfs41_sequence_validate(struct rpc_task *task, void *data)
 {
-	int ret;
 	struct nfs_server *server;
 	struct nfs41_sequence_args *args;
 	struct nfs41_sequence_res *res;
@@ -5173,11 +5167,8 @@ static void nfs41_sequence_validate(struct rpc_task *task, void *data)
 	args = task->tk_msg.rpc_argp;
 	res = task->tk_msg.rpc_resp;
 
-	ret = nfs4_setup_sequence(server->nfs_client, server->session, args,
+	return nfs4_setup_sequence(server->nfs_client, server->session, args,
 				  res, 0, task);
-
-	if (ret != -EAGAIN)
-		rpc_start_call(task);
 }
 
 static const struct rpc_call_ops nfs41_sequence_ops = {
