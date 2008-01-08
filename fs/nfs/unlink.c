@@ -14,6 +14,8 @@
 #include <linux/sched.h>
 #include <linux/wait.h>
 
+#include "nfs4_fs.h"
+
 struct nfs_unlinkdata {
 	struct hlist_node list;
 	struct nfs_removeargs args;
@@ -117,20 +119,15 @@ static void nfs_async_unlink_release(void *calldata)
 }
 
 #if defined(CONFIG_NFS_V4_1)
-void nfs_unlink_validate(struct rpc_task *task, void *calldata)
+int nfs_unlink_validate(struct rpc_task *task, void *calldata)
 {
 	struct nfs_unlinkdata *data = calldata;
 	struct nfs_server *server = NFS_SERVER(data->dir);
-	int (*setup_sequence)(struct nfs4_session *,
-				void *, void *, int, struct rpc_task *);
 
-	setup_sequence = NFS_PROTO(data->dir)->validate_sequence_args;
-
-	if (!setup_sequence || !setup_sequence(server->session,
-						&data->args.seq_args,
-						&data->res.seq_res,
-						1, task))
-		rpc_start_call(task);
+	return nfs41_call_validate_seq_args(server, server->session,
+					    &data->args.seq_args,
+					    &data->res.seq_res,
+					    1, task);
 }
 #endif /* CONFIG_NFS_V4_1 */
 static const struct rpc_call_ops nfs_unlink_ops = {
