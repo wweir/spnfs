@@ -267,6 +267,7 @@ int nfs41_recover_expired_session(struct rpc_task *task,
 {
 	int ret = 0;
 
+	dprintk("--> %s\n", __func__);
 	while (1) {
 		rpc_sleep_on(&session->recovery_waitq, task, NULL, NULL);
 
@@ -280,6 +281,7 @@ int nfs41_recover_expired_session(struct rpc_task *task,
 		nfs41_recover_session(clp, session);
 	}
 
+	dprintk("<-- %s: status=%d\n", __func__, ret);
 	return ret;
 }
 
