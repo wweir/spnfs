@@ -946,6 +946,7 @@ static int reclaimer(void *ptr)
 	struct rpc_cred *cred;
 	int status = 0;
 
+	dprintk("--> %s\n", __func__);
 	allow_signal(SIGKILL);
 
 	/* Ensure exclusive access to NFSv4 state */
@@ -957,6 +958,7 @@ static int reclaimer(void *ptr)
 		goto out;
 	*/
 restart_loop:
+	dprintk("%s: starting loop\n", __func__);
 	ops = nfs4_network_partition_recovery_ops[clp->cl_minorversion];
 	/* Are there any open files on this volume? */
 	cred = nfs4_get_renew_cred(clp);
@@ -1008,6 +1010,7 @@ out:
 	nfs4_clear_recover_bit(clp);
 	nfs_put_client(clp);
 	module_put_and_exit(0);
+	dprintk("<-- %s\n", __func__);
 	return 0;
 out_error:
 	printk(KERN_WARNING "Error: state recovery failed on NFSv4 server %u.%u.%u.%u with error %d\n",
