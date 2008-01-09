@@ -137,6 +137,7 @@ static int session_reclaimer(void *arg)
 	int ret;
 	struct reclaimer_arg *rec = (struct reclaimer_arg *)arg;
 
+	dprintk("--> %s\n", __func__);
 	allow_signal(SIGKILL);
 
 	ret = nfs4_proc_create_session(rec->clp, rec->session);
@@ -146,6 +147,7 @@ static int session_reclaimer(void *arg)
 out:
 	nfs41_end_session_recovery(rec);
 	module_put_and_exit(0);
+	dprintk("<-- %s: status=%d\n", __func__, ret);
 	return ret;
 out_error:
 	printk(KERN_WARNING "Error: session recovery failed on "
