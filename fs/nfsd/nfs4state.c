@@ -73,6 +73,9 @@ static u32 current_delegid = 1;
 static u32 nfs4_init;
 static stateid_t zerostateid;             /* bits all 0 */
 static stateid_t onestateid;              /* bits all 1 */
+#if defined(CONFIG_NFSD_V4_1)
+static u64 current_sessionid = 1;
+#endif
 
 #define ZERO_STATEID(stateid) (!memcmp((stateid), &zerostateid, sizeof(stateid_t)))
 #define ONE_STATEID(stateid)  (!memcmp((stateid), &onestateid, sizeof(stateid_t)))
@@ -365,6 +368,72 @@ dump_sessionid(const char *fn, nfs41_sessionid *sessionid)
 {
 	u32 *ptr = (u32 *)(*sessionid);
 	dprintk("%s: %u:%u:%u:%u\n", fn, ptr[0], ptr[1], ptr[2], ptr[3]);
+}
+
+static void
+gen_sessionid(struct nfs41_session *ses)
+{
+	struct nfs4_client *clp = ses->se_client;
+	u32 *p = (u32 *)ses->se_sessionid;
+
+	*p++ = clp->cl_clientid.cl_boot;
+	*p++ = clp->cl_clientid.cl_id;
+	*p++ = (u32)boot_time;
+	*p++ = current_sessionid++;
+	BUG_ON((char *)p - (char *)ses->se_sessionid !=
+	       sizeof(ses->se_sessionid));
+}
+
+static int
+alloc_init_session(struct nfs4_client *clp, struct nfsd4_create_session *cses)
+{
+	struct nfs41_session *new;
+	int idx, status = nfserr_resource, slotsize, i;
+
+	new = kzalloc(sizeof(*new), GFP_KERNEL);
+	if (!new)
+		goto out;
+
+	if (cses->fore_channel.maxreqs >= NFS41_MAX_SLOTS)
+		cses->fore_channel.maxreqs = NFS41_MAX_SLOTS;
+	new->se_fnumslots = cses->fore_channel.maxreqs;
+	slotsize = new->se_fnumslots * sizeof(struct nfs41_slot);
+
+	new->se_slots = kzalloc(slotsize, GFP_KERNEL);
+	if (!new->se_slots)
+		goto out_free;
+
+	for (i = 0; i < new->se_fnumslots; i++) {
+		new->se_slots[i].sl_session = new;
+		nfs41_set_slot_state(&new->se_slots[i], NFS4_SLOT_AVAILABLE);
+	}
+
+	new->se_client = clp;
+	gen_sessionid(new);
+	idx = hash_sessionid(&new->se_sessionid);
+	memcpy(&clp->cl_sessionid, &new->se_sessionid, sizeof(nfs41_sessionid));
+
+	new->se_flags = cses->flags;
+
+	/* for now, accept the client values */
+	new->se_fheaderpad_sz = cses->fore_channel.headerpadsz;
+	new->se_fmaxreq_sz = cses->fore_channel.maxreq_sz;
+	new->se_fmaxresp_sz = cses->fore_channel.maxresp_sz;
+	new->se_fmaxresp_cached = cses->fore_channel.maxresp_cached;
+	new->se_fmaxops = cses->fore_channel.maxops;
+
+	kref_init(&new->se_ref);
+	INIT_LIST_HEAD(&new->se_hash);
+	INIT_LIST_HEAD(&new->se_perclnt);
+	list_add(&new->se_hash, &sessionid_hashtbl[idx]);
+	list_add(&new->se_perclnt, &clp->cl_sessions);
+
+	status = nfs_ok;
+out:
+	return status;
+out_free:
+	kfree(new);
+	goto out;
 }
 
 struct nfs41_session *
@@ -1157,7 +1226,82 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 			struct nfsd4_compound_state *cstate,
 			struct nfsd4_create_session *session)
 {
-	return -1;	/* stub */
+	u32 ip_addr = svc_addr_in(rqstp)->sin_addr.s_addr;
+	struct nfs4_client *conf, *unconf;
+	__u32   max_blocksize = svc_max_payload(rqstp);
+	int status = 0;
+
+	if (STALE_CLIENTID(&session->clientid))
+		return nfserr_stale_clientid;
+
+	nfs4_lock_state();
+	unconf = find_unconfirmed_client(&session->clientid);
+	conf = find_confirmed_client(&session->clientid);
+
+	if (!conf && !unconf) {
+		status = nfserr_stale_clientid;
+		goto out;
+	}
+	if (conf) {
+		status = nfs_ok;
+		if (conf->cl_seqid == session->seqid) {
+			dprintk("Got a create_session replay! seqid= %d\n",
+				conf->cl_seqid);
+			goto out_replay;
+		} else if (session->seqid != conf->cl_seqid + 1) {
+			status = nfserr_seq_misordered;
+			dprintk("Sequence misordered!\n");
+			dprintk("Expected seqid= %d but got seqid= %d\n",
+				conf->cl_seqid, session->seqid);
+			goto out;
+		}
+		conf->cl_seqid++;
+	} else if (unconf) {
+		if (!same_creds(&unconf->cl_cred, &rqstp->rq_cred) ||
+		    (ip_addr != unconf->cl_addr)) {
+			status = nfserr_clid_inuse;
+			goto out;
+		}
+
+		if (unconf->cl_seqid != session->seqid) {
+			status = nfserr_seq_misordered;
+			goto out;
+		}
+
+		move_to_confirmed(unconf);
+
+		/*
+		 * We do not support RDMA or persistent sessions
+		 */
+		session->flags &= ~SESSION4_PERSIST;
+		session->flags &= ~SESSION4_RDMA;
+
+		if (!(unconf->cl_exchange_flags & EXCHGID4_FLAG_USE_PNFS_MDS) &&
+			unconf->cl_exchange_flags & EXCHGID4_FLAG_USE_PNFS_DS)
+			session->flags &= ~SESSION4_BACK_CHAN;
+
+		conf = unconf;
+	}
+
+	conf->cl_callback.cb_minorversion = 1;
+	conf->cl_callback.cb_prog = session->callback_prog;
+
+	status = alloc_init_session(conf, session);
+
+out_replay:
+	memcpy(session->sessionid, conf->cl_sessionid, 16);
+	session->seqid = conf->cl_seqid;
+	session->fore_channel.maxreq_sz = max_blocksize;
+	session->fore_channel.maxresp_sz = max_blocksize;
+	session->fore_channel.maxresp_cached = max_blocksize;
+	session->back_channel.maxreq_sz = max_blocksize;
+	session->back_channel.maxresp_sz = max_blocksize;
+	session->back_channel.maxresp_cached = max_blocksize;
+
+out:
+	nfs4_unlock_state();
+	dprintk("%s returns %d\n", __func__, ntohl(status));
+	return status;
 }
 #endif /* CONFIG_NFSD_V4_1 */
 

@@ -221,6 +221,9 @@ struct nfs4_client {
 #if defined(CONFIG_NFSD_V4_1)
 	u32			cl_seqid;	/* seqid for create_session */
 	u32			cl_exchange_flags;
+	nfs41_sessionid		cl_sessionid;
+
+	struct svc_xprt		*cl_cb_xprt;	/* 4.1 callback transport */
 #endif /* CONFIG_NFSD_V4_1 */
 };
 
