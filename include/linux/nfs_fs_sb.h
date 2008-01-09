@@ -72,7 +72,7 @@ struct nfs_client {
 #endif
 
 #ifdef CONFIG_NFS_V4_1
-	/* The sequence id returned by EXCHANGE_ID */
+	/* The sequence id to use for the next CREATE_SESSION */
 	u32			cl_seqid;
 	/* The flags used for obtaining the clientid during EXCHANGE_ID */
 	u32			cl_exchange_flags;
