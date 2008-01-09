@@ -423,6 +423,7 @@ static int nfs41_validate_state(struct nfs_server *server)
 {
 	int status;
 
+	dprintk("--> %s\n", __func__);
 	do {
 		/*
 		 * Ensure we have a valid lease
@@ -439,6 +440,7 @@ static int nfs41_validate_state(struct nfs_server *server)
 		/* FIXME: status = nfs41_recover_expired_session(server->session->clnt, server); */
 	} while (status);
 
+	dprintk("<-- %s status=%d\n", __func__, status);
 	return status;
 }
 
