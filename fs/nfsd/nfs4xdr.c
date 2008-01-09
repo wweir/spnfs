@@ -1006,7 +1006,111 @@ static int
 nfsd4_decode_create_session(struct nfsd4_compoundargs *argp,
 			    struct nfsd4_create_session *sess)
 {
-	return -1;	/* stub */
+	DECODE_HEAD;
+
+	u32 dummy;
+	char *machine_name;
+	int i;
+	int nr_secflavs;
+
+	READ_BUF(16);
+	COPYMEM(&sess->clientid, 8);
+	READ32(sess->seqid);
+	READ32(sess->flags);
+
+	/* Fore channel attrs */
+	READ_BUF(24);
+	READ32(sess->fore_channel.headerpadsz);
+	READ32(sess->fore_channel.maxreq_sz);
+	READ32(sess->fore_channel.maxresp_sz);
+	READ32(sess->fore_channel.maxresp_cached);
+	READ32(sess->fore_channel.maxops);
+	READ32(sess->fore_channel.maxreqs);
+	READ_BUF(4);
+	READ32(sess->fore_channel.nr_rdma_attrs);
+	if (sess->fore_channel.nr_rdma_attrs == 1) {
+		READ_BUF(4);
+		READ32(sess->fore_channel.rdma_attrs);
+	} else if (sess->fore_channel.nr_rdma_attrs > 1) {
+		dprintk("Too many fore channel attr bitmaps!\n");
+		goto xdr_error;
+	}
+
+	/* Back channel attrs */
+	READ_BUF(24);
+	READ32(sess->back_channel.headerpadsz);
+	READ32(sess->back_channel.maxreq_sz);
+	READ32(sess->back_channel.maxresp_sz);
+	READ32(sess->back_channel.maxresp_cached);
+	READ32(sess->back_channel.maxops);
+	READ32(sess->back_channel.maxreqs);
+	READ_BUF(4);
+	READ32(sess->back_channel.nr_rdma_attrs);
+	if (sess->back_channel.nr_rdma_attrs == 1) {
+		READ_BUF(4);
+		READ32(sess->back_channel.rdma_attrs);
+	} else if (sess->back_channel.nr_rdma_attrs > 1) {
+		dprintk("Too many back channel attr bitmaps!\n");
+		goto xdr_error;
+	}
+
+	READ_BUF(4);
+	READ32(sess->callback_prog);
+
+	/* callback_sec_params4 */
+	READ_BUF(4);
+	READ32(nr_secflavs);
+	for (i = 0; i < nr_secflavs; ++i) {
+		READ_BUF(4);
+		READ32(dummy);
+		switch (dummy) {
+		case RPC_AUTH_NULL:
+			/* Nothing to read */
+			break;
+		case RPC_AUTH_UNIX:
+			READ_BUF(8);
+			/* stamp */
+			READ32(dummy);
+
+			/* machine name */
+			READ32(dummy);
+			READ_BUF(dummy);
+			SAVEMEM(machine_name, dummy);
+
+			/* uid, gid */
+			READ_BUF(8);
+			READ32(sess->uid);
+			READ32(sess->gid);
+
+			/* more gids */
+			READ_BUF(4);
+			READ32(dummy);
+			for (i = 0; i < dummy; ++i) {
+				READ_BUF(4);
+				READ32(dummy);
+			}
+			break;
+		case RPC_AUTH_GSS:
+			dprintk("RPC_AUTH_GSS callback secflavor "
+				"not supported!\n");
+			READ_BUF(8);
+			/* service */
+			READ32(dummy);
+			/* server handle */
+			READ_BUF(dummy);
+			p += XDR_QUADLEN(dummy);
+			/* client handle */
+			READ_BUF(4);
+			READ32(dummy);
+			READ_BUF(dummy);
+			p += XDR_QUADLEN(dummy);
+			break;
+		default:
+			dprintk("Illegal callback secflavor\n");
+			return nfserr_inval;
+		}
+	}
+	DECODE_TAIL;
 }
 #endif /* CONFIG_NFSD_V4_1 */
 
@@ -2773,7 +2877,53 @@ static void
 nfsd4_encode_create_session(struct nfsd4_compoundres *resp, int nfserr,
 			    struct nfsd4_create_session *sess)
 {
-	return;	/* stub */
+	ENCODE_HEAD;
+
+	if (!nfserr) {
+		RESERVE_SPACE(24);
+		WRITEMEM(sess->sessionid, sizeof(sess->sessionid));
+		WRITE32(sess->seqid);
+		WRITE32(sess->flags);
+		ADJUST_ARGS();
+
+		RESERVE_SPACE(24);
+		WRITE32(sess->fore_channel.headerpadsz);
+		WRITE32(sess->fore_channel.maxreq_sz);
+		WRITE32(sess->fore_channel.maxresp_sz);
+		WRITE32(sess->fore_channel.maxresp_cached);
+		WRITE32(sess->fore_channel.maxops);
+		WRITE32(sess->fore_channel.maxreqs);
+		ADJUST_ARGS();
+
+		RESERVE_SPACE(4);
+		WRITE32(sess->fore_channel.nr_rdma_attrs);
+		ADJUST_ARGS();
+
+		if (sess->fore_channel.nr_rdma_attrs) {
+			RESERVE_SPACE(4);
+			WRITE32(sess->fore_channel.rdma_attrs);
+			ADJUST_ARGS();
+		}
+
+		RESERVE_SPACE(24);
+		WRITE32(sess->back_channel.headerpadsz);
+		WRITE32(sess->back_channel.maxreq_sz);
+		WRITE32(sess->back_channel.maxresp_sz);
+		WRITE32(sess->back_channel.maxresp_cached);
+		WRITE32(sess->back_channel.maxops);
+		WRITE32(sess->back_channel.maxreqs);
+		ADJUST_ARGS();
+
+		RESERVE_SPACE(4);
+		WRITE32(sess->back_channel.nr_rdma_attrs);
+		ADJUST_ARGS();
+
+		if (sess->back_channel.nr_rdma_attrs) {
+			RESERVE_SPACE(4);
+			WRITE32(sess->back_channel.rdma_attrs);
+			ADJUST_ARGS();
+		}
+	}
 }
 
 static void nfsd4_encode_sequence(struct nfsd4_compoundres *resp, int nfserr,
