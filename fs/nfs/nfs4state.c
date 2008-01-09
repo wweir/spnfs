@@ -54,6 +54,8 @@
 #include "delegation.h"
 #include "internal.h"
 
+#define NFSDBG_FACILITY		NFSDBG_PROC
+
 #define OPENOWNER_POOL_SIZE	8
 
 const nfs4_stateid zero_stateid;
@@ -793,13 +795,18 @@ static void nfs4_recover_state(struct nfs_client *clp)
 
 	__module_get(THIS_MODULE);
 	atomic_inc(&clp->cl_count);
+	dprintk("--> %s spawning reclaimer\n", __func__);
 	task = kthread_run(reclaimer, clp, "%u.%u.%u.%u-reclaim",
 			NIPQUAD(clp->cl_addr.sin_addr));
-	if (!IS_ERR(task))
+	if (!IS_ERR(task)) {
+		dprintk("<-- %s\n", __func__);
 		return;
+	}
 	nfs4_clear_recover_bit(clp);
 	nfs_put_client(clp);
 	module_put(THIS_MODULE);
+	dprintk("<-- %s failed spawning reclaimer: error=%ld\n",
+		__func__, PTR_ERR(task));
 }
 
 /*
