@@ -17,10 +17,13 @@
 #include <linux/nfs3.h>
 #include <linux/nfs_xdr.h>
 #include <linux/nfs.h>
+#include <linux/nfs_fs.h>
 #include <linux/namei.h>
 #include <linux/nfs_fs_sb.h>
 #include <linux/nfs41_session_recovery.h>
 #include "nfs4_fs.h"
+
+#define NFSDBG_FACILITY		NFSDBG_PROC
 
 /*
  * Session state bits
@@ -165,15 +168,19 @@ static int nfs41_schedule_session_recovery(struct reclaimer_arg *rec)
 {
 	struct task_struct *task;
 
+	dprintk("--> %s: spawning session_reclaimer\n", __func__);
 	__module_get(THIS_MODULE);
 	task = kthread_run(session_reclaimer, rec, "%llx-session-reclaim",
 				(u64 *)rec->session->sess_id);
 
-	if (!IS_ERR(task))
+	if (!IS_ERR(task)) {
+		dprintk("<-- %s\n", __func__);
 		return 0;
+	}
 
 	module_put(THIS_MODULE);
-
+	dprintk("--> %s: failed spawning session_reclaimer: error=%ld\n",
+		__func__, PTR_ERR(task));
 	return PTR_ERR(task);
 }
 
