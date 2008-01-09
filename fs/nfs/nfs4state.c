@@ -54,6 +54,8 @@
 #include "delegation.h"
 #include "internal.h"
 
+#define NFSDBG_FACILITY		NFSDBG_PROC
+
 #define OPENOWNER_POOL_SIZE	8
 
 const nfs4_stateid zero_stateid;
@@ -758,14 +760,19 @@ static void nfs4_recover_state(struct nfs_client *clp)
 
 	__module_get(THIS_MODULE);
 	atomic_inc(&clp->cl_count);
+	dprintk("--> %s spawning reclaimer\n", __func__);
 	task = kthread_run(reclaimer, clp, "%s-reclaim",
 				rpc_peeraddr2str(clp->cl_rpcclient,
 							RPC_DISPLAY_ADDR));
-	if (!IS_ERR(task))
+	if (!IS_ERR(task)) {
+		dprintk("<-- %s\n", __func__);
 		return;
+	}
 	nfs4_clear_recover_bit(clp);
 	nfs_put_client(clp);
 	module_put(THIS_MODULE);
+	dprintk("<-- %s failed spawning reclaimer: error=%ld\n",
+		__func__, PTR_ERR(task));
 }
 
 /*
@@ -905,6 +912,7 @@ static int reclaimer(void *ptr)
 	struct rpc_cred *cred;
 	int status = 0;
 
+	dprintk("--> %s\n", __func__);
 	allow_signal(SIGKILL);
 
 	/* Ensure exclusive access to NFSv4 state */
@@ -914,6 +922,7 @@ static int reclaimer(void *ptr)
 	if (list_empty(&clp->cl_superblocks))
 		goto out;
 restart_loop:
+	dprintk("%s: starting loop\n", __func__);
 	ops = &nfs4_network_partition_recovery_ops;
 	/* Are there any open files on this volume? */
 	cred = nfs4_get_renew_cred(clp);
@@ -969,6 +978,7 @@ out:
 	nfs4_clear_recover_bit(clp);
 	nfs_put_client(clp);
 	module_put_and_exit(0);
+	dprintk("<-- %s\n", __func__);
 	return 0;
 out_error:
 	printk(KERN_WARNING "Error: state recovery failed on NFSv4 server %s"
