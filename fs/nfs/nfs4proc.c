@@ -4759,8 +4759,11 @@ int nfs4_proc_create_session(struct nfs_client *clp,
 		clp->cl_last_renewal = jiffies;
 		clear_bit(NFS4CLNT_LEASE_EXPIRED, &clp->cl_state);
 		spin_unlock(&clp->cl_lock);
-		nfs41_set_session_valid(session);	/* Activate session */
 
+		/* Increment session ID for use by next CREATE_SESSION */
+		clp->cl_seqid++;
+
+		nfs41_set_session_valid(session);	/* Activate session */
 		nfs4_schedule_state_renewal(clp);
 	} /*else {
 		nfs4_put_session(&session);
