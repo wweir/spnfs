@@ -1349,12 +1349,17 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 	if (conf) {
 		status = nfs_ok;
 		if (conf->cl_seqid == session->seqid) {
-			dprintk("Got a create_session replay!\n");
+			dprintk("Got a create_session replay! seqid= %d\n",
+				conf->cl_seqid);
 			goto out_replay;
-		} else if (conf->cl_seqid != session->seqid + 1) {
+		} else if (session->seqid != conf->cl_seqid + 1) {
 			status = nfserr_seq_misordered;
+			dprintk("Sequence misordered!\n");
+			dprintk("Expected seqid= %d but got seqid= %d\n",
+				conf->cl_seqid, session->seqid);
 			goto out;
 		}
+		conf->cl_seqid++;
 
 		/* XXX why do this check here?
 		 *
@@ -1375,8 +1380,6 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 			status = nfserr_seq_misordered;
 			goto out;
 		}
-
-		unconf->cl_seqid++;
 
 		move_to_confirmed(unconf);
 
