@@ -193,13 +193,13 @@ static int nfs41_schedule_session_recovery(struct reclaimer_arg *rec)
 int nfs41_recover_session(struct nfs_client *clp, struct nfs4_session *session)
 {
 	struct reclaimer_arg *rec;
-	int ret;
+	int ret = -ENOMEM;
 
-	printk(KERN_INFO "--> %s clp %p session %p\n", __func__, clp, session);
+	dprintk("--> %s\n", __func__);
 	/* freed in nfs41_end_session_recovery */
 	rec = kmalloc(sizeof(*rec), GFP_KERNEL);
 	if (!rec)
-		return -ENOMEM;
+		goto out;
 	rec->clp = clp;
 	rec->session = session;
 
@@ -210,8 +210,11 @@ int nfs41_recover_session(struct nfs_client *clp, struct nfs4_session *session)
 	 * If we get 1, it means some other thread beat us to us here, so we
 	 * just sit back and wait for completion of the recovery process
 	 */
-	if (ret)
-		return 0;
+	if (ret) {
+		dprintk("%s: session_recovery already started\n", __func__);
+		ret = 0;
+		goto out;
+	}
 
 	ret = nfs41_schedule_session_recovery(rec);
 	if (!ret)
@@ -222,6 +225,7 @@ int nfs41_recover_session(struct nfs_client *clp, struct nfs4_session *session)
 	 */
 	nfs41_end_session_recovery(rec);
 out:
+	dprintk("<-- %s status=%d\n", __func__, ret);
 	return ret;
 }
 
