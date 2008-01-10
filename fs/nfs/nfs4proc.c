@@ -430,6 +430,8 @@ static int nfs4_setup_sequence(struct nfs_client *clp,
 	switch (clp->cl_minorversion) {
 	case 1:
 		ret = nfs41_recover_expired_session(task, clp, session);
+		if (ret == -EAGAIN)
+			dprintk("%s: session recovery in progress\n", __func__);
 		if (ret) {
 			memset(res, 0, sizeof(*res));
 			break;

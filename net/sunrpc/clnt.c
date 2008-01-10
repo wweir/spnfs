@@ -626,7 +626,7 @@ rpc_call_validate_args(struct rpc_task *task)
 	res = task->tk_ops->rpc_call_validate_args(task, task->tk_calldata);
 	if (!res)
 		rpc_start_call(task);
-	else {
+	else if (res != -EAGAIN) {
 		task->tk_status = res;
 		task->tk_action = NULL;
 	}
