@@ -395,6 +395,8 @@ static int nfs4_setup_sequence(struct nfs_client *clp,
 {
 	int ret;
 
+	dprintk("--> %s clp %p session %p cl_minorversion %d\n",
+		__func__, clp, session, clp->cl_minorversion);
 	switch (clp->cl_minorversion) {
 	case 1:
 		ret = nfs41_recover_expired_session(task, clp, session);
@@ -410,6 +412,7 @@ static int nfs4_setup_sequence(struct nfs_client *clp,
 		BUG();
 	}
 
+	dprintk("<-- %s status=%d\n", __func__, ret);
 	return ret;
 }
 
