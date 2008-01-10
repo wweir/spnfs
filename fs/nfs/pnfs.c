@@ -694,6 +694,35 @@ pnfs_set_pg_test(struct inode *inode, struct nfs_pageio_descriptor *pgio)
 		pgio->pg_test = ld->ld_policy_ops->pg_test;
 }
 
+static u32
+pnfs_getboundary(struct inode *inode)
+{
+	u32 stripe_size = 0;
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	struct layoutdriver_policy_operations *policy_ops;
+	struct nfs_inode *nfsi;
+	struct pnfs_layout_type *lo;
+
+	if (!nfss->pnfs_curr_ld)
+		goto out;
+
+	policy_ops = nfss->pnfs_curr_ld->ld_policy_ops;
+	if (!policy_ops || !policy_ops->get_stripesize)
+		goto out;
+
+	/* The default is to not gather across stripes */
+	if (policy_ops->gather_across_stripes &&
+	    policy_ops->gather_across_stripes(nfss->pnfs_mountid))
+		goto out;
+
+	nfsi = NFS_I(inode);
+	lo = nfsi->current_layout;
+	if (lo)
+		stripe_size = policy_ops->get_stripesize(lo, inode);
+out:
+	return stripe_size;
+}
+
 /*
  * rsize is already set by caller to MDS rsize.
  */
@@ -867,30 +896,6 @@ pnfs_use_nfsv4_rproto(struct inode *inode, ssize_t count)
 		return 1;
 
 	return 0;
-}
-
-u32
-pnfs_getboundary(struct inode *inode)
-{
-	struct pnfs_layout_type *laytype;
-	struct layoutdriver_policy_operations *policy_ops;
-	struct pnfs_layoutdriver_type *ld;
-
-	laytype = NFS_I(inode)->current_layout;
-	ld = NFS_SERVER(inode)->pnfs_curr_ld;
-	if (!pnfs_enabled_sb(NFS_SERVER(inode)) || !laytype)
-		return 0;
-	policy_ops = ld->ld_policy_ops;
-
-	/* The default is to not gather across stripes */
-	if (policy_ops && policy_ops->gather_across_stripes) {
-		if (policy_ops->gather_across_stripes(laytype->mountid))
-			return 0;
-	}
-	if (policy_ops && policy_ops->get_stripesize)
-		return policy_ops->get_stripesize(laytype, inode);
-
-	return 0; /* Gather up to wsize/rsize */
 }
 
 /* Return I/O buffer size for a layout driver
