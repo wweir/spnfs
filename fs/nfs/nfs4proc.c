@@ -412,6 +412,9 @@ static int nfs4_setup_sequence(struct nfs_client *clp,
 		BUG();
 	}
 
+	if (ret)
+		memset(res, 0, sizeof(*res));
+
 	dprintk("<-- %s status=%d\n", __func__, ret);
 	return ret;
 }
