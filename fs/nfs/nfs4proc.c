@@ -247,6 +247,10 @@ static int nfs41_sequence_done(struct nfs_client *clp,
 
 	tbl = &session->fore_channel.slot_table;
 	slot = res->sr_slot;
+	if (slot == NULL) {
+		dprintk("%s: no slot: status %d\n", __func__, status);
+		goto out;	/* session recovery probably failed */
+	}
 
 	switch (status) {
 	case -NFS4ERR_STALE_CLIENTID:
@@ -262,7 +266,6 @@ static int nfs41_sequence_done(struct nfs_client *clp,
 	case -NFS4ERR_OP_NOT_IN_SESSION:
 		break;
 	default:
-		BUG_ON(slot == NULL);
 		++slot->seq_nr;
 		/*
 		 * The sequence call was successful,
@@ -280,7 +283,7 @@ static int nfs41_sequence_done(struct nfs_client *clp,
 	smp_mb__before_clear_bit();
 	clear_bit(NFS4_SLOT_BUSY, &slot->flags);
 	smp_mb__after_clear_bit();
-
+out:
 	rpc_wake_up_next(&tbl->slot_tbl_waitq);
 
 	return status;
