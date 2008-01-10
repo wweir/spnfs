@@ -39,7 +39,6 @@ int pnfs_writepages(struct nfs_write_data *wdata, int how);
 int _pnfs_try_to_write_data(struct nfs_write_data *, const struct rpc_call_ops *, int);
 int pnfs_readpages(struct nfs_read_data *rdata);
 int _pnfs_try_to_read_data(struct nfs_read_data *data, const struct rpc_call_ops *call_ops);
-unsigned int pnfs_getboundary(struct inode *inode);
 int pnfs_initialize(void);
 void pnfs_uninitialize(void);
 void pnfs_layoutcommit_done(struct pnfs_layoutcommit_data *data, int status);
