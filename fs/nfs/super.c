@@ -1728,7 +1728,7 @@ static int nfs4_get_sb(struct file_system_type *fs_type,
 
 	if (s->s_fs_info != server) {
 		nfs_free_server(server);
-		server = NULL;
+		server = s->s_fs_info;
 	}
 
 	if (!s->s_root) {
