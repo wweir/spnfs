@@ -3284,28 +3284,29 @@ nfsd4_encode_layoutget(struct nfsd4_compoundres *resp, int nfserr,
 	int len;
 	ENCODE_HEAD;
 
-	if (!nfserr) {
-		RESERVE_SPACE(32);
-		WRITE32(lgp->lg_return_on_close);
-		WRITE64(lgp->lg_seg.offset);
-		WRITE64(lgp->lg_seg.length);
-		WRITE32(lgp->lg_seg.iomode);
-		WRITE32(lgp->lg_seg.layout_type);
-		ADJUST_ARGS();
-		if (lgp->lg_ops->layout_encode == NULL &&
-		    lgp->lg_seg.layout_type == LAYOUT_NFSV4_FILES) {
-			len = filelayout_encode_layout(p, resp->end, lgp->lg_layout);
-			filelayout_free_layout(lgp->lg_layout);
-		} else {
-			len = lgp->lg_ops->layout_encode(p, resp->end, lgp->lg_layout);
-			lgp->lg_ops->layout_free(lgp->lg_layout);
-		}
-		if (len > 0) {
-			p += XDR_QUADLEN(len);
-			ADJUST_ARGS();
-		} else
-			BUG_ON(len <= 0);
+	if (nfserr)
+		return;
+
+	RESERVE_SPACE(32);
+	WRITE32(lgp->lg_return_on_close);
+	WRITE64(lgp->lg_seg.offset);
+	WRITE64(lgp->lg_seg.length);
+	WRITE32(lgp->lg_seg.iomode);
+	WRITE32(lgp->lg_seg.layout_type);
+	ADJUST_ARGS();
+	if (lgp->lg_ops->layout_encode == NULL &&
+	    lgp->lg_seg.layout_type == LAYOUT_NFSV4_FILES) {
+		len = filelayout_encode_layout(p, resp->end, lgp->lg_layout);
+		filelayout_free_layout(lgp->lg_layout);
+	} else {
+		len = lgp->lg_ops->layout_encode(p, resp->end, lgp->lg_layout);
+		lgp->lg_ops->layout_free(lgp->lg_layout);
 	}
+	if (len > 0) {
+		p += XDR_QUADLEN(len);
+		ADJUST_ARGS();
+	} else
+		BUG_ON(len <= 0);
 }
 
 /* LAYOUTGET: minorversion1-01.txt
