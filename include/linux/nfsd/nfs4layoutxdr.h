@@ -77,23 +77,15 @@ struct pnfs_filelayout_device {
 	struct pnfs_filelayout_multipath 	*fl_device_list;
 };
 
-struct nfsd4_pnfs_layoutlist {
-	u32				dev_id;
-	u32                             dev_index;
-	u32                             dev_util;
-	struct knfsd_fh                 dev_fh;
-};
-
-struct nfsd4_pnfs_filelayout {
+struct pnfs_filelayout_layout {
 	u32                             lg_layout_type; /* response */
 	u32                             lg_stripe_type; /* response */
 	u32                             lg_commit_through_mds; /* response */
 	u64                             lg_stripe_unit; /* response */
-	u64                             lg_file_size;   /* response */
-	u32                             lg_indexlen;    /* response */
-	u32				*lg_indexlist;  /* response */
-	u32                             lg_llistlen;    /* response */
-	struct nfsd4_pnfs_layoutlist    *lg_llist;      /* response */
+	u32                             lg_first_stripe_index;	/* response */
+	u32				device_id;		/* response */
+	u32                             lg_fh_length;		/* response */
+	struct knfsd_fh                 *lg_fh_list;		/* response */
 };
 
 enum stripetype4 {
