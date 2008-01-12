@@ -3277,7 +3277,7 @@ u32            pnfs_layoutiomode4      iomode;
 u32            pnfs_layouttype4        type;
 u32  + len     opaque                  layout<>;
 */
-static void
+static __be32
 nfsd4_encode_layoutget(struct nfsd4_compoundres *resp, int nfserr,
 		       struct nfsd4_pnfs_layoutget *lgp)
 {
@@ -3285,7 +3285,7 @@ nfsd4_encode_layoutget(struct nfsd4_compoundres *resp, int nfserr,
 	ENCODE_HEAD;
 
 	if (nfserr)
-		return;
+		return nfserr;
 
 	RESERVE_SPACE(32);
 	WRITE32(lgp->lg_return_on_close);
@@ -3305,8 +3305,12 @@ nfsd4_encode_layoutget(struct nfsd4_compoundres *resp, int nfserr,
 	if (len > 0) {
 		p += XDR_QUADLEN(len);
 		ADJUST_ARGS();
-	} else
-		BUG_ON(len <= 0);
+	} else if (len < 0) /* check for error from underlying file system */
+		return nfserrno(len);
+	else
+		return nfserr_layoutunavailable;
+
+	return nfs_ok;
 }
 
 /* LAYOUTGET: minorversion1-01.txt
@@ -3444,7 +3448,9 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 		nfsd4_encode_getdevinfo(resp, op->status, &op->u.pnfs_getdevinfo);
 		break;
 	case OP_LAYOUTGET:
-		nfsd4_encode_layoutget(resp, op->status, &op->u.pnfs_layoutget);
+		op->status = nfsd4_encode_layoutget(resp,
+						    op->status,
+						    &op->u.pnfs_layoutget);
 		break;
 	case OP_LAYOUTCOMMIT:
 		nfsd4_encode_layoutcommit(resp, op->status, &op->u.pnfs_layoutcommit);
