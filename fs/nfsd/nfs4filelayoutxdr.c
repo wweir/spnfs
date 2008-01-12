@@ -137,62 +137,70 @@ out:
 }
 EXPORT_SYMBOL(filelayout_encode_devinfo);
 
-static int
-filelayout_encode_layoutlist_item(u32 *p, u32 *end,
-				  struct nfsd4_pnfs_layoutlist *item)
-{
-	int len;
-	unsigned int fhlen = item->dev_fh.fh_size;
-
-	len = 20 + fhlen;
-	if (p + XDR_QUADLEN(len) > end)
-		return -ENOMEM;
-	WRITE32(item->dev_id);
-	WRITE32(item->dev_util); /* nfl_util4 */
-	WRITE32(0); // FIXME:??? fix in the file system
-	WRITE32(1); /* One for now can be an array of FHs */
-	WRITE32(fhlen);
-	WRITEMEM(&item->dev_fh.fh_base, fhlen);
-	return len;
-}
-
 /* File layout export_operations->layout_encode()  */
 __be32
 filelayout_encode_layout(u32 *p, u32 *end, void *layout)
 {
-	struct nfsd4_pnfs_filelayout *flp;
-	struct nfsd4_pnfs_layoutlist *item;
-	int full_len, len;
-	u32 *totlen;
-	u32 nfl_util;
+	struct pnfs_filelayout_layout *flp = (struct pnfs_filelayout_layout *)layout;
+	u32 len = 0, *layoutlen_p, nfl_util, fhlen, i;
 
-	flp = (struct nfsd4_pnfs_filelayout *)layout;
-	len = 4;
-	if (p + XDR_QUADLEN(len + 4) > end)
+	dprintk("filelayout_encode_layout: devid %u, fsi %u, numfh %u\n",
+		flp->device_id,
+		flp->lg_first_stripe_index,
+		flp->lg_fh_length);
+
+	/* Ensure room for len, devid, util, and first_stripe_index */
+	if (p + XDR_QUADLEN(16) > end)
 		return -ENOMEM;
-	full_len = len + 4;
-	totlen = p; 	/* fill-in opaque layout length later*/
+
+	/* save spot for opaque file layout length, fill-in later*/
+	layoutlen_p = p;
 	p++;
+	len += 4;
+
+	/* encode device id */
+	WRITE32(flp->device_id);
+	len += 4;
+
+	/* set and encode flags */
 	nfl_util = flp->lg_stripe_unit;
 	if (flp->lg_commit_through_mds)
 		nfl_util |= NFL4_UFLG_COMMIT_THRU_MDS;
 	if (flp->lg_stripe_type)
 		nfl_util |= NFL4_UFLG_DENSE;
+	WRITE32(nfl_util);
+	len += 4;
 
-	if (flp->lg_indexlen > 0) {   //??? if>0 must build index list
-		printk("filelayout_encode_layout: XXX add loop for index list\n");
-	}
-	item = &flp->lg_llist[0];
-	item->dev_util = nfl_util;
-	len = filelayout_encode_layoutlist_item(p, end, item);
-	if (len > 0) {
-		p += XDR_QUADLEN(len);
-		full_len += len;
+	/* encode first stripe index */
+	WRITE32(flp->lg_first_stripe_index);
+	len += 4;
 
-		*totlen = htonl(full_len);
-		full_len += 4;
+	/* Ensure file system added at least one file handle */
+	if (flp->lg_fh_length <= 0) {
+		printk("%s: File Layout has no file handles!!\n", __FUNCTION__);
+		return -NFSERR_LAYOUTUNAVAILABLE;
 	}
-	return full_len;
+
+	/* encode number of file handles */
+	if (p + XDR_QUADLEN(4) > end)
+		return -ENOMEM;
+	WRITE32(flp->lg_fh_length);
+	len += 4;
+
+	/* encode file handles */
+	for (i = 0; i < flp->lg_fh_length; i++) {
+		fhlen = flp->lg_fh_list[i].fh_size;
+		if (p + XDR_QUADLEN(4 + fhlen) > end)
+			return -ENOMEM;
+		WRITE32(fhlen);
+		WRITEMEM(&flp->lg_fh_list[i].fh_base, fhlen);
+		len += (4 + fhlen);
+	}
+
+	/* Set number of bytes encoded =  total_bytes_encoded - length var */
+	*layoutlen_p = htonl(len - 4);
+
+	return len;
 }
 EXPORT_SYMBOL(filelayout_encode_layout);
 
@@ -200,14 +208,12 @@ EXPORT_SYMBOL(filelayout_encode_layout);
 void
 filelayout_free_layout(void *layout)
 {
-	struct nfsd4_pnfs_filelayout *flp;
+	struct pnfs_filelayout_layout *flp = (struct pnfs_filelayout_layout *)layout;
 
-	flp = (struct nfsd4_pnfs_filelayout *)layout;
-
-	if (!flp || !flp->lg_llist)
+	if (!flp || !flp->lg_fh_list)
 		return;
 
-	kfree(flp->lg_llist);
+	kfree(flp->lg_fh_list);
 }
 EXPORT_SYMBOL(filelayout_free_layout);
 
