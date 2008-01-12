@@ -3475,7 +3475,7 @@ nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp,
 	return nfs_ok;
 }
 
-/* LAYOUTGET: minorversion1-08.txt
+/* LAYOUTGET: minorversion1-13.txt
 u32            bool                    logr_return_on_close;
 u64            offset4                 offset;
 u64            length4                 length;
