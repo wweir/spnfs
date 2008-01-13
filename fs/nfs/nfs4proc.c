@@ -241,8 +241,11 @@ static int nfs41_sequence_done(struct nfs_client *clp,
 	struct nfs4_slot_table *tbl;
 	struct nfs4_slot *slot;
 
+	if (session == NULL) {
+		dprintk("%s: no session: status %d\n", __func__, status);
+		goto ret;
+	}
 	BUG_ON(clp == NULL);
-	BUG_ON(session == NULL);
 	BUG_ON(res == NULL);
 
 	tbl = &session->fore_channel.slot_table;
@@ -285,7 +288,7 @@ static int nfs41_sequence_done(struct nfs_client *clp,
 	smp_mb__after_clear_bit();
 out:
 	rpc_wake_up_next(&tbl->slot_tbl_waitq);
-
+ret:
 	return status;
 }
 
