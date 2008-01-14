@@ -16,7 +16,7 @@
 
 #include <linux/nfs_page.h>
 
-#define NFS4_PNFS_DEV_MAXCOUNT 16
+#define NFS4_PNFS_DEV_MAXNUM 16
 #define NFS4_PNFS_DEV_MAXSIZE 128
 
 /* Per-layout driver specific registration structure */
@@ -191,7 +191,7 @@ struct pnfs_devicelist {
 	unsigned int        num_devs;
 	unsigned int        eof;
 	unsigned int        devs_len;
-	struct pnfs_device  devs[NFS4_PNFS_DEV_MAXCOUNT];
+	struct pnfs_device  devs[NFS4_PNFS_DEV_MAXNUM];
 };
 
 /* pNFS client callback functions.
