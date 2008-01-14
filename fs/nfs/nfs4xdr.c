@@ -272,7 +272,7 @@ static int nfs4_stat_to_errno(int);
 #define encode_getdevicelist_maxsz (op_encode_hdr_maxsz + 4 +  \
 				   (NFS4_VERIFIER_SIZE >> 2))
 #define decode_getdevicelist_maxsz (op_decode_hdr_maxsz + 5 + 2 +      \
-				   NFS4_PNFS_DEV_MAXCOUNT*NFS4_PNFS_DEV_MAXSIZE)
+				   NFS4_PNFS_DEV_MAXNUM*NFS4_PNFS_DEV_MAXSIZE)
 #define encode_getdeviceinfo_maxsz (op_encode_hdr_maxsz + 2)
 #define decode_getdeviceinfo_maxsz (op_decode_hdr_maxsz + 3 + \
 				   NFS4_PNFS_DEV_MAXSIZE)
@@ -1811,7 +1811,7 @@ static int encode_getdevicelist(struct xdr_stream *xdr,
 	RESERVE_SPACE(20);
 	WRITE32(OP_GETDEVICELIST);
 	WRITE32(args->layoutclass);             /* layout type */
-	WRITE32(NFS4_PNFS_DEV_MAXCOUNT);        /* maxcount */
+	WRITE32(NFS4_PNFS_DEV_MAXNUM * NFS4_PNFS_DEV_MAXSIZE); /* maxcount */
 	WRITE64(0ULL);                          /* cookie */
 	encode_nfs4_verifier(xdr, &dummy);
 
@@ -5469,7 +5469,7 @@ static int decode_getdevicelist(struct xdr_stream *xdr,
 	READ32(res->num_devs);
 
 	for (i = 0, cnt = 0;
-	     i < res->num_devs && cnt < NFS4_PNFS_DEV_MAXCOUNT;
+	     i < res->num_devs && cnt < NFS4_PNFS_DEV_MAXNUM;
 	     i++) {
 		READ_BUF(4);
 		READ32(res->devs[cnt].dev_id);	/* device id */
