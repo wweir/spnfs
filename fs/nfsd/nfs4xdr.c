@@ -3208,10 +3208,20 @@ nfsd4_encode_devlist_iterator(struct nfsd4_compoundres *resp,
 	struct pnfs_deviter_arg iter_arg;
 	struct pnfs_devinfo_arg info_arg;
 	int nfserr;
+	int maxcount = gdevl->gd_maxcount;
 
 	ENCODE_HEAD;
 
 	dprintk("%s: Begin\n", __func__);
+
+	/* Do we have space for at least 1 device?
+	 * Reduce available bytes for device for devid and type
+	 */
+	maxcount -= 8;
+	if (maxcount < 0) {
+		nfserr =  nfserr_toosmall;
+		goto out_err;
+	}
 
 	/* set initial iterator args */
 	iter_arg.type = gdevl->gd_type;
@@ -3219,13 +3229,8 @@ nfsd4_encode_devlist_iterator(struct nfsd4_compoundres *resp,
 	iter_arg.verf = gdevl->gd_verf;
 	iter_arg.eof = 0;
 
-	/* TODO: need to update the number of available bytes on each iteration
-	 * e.g., maxcount -= xdr.bytes_written
-	 * Also, should the file layout xdr function check for maxcount
-	 * or should we just see if they exceeded maxcount in this function
-	 * on return.of getdeviceinfo?
-	 */
-	while (1) {
+	/* Retrieve device ids and encode the associated device */
+	do {
 		/* Call iterator to get next device id.
 		 * On return the cookie and verf should be ready to go
 		 * for the next iteration.
@@ -3270,7 +3275,7 @@ nfsd4_encode_devlist_iterator(struct nfsd4_compoundres *resp,
 		/* set xdr info */
 		info_arg.xdr.p = resp->p;
 		info_arg.xdr.end = resp->end;
-		info_arg.xdr.maxcount = gdevl->gd_maxcount;
+		info_arg.xdr.maxcount = maxcount;
 
 		dprintk("%s: pre get_device_info type %u, mxcnt %u,devid %u\n",
 			__func__,
@@ -3282,27 +3287,47 @@ nfsd4_encode_devlist_iterator(struct nfsd4_compoundres *resp,
 			__func__,
 			nfserr,
 			info_arg.xdr.bytes_written);
-		if (nfserr)
-			goto out_err;
 
-		/* tally the number of total bytes written so far */
-		*bytes_written += info_arg.xdr.bytes_written;
-		(*dev_count)++;
-	}
+		/* Check for err or not enough space to enc a single dev */
+		nfserr = nfserrno(nfserr);
+		switch (nfserr) {
+		case NFS4_OK:
+			/* tally the number of total bytes written so far */
+			*bytes_written += info_arg.xdr.bytes_written;
+			(*dev_count)++;
+			maxcount -= info_arg.xdr.bytes_written;
+
+			/* Update cookie/verf/eof to indicate if there
+			 * are remaining devices
+			 */
+			gdevl->gd_eof = iter_arg.eof;
+			gdevl->gd_cookie = iter_arg.cookie;
+			gdevl->gd_verf = iter_arg.verf;
+			break;
+		case NFSERR_TOOSMALL:
+			/* Not enough space for current device
+			 * If we have encoded > 1 device, ok
+			 * If we haven't encoded at least 1 device, error
+			 */
+			if (*dev_count > 0)
+				goto out;
+		default:
+			goto out_err;
+		}
+
+		/* Do we have some room for another device?
+		 * Reduce available bytes for device for devid and type
+		 */
+		maxcount -= 8;
+	} while (maxcount > 0);
 
 out:
-	/* Update cookie/verf/eof to indicate if there are remaining devices */
-	gdevl->gd_eof = iter_arg.eof;
-	gdevl->gd_cookie = iter_arg.cookie;
-	gdevl->gd_verf = iter_arg.verf;
-
+	nfserr = nfs_ok;
+out_err:
 	dprintk("%s: Encoded %u devices and %u bytes\n",
 		__func__,
 		*dev_count,
 		*bytes_written);
-	return 0;
-
-out_err:
 	return nfserr;
 }
 
@@ -3313,7 +3338,7 @@ nfsd4_encode_getdevlist(struct nfsd4_compoundres *resp,
 			int nfserr,
 			struct nfsd4_pnfs_getdevlist *gdevl)
 {
-	unsigned int dev_count = 0, bytes_written = 0, lead_count;
+	unsigned int dev_count = 0, bytes_written = 0, lead_count, maxcount = 0;
 	u32 *p_in = resp->p;
 
 	ENCODE_HEAD;
@@ -3331,16 +3356,30 @@ nfsd4_encode_getdevlist(struct nfsd4_compoundres *resp,
 	p += XDR_QUADLEN(lead_count);
 	ADJUST_ARGS();
 
+	maxcount = PAGE_SIZE;
+	if (maxcount > gdevl->gd_maxcount)
+		maxcount = gdevl->gd_maxcount;
+
+	/* Ensure have room for cookie,verf, and devlist_len at the end */
+	maxcount -= lead_count;
+	if (maxcount < 0) {
+		nfserr =  nfserr_toosmall;
+		goto out;
+	}
+
 	/* Iterate over as many devices as we have room for and encode them
 	 * on the xdr stream.
 	 */
+	gdevl->gd_maxcount = maxcount;
 	nfserr = nfsd4_encode_devlist_iterator(resp, gdevl, &dev_count,
 						&bytes_written);
 	if (nfserr)
-		return nfserr;
+		goto out;
 
-	if (dev_count <= 0)
-		return nfserr_noent;
+	if (dev_count <= 0) {
+		nfserr = nfserr_noent;
+		goto out;
+	}
 
 	/* Backfill in cookie, verf and number of devices encoded */
 	p = p_in;
@@ -3359,7 +3398,9 @@ nfsd4_encode_getdevlist(struct nfsd4_compoundres *resp,
 
 	dprintk("%s: done.\n", __func__);
 
-	return nfs_ok;
+	nfserr = nfs_ok;
+out:
+	return nfserr;
 }
 
 /* For a given device id, have the file system retrieve and encode the
