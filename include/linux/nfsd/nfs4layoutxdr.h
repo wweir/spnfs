@@ -64,6 +64,19 @@ struct pnfs_filelayout_devaddr {
 	struct xdr_netobj	r_addr;
 };
 
+/* list of multipath servers */
+struct pnfs_filelayout_multipath {
+	u32				fl_multipath_length;
+	struct pnfs_filelayout_devaddr 	*fl_multipath_list;
+};
+
+struct pnfs_filelayout_device {
+	u32					fl_stripeindices_length;
+	u32       		 		*fl_stripeindices_list;
+	u32					fl_device_length;
+	struct pnfs_filelayout_multipath 	*fl_device_list;
+};
+
 struct nfsd4_pnfs_layoutlist {
 	u32				dev_id;
 	u32                             dev_index;
