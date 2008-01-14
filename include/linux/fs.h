@@ -989,7 +989,11 @@ struct super_block {
 	const struct super_operations	*s_op;
 	struct dquot_operations	*dq_op;
  	struct quotactl_ops	*s_qcop;
+#if defined(CONFIG_PNFSD)
+	struct export_operations *s_export_op;
+#else /* CONFIG_PNFSD */
 	const struct export_operations *s_export_op;
+#endif /* !CONFIG_PNFSD */
 	unsigned long		s_flags;
 	unsigned long		s_magic;
 	struct dentry		*s_root;
