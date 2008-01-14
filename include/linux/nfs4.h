@@ -112,6 +112,7 @@
 #define EXCHGID4_FLAG_USE_NON_PNFS      0x00010000
 #define EXCHGID4_FLAG_USE_PNFS_MDS      0x00020000
 #define EXCHGID4_FLAG_USE_PNFS_DS       0x00040000
+#define EXCHGID4_MFS_DS_FLAG_MASK	0x00060000
 #define EXCHGID4_INVAL_FLAG_MASK	0x77707774
 
 #define NFS4_LENGTH_EOF (~(u64)0)
@@ -413,6 +414,7 @@ enum lock_type4 {
 #define FATTR4_WORD1_TIME_MODIFY        (1UL << 21)
 #define FATTR4_WORD1_TIME_MODIFY_SET    (1UL << 22)
 #define FATTR4_WORD1_MOUNTED_ON_FILEID  (1UL << 23)
+#define FATTR4_WORD1_FS_LAYOUT_TYPES	(1UL << 30)
 
 #define NFSPROC4_NULL 0
 #define NFSPROC4_COMPOUND 1
@@ -464,6 +466,12 @@ enum {
 	NFSPROC4_CLNT_DESTROY_SESSION,
 	NFSPROC4_CLNT_SEQUENCE,
 	NFSPROC4_CLNT_GET_LEASE_TIME,
+	NFSPROC4_CLNT_PNFS_LAYOUTGET,
+	NFSPROC4_CLNT_PNFS_LAYOUTCOMMIT,
+	NFSPROC4_CLNT_PNFS_LAYOUTRETURN,
+	NFSPROC4_CLNT_PNFS_GETDEVICELIST,
+	NFSPROC4_CLNT_PNFS_GETDEVICEINFO,
+	NFSPROC4_CLNT_PNFS_WRITE,
 #endif /* CONFIG_NFSD_V4_1 */
 };
 
@@ -481,6 +489,34 @@ enum state_protect_how4 {
 	SP4_SSV         = 2
 };
 #endif /* defined(CONFIG_NFSD_V4_1) || defined(CONFIG_NFS_V4_1) */
+
+#if defined(CONFIG_PNFS) || defined(CONFIG_PNFSD)
+enum pnfs_layouttype {
+	LAYOUT_NFSV4_FILES  = 1,
+	LAYOUT_OSD2_OBJECTS = 2,
+	LAYOUT_BLOCK_VOLUME = 3,
+	LAYOUT_PVFS2        = 4
+};
+
+/* FIXME: should recall and return types be combined? */
+enum pnfs_layoutrecall_type {
+	RECALL_FILE = 1,
+	RECALL_FSID = 2,
+	RECALL_ALL  = 3
+};
+
+enum pnfs_layoutreturn_type {
+	RETURN_FILE = 1,
+	RETURN_FSID = 2,
+	RETURN_ALL  = 3
+};
+
+enum pnfs_iomode {
+	IOMODE_READ = 1,
+	IOMODE_RW = 2,
+	IOMODE_ANY = 3,
+};
+#endif /* defined(CONFIG_PNFS) || defined(CONFIG_PNFSD) */
 
 #endif
 #endif
