@@ -164,6 +164,7 @@ enum nfsd_fsid {
 	FSID_UUID8,
 	FSID_UUID16,
 	FSID_UUID16_INUM,
+	FSID_MAX
 };
 
 enum fsid_source {

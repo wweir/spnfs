@@ -39,6 +39,7 @@
 
 #include <linux/list.h>
 #include <linux/kref.h>
+#include <linux/nfs_xdr.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/nfs4.h>
 
@@ -213,6 +214,9 @@ struct nfs4_client {
 	struct list_head	cl_strhash; 	/* hash by cl_name */
 	struct list_head	cl_openowners;
 	struct list_head	cl_delegations;
+#if defined(CONFIG_PNFSD)
+	struct list_head	cl_layouts;	/* outstanding layouts */
+#endif /* CONFIG_PNFSD */
 #if defined(CONFIG_NFSD_V4_1)
 	struct list_head	cl_sessions;
 #endif /* CONFIG_NFSD_V4_1 */
@@ -239,6 +243,42 @@ struct nfs4_client {
 	u32			cl_cb_seq_nr;
 #endif /* CONFIG_NFSD_V4_1 */
 };
+
+struct nfs4_fsid {
+        u64     major;
+        u64     minor;
+};
+
+#if defined(CONFIG_PNFSD)
+
+#include <linux/nfsd/nfsd4_pnfs.h>
+
+struct nfs4_cb_layout {
+	struct super_block	*cbl_sb;
+	struct nfs4_client	*cbl_client;
+	u32			cbl_ident;
+	u32			cbl_recall_type;
+	u32			cbl_layout_type;
+	u32			cbl_iomode;
+	u32			cbl_layoutchanged;
+	u64			cbl_offset;
+	u64			cbl_length;
+	struct nfs_fsid		cbl_fsid;
+	u32			cbl_fhlen;
+	u32			cbl_fhval[NFS4_FHSIZE];
+};
+
+/* outstanding layout */
+struct nfs4_layout {
+	struct list_head	lo_perfile;	/* hash by f_id */
+	struct list_head	lo_perclnt;	/* hash by clientid */
+	struct list_head	lo_recall_lru; /* when in recall */
+	struct nfs4_file	*lo_file;	/* backpointer */
+	struct nfs4_client	*lo_client;
+	struct nfsd4_layout_seg lo_seg;
+};
+
+#endif /* CONFIG_PNFSD */
 
 /* struct nfs4_client_reset
  * one per old client. Populates reset_str_hashtbl. Filled from conf_id_hashtbl
@@ -328,11 +368,29 @@ struct nfs4_file {
 	struct list_head        fi_hash;    /* hash by "struct inode *" */
 	struct list_head        fi_stateids;
 	struct list_head	fi_delegations;
+#if defined(CONFIG_PNFSD)
+	struct list_head	fi_layouts;
+#endif /* CONFIG_PNFSD */
 	struct inode		*fi_inode;
 	u32                     fi_id;      /* used with stateowner->so_id 
 					     * for stateid_hashtbl hash */
 	bool			fi_had_conflict;
+#if defined(CONFIG_PNFSD)
+	/* used by layoutget / layoutrecall */
+	struct nfs4_fsid	fi_fsid;
+	u32			fi_fhlen;
+	u8			fi_fhval[NFS4_FHSIZE];
+#endif /* CONFIG_PNFSD */
 };
+
+#if defined(CONFIG_PNFSD)
+/* pNFS Metadata server state */
+
+struct pnfs_ds_dev_entry {
+	struct list_head	dd_dev_entry; /* st_pnfs_ds_id entry */
+	u32			dd_devid;
+};
+#endif /* CONFIG_PNFSD */
 
 /*
 * nfs4_stateid can either be an open stateid or (eventually) a lock stateid
@@ -356,6 +414,9 @@ struct nfs4_stateid {
 	struct list_head              st_perfile;
 	struct list_head              st_perstateowner;
 	struct list_head              st_lockowners;
+#if defined(CONFIG_PNFSD)
+	struct list_head              st_pnfs_ds_id;
+#endif /* CONFIG_PNFSD */
 	struct nfs4_stateowner      * st_stateowner;
 	struct nfs4_file            * st_file;
 	stateid_t                     st_stateid;
@@ -395,6 +456,9 @@ extern void put_nfs4_client(struct nfs4_client *clp);
 extern void nfs4_free_stateowner(struct kref *kref);
 extern void nfsd4_probe_callback(struct nfs4_client *clp);
 extern void nfsd4_cb_recall(struct nfs4_delegation *dp);
+#if defined(CONFIG_PNFSD)
+extern void nfsd4_cb_layout(struct nfs4_cb_layout *lp);
+#endif /* CONFIG_PNFSD */
 extern void nfs4_put_delegation(struct nfs4_delegation *dp);
 extern __be32 nfs4_make_rec_clidname(char *clidname, struct xdr_netobj *clname);
 extern void nfsd4_init_recdir(char *recdir_name);
@@ -405,6 +469,11 @@ extern int nfs4_has_reclaimed_state(const char *name);
 extern void nfsd4_recdir_purge_old(void);
 extern int nfsd4_create_clid_dir(struct nfs4_client *clp);
 extern void nfsd4_remove_clid_dir(struct nfs4_client *clp);
+#if defined(CONFIG_PNFSD)
+extern int nfs4_preprocess_pnfs_ds_stateid(struct svc_fh *, stateid_t *);
+extern struct pnfs_ds_stateid *find_pnfs_ds_stateid(stateid_t *stid);
+#endif /* CONFIG_PNFSD */
+
 
 static inline void
 nfs4_put_stateowner(struct nfs4_stateowner *so)

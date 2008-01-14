@@ -44,6 +44,7 @@ struct nfs_page {
 	struct kref		wb_kref;	/* reference count */
 	unsigned long		wb_flags;
 	struct nfs_writeverf	wb_verf;	/* Commit cookie */
+	unsigned int		wb_devid;	/* pNFS data server id */
 };
 
 struct nfs_pageio_descriptor {
