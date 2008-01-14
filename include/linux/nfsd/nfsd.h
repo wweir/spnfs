@@ -79,6 +79,10 @@ __be32		 nfsd_lookup_dentry(struct svc_rqst *, struct svc_fh *,
 				struct svc_export **, struct dentry **);
 __be32		nfsd_setattr(struct svc_rqst *, struct svc_fh *,
 				struct iattr *, int, time_t);
+#if defined(CONFIG_PNFSD)
+u32		pnfs_set_layout_type(struct super_block *,
+				     struct svc_export *);
+#endif /* CONFIG_PNFSD */
 #ifdef CONFIG_NFSD_V4
 __be32          nfsd4_set_nfs4_acl(struct svc_rqst *, struct svc_fh *,
                     struct nfs4_acl *);
@@ -246,8 +250,8 @@ void		nfsd_lockd_shutdown(void);
 #define	nfserr_cb_path_down	__constant_htonl(NFSERR_CB_PATH_DOWN)
 #define	nfserr_locked		__constant_htonl(NFSERR_LOCKED)
 #define	nfserr_wrongsec		__constant_htonl(NFSERR_WRONGSEC)
-#define	nfserr_replay_me	__constant_htonl(NFSERR_REPLAY_ME)
 #define	nfserr_badiomode	__constant_htonl(NFSERR_BADIOMODE)
+#define	nfserr_replay_me	__constant_htonl(NFSERR_REPLAY_ME)
 #define	nfserr_badlayout	__constant_htonl(NFSERR_BADLAYOUT)
 #define nfserr_bad_session_digest	__constant_htonl(NFSERR_BAD_SESSION_DIGEST)
 #define nfserr_badsession	__constant_htonl(NFSERR_BADSESSION)
@@ -339,8 +343,13 @@ extern struct timeval	nfssvc_boot;
 #define NFSD4_1_SUPPORTED_ATTRS_WORD0 \
 	NFSD4_SUPPORTED_ATTRS_WORD0
 
+#if defined(CONFIG_PNFSD)
+#define NFSD4_1_SUPPORTED_ATTRS_WORD1 \
+	(NFSD4_SUPPORTED_ATTRS_WORD1 | FATTR4_WORD1_FS_LAYOUT_TYPES)
+#else /* CONFIG_PNFSD */
 #define NFSD4_1_SUPPORTED_ATTRS_WORD1 \
 	NFSD4_SUPPORTED_ATTRS_WORD1
+#endif /* CONFIG_PNFSD */
 
 #define NFSD4_1_SUPPORTED_ATTRS_WORD2 \
 	(NFSD4_SUPPORTED_ATTRS_WORD2 | FATTR4_WORD2_SUPPATTR_EXCLCREAT)
