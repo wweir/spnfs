@@ -595,7 +595,7 @@ decode_and_add_devicelist(struct filelayout_mount_type *mt,
 	dprintk("%s invoked.  num_devs=%d\n", __func__, devlist->num_devs);
 
 	for (i = 0, cnt = 0;
-	     i < devlist->num_devs && cnt < NFS4_PNFS_DEV_MAXCOUNT;
+	     i < devlist->num_devs && cnt < NFS4_PNFS_DEV_MAXNUM;
 	     i++) {
 		if (!decode_and_add_device(mt, &devlist->devs[cnt])) {
 			dprintk("%s: error count=%d\n", __func__, cnt);
