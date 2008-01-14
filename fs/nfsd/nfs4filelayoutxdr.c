@@ -45,6 +45,7 @@
 #include <linux/nfsd/nfs4layoutxdr.h>
 #include <linux/nfsd/nfsd4_pnfs.h>
 
+#define NFSDDBG_FACILITY	NFSDDBG_PNFS
 
 /* File layout export_operations->devaddr_encode()  */
 int
