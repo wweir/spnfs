@@ -48,6 +48,11 @@
 #include <linux/nfsd/xdr4.h>
 #include <linux/nfs4_acl.h>
 #include <linux/sunrpc/gss_api.h>
+#if defined(CONFIG_PNFSD)
+#include <linux/nfsd/stats.h>
+#include <linux/nfsd/pnfsd.h>
+#include <linux/exportfs.h>
+#endif /* CONFIG_PNFSD */
 
 #define NFSDDBG_FACILITY		NFSDDBG_PROC
 
@@ -416,10 +421,24 @@ nfsd4_commit(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	     struct nfsd4_commit *commit)
 {
 	__be32 status;
+#if defined(CONFIG_PNFSD)
+	struct super_block *sb;
+	struct svc_fh *current_fh = &cstate->current_fh;
+#endif
 
 	u32 *p = (u32 *)commit->co_verf.data;
+
+#if defined(CONFIG_PNFSD)
+	sb = current_fh->fh_dentry->d_inode->i_sb;
+	if (sb->s_export_op->get_verifier) {
+		sb->s_export_op->get_verifier(sb, p);
+		p += 2;
+	} else
+#endif /* CONFIG_PNFSD */
+	{
 	*p++ = nfssvc_boot.tv_sec;
 	*p++ = nfssvc_boot.tv_usec;
+	}
 
 	status = nfsd_commit(rqstp, &cstate->current_fh, commit->co_offset,
 			     commit->co_count);
@@ -759,6 +778,10 @@ nfsd4_write(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	struct file *filp = NULL;
 	u32 *p;
 	__be32 status = nfs_ok, flags = 0;
+#if defined(CONFIG_PNFSD)
+	struct super_block *sb;
+	struct svc_fh *current_fh = &cstate->current_fh;
+#endif
 
 	/* no need to check permission - this will be done in nfsd_write() */
 
@@ -783,9 +806,26 @@ nfsd4_write(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	write->wr_bytes_written = write->wr_buflen;
 	write->wr_how_written = write->wr_stable_how;
 	p = (u32 *)write->wr_verifier.data;
+
+#if defined(CONFIG_PNFSD)
+	sb = current_fh->fh_dentry->d_inode->i_sb;
+	if (sb->s_export_op->get_verifier) {
+		struct pnfs_ds_stateid *dsp = find_pnfs_ds_stateid(stateid);
+		if (dsp) {
+			/* get it from MDS */
+			*p++ = dsp->ds_verifier[0];
+			*p++ = dsp->ds_verifier[1];
+		} else {
+			/* must be on MDS */
+			sb->s_export_op->get_verifier(sb, p);
+			p += 2;
+		}
+	} else
+#endif /* CONFIG_PNFSD */
+	{
 	*p++ = nfssvc_boot.tv_sec;
 	*p++ = nfssvc_boot.tv_usec;
-
+	}
 	status =  nfsd_write(rqstp, &cstate->current_fh, filp,
 			     write->wr_offset, rqstp->rq_vec, write->wr_vlen,
 			     write->wr_buflen, &write->wr_how_written);
@@ -874,6 +914,283 @@ nfsd4_verify(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	status = _nfsd4_verify(rqstp, cstate, verify);
 	return status == nfserr_same ? nfs_ok : status;
 }
+
+#if defined(CONFIG_PNFSD)
+static __be32
+nfsd4_getdevlist(struct svc_rqst *rqstp,
+		struct nfsd4_compound_state *cstate,
+		struct nfsd4_pnfs_getdevlist *gdlp)
+{
+	struct super_block *sb;
+	struct svc_fh *current_fh = &cstate->current_fh;
+	int status = 0;
+
+	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
+	if (status) {
+		printk("pNFS %s: verify filehandle failed\n", __FUNCTION__);
+		goto out;
+	}
+
+	status = nfserr_inval;
+	sb = current_fh->fh_dentry->d_inode->i_sb;
+	if (!sb)
+		goto out;
+
+	/* check to see if requested layout type is supported. */
+	status = nfserr_unknown_layouttype;
+	if (!sb->s_export_op->layout_type ||
+	    sb->s_export_op->layout_type() != gdlp->gd_type) {
+		printk("pNFS %s: requested layout type %d "
+		       "does not match suppored type %d\n",
+			__FUNCTION__, gdlp->gd_type,
+			sb->s_export_op->layout_type());
+		goto out;
+	}
+
+	/* set the layouttype for encoding the devaddr */
+	gdlp->gd_ops = sb->s_export_op;
+
+	/* device list is allocated by underlying file system, and free'd
+	 * via export_ops callback. */
+	if (sb->s_export_op->get_devicelist) {
+		status = sb->s_export_op->get_devicelist(sb, (void *)gdlp);
+
+		dprintk("%s: status %d type %d maxcount %d len %d\n",
+			__FUNCTION__, status, gdlp->gd_type, gdlp->gd_maxcount,
+			gdlp->gd_devlist_len);
+	}
+	if (gdlp->gd_devlist_len < 0)
+		status = nfserr_inval;
+out:
+	return status;
+}
+
+/*
+ * NOTE: to implement CB_LAYOUTRECALL, need to associate layouts with clientid
+ */
+static __be32
+nfsd4_layoutget(struct svc_rqst *rqstp,
+		struct nfsd4_compound_state *cstate,
+		struct nfsd4_pnfs_layoutget *lgp)
+{
+	int status = 0;
+	struct super_block *sb;
+	struct current_session *current_ses = cstate->current_ses;
+	struct svc_fh *current_fh = &cstate->current_fh;
+
+	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
+	if (status) {
+		printk("pNFS %s: verify filehandle failed\n", __FUNCTION__);
+		goto out;
+	}
+
+	status = nfserr_inval;
+	sb = current_fh->fh_dentry->d_inode->i_sb;
+	if (!sb)
+		goto out;
+
+	/* check to see if requested layout type is supported. */
+	status = nfserr_unknown_layouttype;
+	if (!sb->s_export_op->layout_type ||
+	    sb->s_export_op->layout_type() != lgp->lg_seg.layout_type) {
+		printk("pNFS %s: requested layout type %d "
+		       "does not match suppored type %d\n",
+			__FUNCTION__, lgp->lg_seg.layout_type,
+			sb->s_export_op->layout_type());
+		goto out;
+	}
+
+	status = nfserr_layoutunavailable;
+	if (!sb->s_export_op->layout_get) {
+		dprintk("pNFS %s: layout_get not implemented for layout "
+			"type %d\n", __FUNCTION__, lgp->lg_seg.layout_type);
+		goto out;
+	}
+
+	status = nfserr_inval;
+	if (lgp->lg_seg.iomode != IOMODE_READ &&
+	    lgp->lg_seg.iomode != IOMODE_RW &&
+	    lgp->lg_seg.iomode != IOMODE_ANY) {
+		dprintk("pNFS %s: invalid iomode %d\n", __FUNCTION__,
+			lgp->lg_seg.iomode);
+		goto out;
+	}
+
+	status = nfserr_badiomode;
+	if (lgp->lg_seg.iomode == IOMODE_ANY) {
+		dprintk("pNFS %s: IOMODE_ANY is not allowed\n", __FUNCTION__);
+		goto out;
+	}
+
+	/* set the export ops for encoding the devaddr */
+	lgp->lg_ops = sb->s_export_op;
+
+	lgp->lg_seg.clientid = *(u64 *)&current_ses->cs_sid.clientid;
+
+	status = nfs4_pnfs_get_layout(sb, current_fh, lgp);
+out:
+	return status;
+}
+
+static __be32
+nfsd4_layoutcommit(struct svc_rqst *rqstp,
+		struct nfsd4_compound_state *cstate,
+		struct nfsd4_pnfs_layoutcommit *lcp)
+{
+	int status;
+	struct inode *ino = NULL;
+	struct iattr ia;
+	struct super_block *sb;
+	struct current_session *current_ses = cstate->current_ses;
+	struct svc_fh *current_fh = &cstate->current_fh;
+
+	dprintk("NFSD: nfsd4_layoutcommit \n");
+	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
+	if (status) {
+		printk("%s: verify filehandle failed\n", __FUNCTION__);
+		goto out;
+	}
+
+	ino = current_fh->fh_dentry->d_inode;
+
+	/* This will only extend the file length.  Do a quick
+	 * check to see if there is any point in waiting for the update
+	 * locks.
+	 * TODO: Is this correct for all back ends?
+	 */
+	dprintk("%s:new size: %llu old size: %lld\n",
+		__FUNCTION__, lcp->lc_last_wr + 1, ino->i_size);
+
+	fh_lock(current_fh);
+	if ((lcp->lc_last_wr + 1) <= ino->i_size) {
+		status = 0;
+		lcp->lc_size_chg = 0;
+		fh_unlock(current_fh);
+		goto out;
+	}
+
+	/* Set clientid from sessionid */
+	lcp->lc_seg.clientid = *(u64 *)&current_ses->cs_sid.clientid;
+
+	/* Try our best to update the file size */
+	dprintk("%s: Modifying file size\n", __FUNCTION__);
+	ia.ia_valid = ATTR_SIZE;
+	ia.ia_size = lcp->lc_last_wr + 1;
+	sb = current_fh->fh_dentry->d_inode->i_sb;
+	if (sb->s_export_op->layout_commit) {
+		status = sb->s_export_op->layout_commit(ino, lcp);
+		dprintk("%s:layout_commit result %d\n", __FUNCTION__, status);
+	} else {
+		status = notify_change(current_fh->fh_dentry, &ia);
+		dprintk("%s:notify_change result %d\n", __FUNCTION__, status);
+	}
+
+	fh_unlock(current_fh);
+
+	if (!status) {
+		if (EX_ISSYNC(current_fh->fh_export)) {
+			dprintk("%s:Synchronously writing inode size %llu\n",
+				__FUNCTION__, ino->i_size);
+			write_inode_now(ino, 1);
+		}
+		lcp->lc_size_chg = 1;
+		lcp->lc_newsize = ino->i_size;
+		status = 0;
+	}
+out:
+	return status;
+}
+
+static __be32
+nfsd4_layoutreturn(struct svc_rqst *rqstp,
+		struct nfsd4_compound_state *cstate,
+		struct nfsd4_pnfs_layoutreturn *lrp)
+{
+	int status = 0;
+	struct super_block *sb;
+	struct current_session *current_ses = cstate->current_ses;
+	struct svc_fh *current_fh = &cstate->current_fh;
+
+	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
+	if (status) {
+		printk("pNFS %s: verify filehandle failed\n", __FUNCTION__);
+		goto out;
+	}
+
+	status = nfserr_inval;
+	sb = current_fh->fh_dentry->d_inode->i_sb;
+	if (!sb)
+		goto out;
+
+	/* check to see if requested layout type is supported. */
+	status = nfserr_unknown_layouttype;
+	if (!sb->s_export_op->layout_type ||
+	    sb->s_export_op->layout_type() != lrp->lr_seg.layout_type) {
+		printk("pNFS %s: requested layout type %d "
+		       "does not match suppored type %d\n",
+			__FUNCTION__, lrp->lr_seg.layout_type,
+			sb->s_export_op->layout_type());
+		goto out;
+	}
+
+	/* Set clientid from sessionid */
+	lrp->lr_seg.clientid = *(u64 *)&current_ses->cs_sid.clientid;
+	status = nfs4_pnfs_return_layout(sb, current_fh, lrp);
+out:
+	dprintk("pNFS %s: status %d layout_type 0x%x\n",
+		__FUNCTION__, status, lrp->lr_seg.layout_type);
+	return status;
+}
+
+static __be32
+nfsd4_getdevinfo(struct svc_rqst *rqstp,
+		struct nfsd4_compound_state *cstate,
+		struct nfsd4_pnfs_getdevinfo *gdp)
+{
+	struct super_block *sb;
+	struct svc_fh *current_fh = &cstate->current_fh;
+	int status;
+
+	printk("%s: type %d dev_id %d\n",
+		__FUNCTION__, gdp->gd_type, gdp->gd_dev_id);
+
+	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
+	if (status) {
+		printk("%s: verify filehandle failed\n", __FUNCTION__);
+		goto out;
+	}
+
+	status = nfserr_inval;
+	sb = current_fh->fh_dentry->d_inode->i_sb;
+	if (!sb)
+		goto out;
+
+	/* check to see if requested layout type is supported. */
+	status = nfserr_unknown_layouttype;
+	if (!sb->s_export_op->layout_type ||
+	    sb->s_export_op->layout_type() != gdp->gd_type) {
+		printk("pNFS %s: requested layout type %d "
+		       "does not match suppored type %d\n",
+			__FUNCTION__, gdp->gd_type,
+			sb->s_export_op->layout_type());
+		goto out;
+	}
+
+	/* set the ops for encoding the devaddr */
+	gdp->gd_ops = sb->s_export_op;
+
+	if (sb && sb->s_export_op->get_deviceinfo) {
+		status = sb->s_export_op->get_deviceinfo(sb, (void *)gdp);
+
+		dprintk("%s: status %d type %d dev_id %d\n",
+			__FUNCTION__, status, gdp->gd_type, gdp->gd_dev_id);
+		goto out;
+	}
+	printk("%s:  failed, no support\n", __FUNCTION__);
+out:
+	return status;
+}
+#endif /* CONFIG_PNFSD */
 
 /*
  * NULL call.
@@ -1207,6 +1524,25 @@ static struct nfsd4_operation nfsd4_ops[NFSD4_LAST_OP+1] = {
 		.op_flags = ALLOWED_WITHOUT_FH | ALLOWED_ON_ABSENT_FS,
 	},
 #if defined(CONFIG_NFSD_V4_1)
+#if defined(CONFIG_PNFSD)
+	[OP_GETDEVICELIST] = {
+		.op_func = (nfsd4op_func)nfsd4_getdevlist,
+		.op_flags = ALLOWED_WITHOUT_FH,
+	},
+	[OP_GETDEVICEINFO] = {
+		.op_func = (nfsd4op_func)nfsd4_getdevinfo,
+		.op_flags = ALLOWED_WITHOUT_FH,
+	},
+	[OP_LAYOUTGET] = {
+		.op_func = (nfsd4op_func)nfsd4_layoutget,
+	},
+	[OP_LAYOUTCOMMIT] = {
+		.op_func = (nfsd4op_func)nfsd4_layoutcommit,
+	},
+	[OP_LAYOUTRETURN] = {
+		.op_func = (nfsd4op_func)nfsd4_layoutreturn,
+	},
+#endif /* CONFIG_PNFSD */
 	[OP_EXCHANGE_ID] = {
 		.op_func = (nfsd4op_func)nfsd4_exchange_id,
 		.op_flags = ALLOWED_WITHOUT_FH,
