@@ -58,6 +58,10 @@
 #include <linux/nfs4_acl.h>
 #include <linux/sunrpc/gss_api.h>
 #include <linux/sunrpc/svcauth_gss.h>
+#if defined(CONFIG_PNFSD)
+#include <linux/exportfs.h>
+#include <linux/nfs_xdr.h>
+#endif /* CONFIG_PNFSD */
 
 #define NFSDDBG_FACILITY		NFSDDBG_XDR
 
@@ -1234,6 +1238,165 @@ nfsd4_decode_release_lockowner(struct nfsd4_compoundargs *argp, struct nfsd4_rel
 	DECODE_TAIL;
 }
 
+#if defined(CONFIG_PNFSD)
+/* GETDEVICELIST: minorversion1-01.txt
+u32            			pnfs_layouttype4                layout_type;
+u32             		count4                          maxcount;
+u64             		nfs_cookie4                     cookie;
+NFS4_VERIFIER_SIZE		verifier4                       cookieverf;
+*/
+static int
+nfsd4_decode_getdevlist(struct nfsd4_compoundargs *argp,
+			struct nfsd4_pnfs_getdevlist *gdevl)
+{
+	DECODE_HEAD;
+
+	READ_BUF(16 + sizeof(nfs4_verifier));
+	READ32(gdevl->gd_type);
+	READ32(gdevl->gd_maxcount);
+	READ64(gdevl->gd_cookie);
+	COPYMEM(&gdevl->gd_verf, sizeof(nfs4_verifier));
+
+	DECODE_TAIL;
+}
+
+/* GETDEVICEINFO: minorversion1-01.txt
+u32             pnfs_deviceid4                  device_id;
+u32             pnfs_layouttype4                layout_type;
+u32             count4                          maxcount;
+
+*/
+  static int
+nfsd4_decode_getdevinfo(struct nfsd4_compoundargs *argp,
+			struct nfsd4_pnfs_getdevinfo *gdev)
+{
+	DECODE_HEAD;
+
+	READ_BUF(12);
+	READ32(gdev->gd_dev_id);
+	READ32(gdev->gd_type);
+	READ32(gdev->gd_maxcnt);
+
+	DECODE_TAIL;
+}
+
+/* LAYOUTGET: minorversion1-01.txt
+u32     int32                   signal_layout_available;
+u32     pnfs_layouttype4        layout_type;
+u32     pnfs_layoutiomode4      iomode;
+u64     offset4                 offset;
+u64     length4                 length;
+u64     length4                 minlength;
+u32     count4                  maxcount;
+*/
+ static int
+nfsd4_decode_layoutget(struct nfsd4_compoundargs *argp,
+			struct nfsd4_pnfs_layoutget *lgp)
+{
+	DECODE_HEAD;
+
+	READ_BUF(40);
+	READ32(lgp->lg_signal);
+	READ32(lgp->lg_seg.layout_type);
+	READ32(lgp->lg_seg.iomode);
+	READ64(lgp->lg_seg.offset);
+	READ64(lgp->lg_seg.length);
+	READ64(lgp->lg_minlength);
+	READ32(lgp->lg_mxcnt);
+
+	DECODE_TAIL;
+}
+
+/* LAYOUTCOMMIT: minorversion1-01.txt
+
+     struct pnfs_layoutupdate4 {
+            pnfs_layouttype4        type;
+            opaque                  layoutupdate_data<>;
+     };
+
+
+u64             offset4                 offset;
+u64             length4                 length;
+u64             length4                 last_write_offset;
+u32 + u64 + u32       newtime4                time_modify;
+u32 + u64 + u32       newtime4                time_access;
+u32             pnfs_layoutupdate4      layoutupdate;
+
+
+*/
+static int
+nfsd4_decode_layoutcommit(struct nfsd4_compoundargs *argp,
+			  struct nfsd4_pnfs_layoutcommit *lcp)
+{
+	DECODE_HEAD;
+	u32 timechange;
+
+	READ_BUF(24);
+	READ64(lcp->lc_seg.offset);
+	READ64(lcp->lc_seg.length);
+	READ32(lcp->lc_reclaim);
+	READ32(lcp->lc_newoffset);
+	if (lcp->lc_newoffset) {
+		READ_BUF(8);
+		READ64(lcp->lc_last_wr);
+	} else
+		lcp->lc_last_wr = 0;
+	READ_BUF(4);
+	READ32(timechange);
+	if (timechange) {
+		READ_BUF(12);
+		READ64(lcp->lc_mtime.seconds);
+		READ32(lcp->lc_mtime.nseconds);
+	} else {
+		lcp->lc_mtime.seconds = 0;
+		lcp->lc_mtime.nseconds = 0;
+	}
+	READ_BUF(4);
+	READ32(timechange);
+	if (timechange) {
+		READ_BUF(12);
+		READ64(lcp->lc_atime.seconds);
+		READ32(lcp->lc_atime.nseconds);
+	} else {
+		lcp->lc_atime.seconds = 0;
+		lcp->lc_atime.nseconds = 0;
+	}
+	READ_BUF(8);
+	READ32(lcp->lc_seg.layout_type);
+	/* XXX: saving XDR'ed layout update. Since we don't have the
+	 * current_fh yet, and therefore no export_ops, we can't call
+	 * the layout specific decode routines. File and pVFS2
+	 * do not use the layout update....
+	 */
+	READ32(lcp->lc_up_len);
+	if (lcp->lc_up_len > 0) {
+		READ_BUF(lcp->lc_up_len);
+		READMEM(lcp->lc_up_layout, lcp->lc_up_len);
+	}
+
+	DECODE_TAIL;
+}
+
+static int
+nfsd4_decode_layoutreturn(struct nfsd4_compoundargs *argp,
+			  struct nfsd4_pnfs_layoutreturn *lrp)
+{
+	DECODE_HEAD;
+
+	READ_BUF(32);
+	READ32(lrp->lr_reclaim);
+	READ32(lrp->lr_seg.layout_type);
+	READ32(lrp->lr_seg.iomode);
+	READ32(lrp->lr_return_type);
+	if (lrp->lr_return_type == RETURN_FILE) {
+		READ64(lrp->lr_seg.offset);
+		READ64(lrp->lr_seg.length);
+	}
+
+	DECODE_TAIL;
+}
+#endif /* CONFIG_PNFSD */
+
 static __be32
 nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 {
@@ -1432,6 +1595,23 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 			op->status = nfsd4_decode_destroy_session(argp,
 							&op->u.destroy_session);
 			break;
+#if defined(CONFIG_PNFSD)
+		case OP_GETDEVICELIST:
+			op->status = nfsd4_decode_getdevlist(argp, &op->u.pnfs_getdevlist);
+			break;
+		case OP_GETDEVICEINFO:
+			op->status = nfsd4_decode_getdevinfo(argp, &op->u.pnfs_getdevinfo);
+			break;
+		case OP_LAYOUTGET:
+			op->status = nfsd4_decode_layoutget(argp, &op->u.pnfs_layoutget);
+			break;
+		case OP_LAYOUTCOMMIT:
+			op->status = nfsd4_decode_layoutcommit(argp, &op->u.pnfs_layoutcommit);
+			break;
+		case OP_LAYOUTRETURN:
+			op->status = nfsd4_decode_layoutreturn(argp, &op->u.pnfs_layoutreturn);
+			break;
+#else /* CONFIG_PNFSD */
 		case OP_GETDEVICELIST:
 		case OP_GETDEVICEINFO:
 		case OP_LAYOUTGET:
@@ -1439,6 +1619,7 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 		case OP_LAYOUTRETURN:
 			op->status = nfserr_notsupp;
 			break;
+#endif /* CONFIG_PNFSD */
 #endif /* CONFIG_NFSD_V4_1 */
 		default:
 			op->opnum = OP_ILLEGAL;
@@ -2106,6 +2287,31 @@ out_acl:
 		}
 		WRITE64(stat.ino);
 	}
+#if defined(CONFIG_PNFSD)
+	if (bmval1 & FATTR4_WORD1_FS_LAYOUT_TYPES) {
+		struct super_block *sb = dentry->d_inode->i_sb;
+		int type = 0;
+
+	/* Query the underlying filesystem for supported pNFS layout types.
+	 * Currently, we only support one layout type per file system.
+	 * The export_ops->layout_type() returns the pnfs_layouttype4.
+	 */
+		buflen -= 4;
+		if (buflen < 0)		/* length */
+			goto out_resource;
+
+		if (sb && sb->s_export_op->layout_type)
+			type = sb->s_export_op->layout_type();
+		if (type) {
+			if ((buflen -= 4) < 0)	/* type */
+				goto out_resource;
+			WRITE32(1); 	/* length */
+			WRITE32(type);  /* type */
+		} else
+			WRITE32(0);  /* length */
+	}
+#endif /* CONFIG_PNFSD */
+
 	*attrlenp = htonl((char *)p - (char *)attrlenp - 4);
 	*countp = p - buffer;
 	status = nfs_ok;
@@ -2294,6 +2500,10 @@ nfsd4_encode_commit(struct nfsd4_compoundres *resp, __be32 nfserr, struct nfsd4_
 	if (!nfserr) {
 		RESERVE_SPACE(8);
 		WRITEMEM(commit->co_verf.data, 8);
+		dprintk("NFSD: nfsd4_encode_commit: verifier %x:%x\n",
+			*(u32 *)(&commit->co_verf.data)[0],
+			*(u32 *)(&commit->co_verf.data)[1]);
+
 		ADJUST_ARGS();
 	}
 }
@@ -2421,7 +2631,6 @@ nfsd4_encode_link(struct nfsd4_compoundres *resp, __be32 nfserr, struct nfsd4_li
 		ADJUST_ARGS();
 	}
 }
-
 
 static void
 nfsd4_encode_open(struct nfsd4_compoundres *resp, __be32 nfserr, struct nfsd4_open *open)
@@ -2976,9 +3185,187 @@ nfsd4_encode_write(struct nfsd4_compoundres *resp, __be32 nfserr, struct nfsd4_w
 		WRITE32(write->wr_bytes_written);
 		WRITE32(write->wr_how_written);
 		WRITEMEM(write->wr_verifier.data, 8);
+		dprintk("NFSD: nfsd4_encode_write: verifier %x:%x\n",
+			*(u32 *)(&write->wr_verifier.data)[0],
+			*(u32 *)(&write->wr_verifier.data)[1]);
 		ADJUST_ARGS();
 	}
 }
+
+#if defined(CONFIG_PNFSD)
+static int
+nfsd4_encode_devlist_item(struct nfsd4_compoundres *resp,
+			  struct nfsd4_pnfs_devlist *dlist,
+			  struct export_operations *ex_ops,
+			  int lotype)
+{
+	int len;
+	ENCODE_HEAD;
+
+	RESERVE_SPACE(8);
+	WRITE32(dlist->dev_id);
+	WRITE32(lotype);
+	ADJUST_ARGS();
+
+	if (ex_ops->devaddr_encode == NULL && lotype == LAYOUT_NFSV4_FILES) {
+		len = filelayout_encode_devaddr(p, resp->end, dlist->dev_addr);
+		filelayout_free_devaddr(dlist->dev_addr);
+	} else {
+		len = ex_ops->devaddr_encode(p,  resp->end, dlist->dev_addr);
+		ex_ops->devaddr_free(dlist->dev_addr);
+	}
+	kfree(dlist->dev_addr);
+
+	if (len > 0) {
+		p += XDR_QUADLEN(len);
+		ADJUST_ARGS();
+	} else
+		BUG_ON(len <= 0);
+	return len;
+}
+
+/* GETDEVICELIST: minorversion1-01.txt
+u64			nfs_cookie4                     cookie;
+NFS4_VERIFIER_SIZE      verifier4                       cookieverf;
+u32 + len structs	pnfs_devlist_item4              device_addrs<>;
+
+nfserr is set in nfsd4_getdevlist()
+	- when gdevl->gd_devslist_len == 0
+	- when gdevl->gd_ops->layout_encode == NULL
+*/
+static void
+nfsd4_encode_getdevlist(struct nfsd4_compoundres *resp, int nfserr,
+			struct nfsd4_pnfs_getdevlist *gdevl)
+{
+	int i, len;
+	struct nfsd4_pnfs_devlist *item;
+
+	ENCODE_HEAD;
+
+	dprintk("%s: err %d gdevl %p\n", __FUNCTION__, nfserr, gdevl);
+	if (!nfserr) {
+		RESERVE_SPACE(12 + sizeof(nfs4_verifier));
+		WRITE64(gdevl->gd_cookie);
+		WRITEMEM(&gdevl->gd_verf, sizeof(nfs4_verifier));
+		WRITE32(gdevl->gd_devlist_len);
+		ADJUST_ARGS();
+		item = gdevl->gd_devlist;
+		for (i = 0; i < gdevl->gd_devlist_len; i++) {
+			dprintk("%s: i %d item %p\n", __FUNCTION__, i, item);
+			len = nfsd4_encode_devlist_item(resp, item,
+						gdevl->gd_ops, gdevl->gd_type);
+			item++;
+			if (len <= 0)
+				break;
+		}
+		RESERVE_SPACE(4);
+		WRITE32(gdevl->gd_eof);
+		ADJUST_ARGS();
+		kfree(gdevl->gd_devlist);
+	}
+}
+
+/* GETDEVICEINFO: minorversion1-01.txt
+
+u32             pnfs_layouttype4 type;
+u32 + len       opaque           device_addr<>;
+
+*/
+static void
+nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp, int nfserr,
+			struct nfsd4_pnfs_getdevinfo *gdev)
+{
+	int len;
+	ENCODE_HEAD;
+
+	printk("%s: err %d\n", __FUNCTION__, nfserr);
+	if (!nfserr) {
+		RESERVE_SPACE(8);
+		WRITE32(gdev->gd_type);
+		if (gdev->gd_ops->devaddr_encode == NULL &&
+					gdev->gd_type == LAYOUT_NFSV4_FILES) {
+			len = filelayout_encode_devaddr(p, resp->end,gdev->gd_devaddr);
+			filelayout_free_devaddr(gdev->gd_devaddr);
+		} else {
+			len = gdev->gd_ops->devaddr_encode(p, resp->end, gdev->gd_devaddr);
+			gdev->gd_ops->devaddr_free(gdev->gd_devaddr);
+		}
+		if (len > 0) {
+			p += XDR_QUADLEN(len);
+			ADJUST_ARGS();
+		} else
+			BUG_ON(len <= 0);
+	}
+}
+
+/* LAYOUTGET: minorversion1-08.txt
+u32            bool                    logr_return_on_close;
+u64            offset4                 offset;
+u64            length4                 length;
+u32            pnfs_layoutiomode4      iomode;
+u32            pnfs_layouttype4        type;
+u32  + len     opaque                  layout<>;
+*/
+static __be32
+nfsd4_encode_layoutget(struct nfsd4_compoundres *resp, int nfserr,
+		       struct nfsd4_pnfs_layoutget *lgp)
+{
+	int len;
+	ENCODE_HEAD;
+
+	if (nfserr)
+		return nfserr;
+
+	RESERVE_SPACE(32);
+	WRITE32(lgp->lg_return_on_close);
+	WRITE64(lgp->lg_seg.offset);
+	WRITE64(lgp->lg_seg.length);
+	WRITE32(lgp->lg_seg.iomode);
+	WRITE32(lgp->lg_seg.layout_type);
+	ADJUST_ARGS();
+	if (lgp->lg_ops->layout_encode == NULL &&
+	    lgp->lg_seg.layout_type == LAYOUT_NFSV4_FILES) {
+		len = filelayout_encode_layout(p, resp->end, lgp->lg_layout);
+		filelayout_free_layout(lgp->lg_layout);
+	} else {
+		len = lgp->lg_ops->layout_encode(p, resp->end, lgp->lg_layout);
+		lgp->lg_ops->layout_free(lgp->lg_layout);
+	}
+	if (len > 0) {
+		p += XDR_QUADLEN(len);
+		ADJUST_ARGS();
+	} else if (len < 0) /* check for error from underlying file system */
+		return nfserrno(len);
+	else
+		return nfserr_layoutunavailable;
+
+	return nfs_ok;
+}
+
+/* LAYOUTGET: minorversion1-01.txt
+     struct LAYOUTCOMMIT4resok {
+            newsize4                 newsize;
+     };
+
+*/
+static void
+nfsd4_encode_layoutcommit(struct nfsd4_compoundres *resp, int nfserr,
+			  struct nfsd4_pnfs_layoutcommit *lcp)
+{
+	ENCODE_HEAD;
+
+	if (!nfserr) {
+		RESERVE_SPACE(4);
+		WRITE32(lcp->lc_size_chg);
+		ADJUST_ARGS();
+		if (lcp->lc_size_chg) {
+			RESERVE_SPACE(8);
+			WRITE64(lcp->lc_newsize);
+			ADJUST_ARGS();
+		}
+	}
+}
+#endif /* CONFIG_PNFSD */
 
 void
 nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
@@ -3082,6 +3469,24 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 		break;
 	case OP_RELEASE_LOCKOWNER:
 		break;
+#if defined(CONFIG_PNFSD)
+	case OP_GETDEVICELIST:
+		nfsd4_encode_getdevlist(resp, op->status, &op->u.pnfs_getdevlist);
+		break;
+	case OP_GETDEVICEINFO:
+		nfsd4_encode_getdevinfo(resp, op->status, &op->u.pnfs_getdevinfo);
+		break;
+	case OP_LAYOUTGET:
+		op->status = nfsd4_encode_layoutget(resp,
+						    op->status,
+						    &op->u.pnfs_layoutget);
+		break;
+	case OP_LAYOUTCOMMIT:
+		nfsd4_encode_layoutcommit(resp, op->status, &op->u.pnfs_layoutcommit);
+		break;
+	case OP_LAYOUTRETURN:
+		break;
+#endif /* CONFIG_PNFSD */
 #if defined(CONFIG_NFSD_V4_1)
 	case OP_EXCHANGE_ID:
 		nfsd4_encode_exchange_id(resp, op->status, &op->u.exchange_id);
