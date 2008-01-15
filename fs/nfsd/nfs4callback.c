@@ -563,6 +563,12 @@ nfsd4_probe_callback(struct nfs4_client *clp)
 		goto out_err;
 	}
 
+	/*
+	 * The task holds a reference to the nfs4_client struct.
+	 * It is released in the callback function upon success.
+	 */
+	atomic_inc(&clp->cl_count);
+
 	status = rpc_call_async(cb->cb_client, &msg, RPC_TASK_ASYNC,
 				&nfs4_cb_null_ops, NULL);
 
@@ -573,6 +579,7 @@ nfsd4_probe_callback(struct nfs4_client *clp)
 	return;
 
 out_release_clp:
+	atomic_dec(&clp->cl_count);
 	rpc_shutdown_client(cb->cb_client);
 out_err:
 	cb->cb_client = NULL;
@@ -645,6 +652,12 @@ nfsd41_probe_callback(struct nfs4_client *clp)
 	dprintk("NFSD: %s: clp %p cb_client %p\n", __FUNCTION__,
 		clp, clp->cl_callback.cb_client);
 
+	/*
+	 * The task holds a reference to the nfs4_client struct.
+	 * It is released in the callback function upon success.
+	 */
+	atomic_inc(&clp->cl_count);
+
 	status = rpc_call_async(cb->cb_client, &msg, RPC_TASK_ASYNC,
 				&nfs4_cb_null_ops, NULL);
 
@@ -655,6 +668,7 @@ nfsd41_probe_callback(struct nfs4_client *clp)
 	return;
 
 out_release_clp:
+	atomic_dec(&clp->cl_count);
 	rpc_shutdown_client(cb->cb_client);
 out_err:
 	cb->cb_client = NULL;
