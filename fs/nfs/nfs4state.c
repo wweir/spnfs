@@ -498,6 +498,8 @@ static void __nfs4_close(struct path *path, struct nfs4_state *state, mode_t mod
 #ifdef CONFIG_PNFS
 	struct nfs_inode *nfsi = NFS_I(state->inode);
 
+	if (nfsi->layoutcommit_ctx)
+		pnfs_layoutcommit_inode(state->inode, 0);
 	if (nfsi->current_layout && nfsi->current_layout->roc_iomode) {
 		struct nfs4_pnfs_layout_segment range;
 
