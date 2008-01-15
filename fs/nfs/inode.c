@@ -1051,13 +1051,7 @@ static int nfs_update_inode(struct inode *inode, struct nfs_fattr *fattr)
 	if (new_isize != cur_isize) {
 		/* Do we perhaps have any outstanding writes, or has
 		 * the file grown beyond our last write? */
-#ifdef CONFIG_PNFS
-		/* XXX Andros: is the check for layoutcommit_ctx needed? */
-		if (nfsi->npages == 0 || new_isize > cur_isize ||
-		    !nfsi->layoutcommit_ctx) {
-#else
 		if (nfsi->npages == 0 || new_isize > cur_isize) {
-#endif /* CONFIG_PNFS */
 			inode->i_size = new_isize;
 			invalid |= NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA;
 		}
