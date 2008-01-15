@@ -1460,6 +1460,12 @@ long nfs_sync_mapping_wait(struct address_space *mapping, struct writeback_contr
 
 	} while (ret >= 0);
 	spin_unlock(&inode->i_lock);
+#ifdef CONFIG_PNFS
+	if (how == 0 && ret == 0 && NFS_I(inode)->layoutcommit_ctx) {
+		dprintk("%s calling layoutcommit\n", __func__);
+		ret = pnfs_layoutcommit_inode(inode, 1);
+	}
+#endif /* CONFIG_PNFS */
 	return ret;
 }
 
