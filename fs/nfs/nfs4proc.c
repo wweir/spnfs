@@ -5081,10 +5081,40 @@ static int nfs4_proc_pnfs_layoutget(struct nfs4_pnfs_layoutget *layout)
 	return status;
 }
 
-static int pnfs_proc_layoutcommit(struct pnfs_layoutcommit_data *data)
+static int _pnfs4_proc_layoutcommit(struct pnfs_layoutcommit_data *data)
 {
-	/* XXX Need to implement */
-	return -1;
+	struct inode *inode = data->inode;
+	struct nfs_fattr *fattr = data->res.fattr;
+	struct nfs_server *server = NFS_SERVER(inode);
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_PNFS_LAYOUTCOMMIT],
+		.rpc_argp = &data->args,
+		.rpc_resp = &data->res,
+		.rpc_cred = data->cred,
+	};
+	int status;
+
+	dprintk("NFS call layoutcommit %lld @ %lld\n",
+		data->args.lseg.length, data->args.lseg.offset);
+
+	nfs_fattr_init(fattr);
+	status = nfs4_call_sync(server, NFS_CLIENT(data->inode), &msg,
+				&data->args, &data->res, 0);
+	dprintk("NFS reply layoutcommit: %d\n", status);
+
+	return status;
+}
+
+static int pnfs4_proc_layoutcommit(struct pnfs_layoutcommit_data *data)
+{
+	struct nfs4_exception exception = { };
+	int err;
+	do {
+		err = nfs4_handle_exception(NFS_SERVER(data->inode),
+					_pnfs4_proc_layoutcommit(data),
+					&exception);
+	} while (exception.retry);
+	return err;
 }
 
 static int pnfs4_proc_layoutreturn(struct nfs4_pnfs_layoutreturn *layout)
@@ -5389,7 +5419,7 @@ const struct nfs_rpc_ops pnfs_v41_clientops = {
 	.lock		= nfs4_proc_lock,
 	.clear_acl_cache = nfs4_zap_acl_attr,
 	.pnfs_layoutget      = nfs4_proc_pnfs_layoutget,
-	.pnfs_layoutcommit       = pnfs_proc_layoutcommit,
+	.pnfs_layoutcommit       = pnfs4_proc_layoutcommit,
 	.pnfs_layoutreturn       = pnfs4_proc_layoutreturn,
 	.validate_sequence_args = nfs41_validate_seq_args,
 	.increment_open_seqid = nfs41_increment_open_seqid,
