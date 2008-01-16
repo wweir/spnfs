@@ -200,12 +200,13 @@ void nfs_initiate_read(struct nfs_read_data *data, struct rpc_clnt *clnt,
 /*
  * Set up the NFS read request struct
  */
-static void nfs_read_rpcsetup(struct nfs_page *req, struct nfs_read_data *data,
+static int nfs_read_rpcsetup(struct nfs_page *req, struct nfs_read_data *data,
 		const struct rpc_call_ops *call_ops,
 		unsigned int count, unsigned int offset)
 {
 	struct inode *inode;
 	struct nfs_server *server = data->args.server;
+	int ret = 0;
 
 	BUG_ON(server == NULL);
 
@@ -226,12 +227,13 @@ static void nfs_read_rpcsetup(struct nfs_page *req, struct nfs_read_data *data,
 	nfs_fattr_init(&data->fattr);
 
 #ifdef CONFIG_PNFS
-	data->error = pnfs_try_to_read_data(data, call_ops);
-	if (data->error <= 0)
-		return;
+	ret = pnfs_try_to_read_data(data, call_ops);
+	if (ret <= 0)
+		return ret;
 #endif /* CONFIG_PNFS*/
 
 	nfs_initiate_read(data, NFS_CLIENT(inode), call_ops);
+	return 0;
 }
 
 static void
@@ -267,7 +269,7 @@ static int nfs_pagein_multi(struct inode *inode, struct list_head *head, unsigne
 	struct nfs_read_data *data;
 	size_t rsize = NFS_SERVER(inode)->rsize, nbytes;
 	unsigned int offset;
-	int requests = 0;
+	int requests = 0, ret = 0;
 	LIST_HEAD(list);
 
 	nfs_list_remove_request(req);
@@ -298,11 +300,11 @@ static int nfs_pagein_multi(struct inode *inode, struct list_head *head, unsigne
 
 		if (nbytes < rsize)
 			rsize = nbytes;
-		nfs_read_rpcsetup(req, data, &nfs_read_partial_ops,
+		ret = nfs_read_rpcsetup(req, data, &nfs_read_partial_ops,
 				  rsize, offset);
 #ifdef CONFIG_PNFS
-		if (data->error < 0)
-			return data->error;
+		if (ret < 0)
+			return ret;
 #endif /* CONFIG_PNFS */
 		offset += rsize;
 		nbytes -= rsize;
@@ -326,6 +328,7 @@ static int nfs_pagein_one(struct inode *inode, struct list_head *head, unsigned 
 	struct nfs_page		*req;
 	struct page		**pages;
 	struct nfs_read_data	*data;
+	int ret = 0;
 
 	data = nfs_readdata_alloc(npages);
 	if (!data)
@@ -343,10 +346,10 @@ static int nfs_pagein_one(struct inode *inode, struct list_head *head, unsigned 
 	}
 	req = nfs_list_entry(data->pages.next);
 
-	nfs_read_rpcsetup(req, data, &nfs_read_full_ops, count, 0);
+	ret = nfs_read_rpcsetup(req, data, &nfs_read_full_ops, count, 0);
 #ifdef CONFIG_PNFS
-	if (data->error < 0)
-		return data->error;
+	if (ret < 0)
+		return ret;
 #endif /* CONFIG_PNFS */
 
 	return 0;

@@ -1049,7 +1049,6 @@ struct nfs_read_data {
 	int			pnfsflags;
 	__u64			orig_offset;
 	struct nfs_client	*ds_nfs_client;
-	int			error;		/* propagate pNFS read error */
 #endif /* CONFIG_PNFS */
 	struct page		*page_array[NFS_PAGEVEC_SIZE];
 };
