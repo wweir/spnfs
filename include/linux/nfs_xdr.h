@@ -1106,9 +1106,7 @@ struct nfs_rpc_ops {
 	struct dentry_operations *dentry_ops;
 	const struct inode_operations *dir_inode_ops;
 	const struct inode_operations *file_inode_ops;
-#if defined(CONFIG_PNFS)
 	const struct file_operations *file_ops;
-#endif /* CONFIG_PNFS */
 
 	int	(*getroot) (struct nfs_server *, struct nfs_fh *,
 			    struct nfs_fsinfo *);
