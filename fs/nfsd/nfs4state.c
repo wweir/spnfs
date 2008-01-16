@@ -4657,34 +4657,50 @@ out:
  *
  */
 int
-nfs4_pnfs_cb_get_state(struct pnfs_get_state *arg)
+nfs4_pnfs_cb_get_state(struct super_block *sb, struct pnfs_get_state *arg)
 {
 	struct nfs4_stateid *stp;
 	int flags = LOCK_STATE | OPEN_STATE; /* search both hash tables */
 	int status = -EINVAL;
+	struct inode *ino;
+	struct nfs4_delegation *dl;
 
-	dprintk("NFSD: %s=(%08x/%08x/%08x/%08x)\n\n",
+	dprintk("NFSD: %s sid=(%08x/%08x/%08x/%08x) ion %ld\n\n",
 				__func__,
 				arg->stid.si_boot,
 				arg->stid.si_stateownerid,
 				arg->stid.si_fileid,
-				arg->stid.si_generation);
+				arg->stid.si_generation,
+				arg->ino);
 
 	nfs4_lock_state();
 	stp = find_stateid(&arg->stid, flags);
-	if (!stp)
-		goto out;
+	if (!stp) {
+		ino = iget_locked(sb, arg->ino);
+		if (!ino)
+			goto out;
 
-	/* XXX ANDROS: marc removed nfs4_check_fh - how come? */
+		if (ino->i_state & I_NEW) {
+			iget_failed(ino);
+			goto out;
+		}
 
-	/* arg->devid is the Data server id, set by the cluster fs */
-	status = nfs4_add_pnfs_ds_dev(stp, arg->devid);
-	if (status)
-		goto out;
+		dl = find_delegation_stateid(ino, &arg->stid);
+		if (dl)
+			status = 0;
 
-	arg->access = stp->st_access_bmap;
-	arg->clid = stp->st_stateowner->so_client->cl_clientid;
+		iput(ino);
+	} else {
+		/* XXX ANDROS: marc removed nfs4_check_fh - how come? */
 
+		/* arg->devid is the Data server id, set by the cluster fs */
+		status = nfs4_add_pnfs_ds_dev(stp, arg->devid);
+		if (status)
+			goto out;
+
+		arg->access = stp->st_access_bmap;
+		arg->clid = stp->st_stateowner->so_client->cl_clientid;
+	}
 out:
 	nfs4_unlock_state();
 	return status;
