@@ -373,6 +373,9 @@ extern const struct inode_operations nfs3_file_inode_operations;
 #endif /* CONFIG_NFS_V3 */
 extern const struct file_operations nfs_file_operations;
 extern const struct address_space_operations nfs_file_aops;
+#ifdef CONFIG_PNFS
+extern const struct file_operations pnfs_file_operations;
+#endif /* CONFIG_PNFS */
 
 static inline struct nfs_open_context *nfs_file_open_context(struct file *filp)
 {
