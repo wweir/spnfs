@@ -43,6 +43,7 @@
 /* pNFS Metadata to Data server state communication*/
 struct pnfs_get_state {
 	u32			devid;    /* request */
+	unsigned long		ino;      /* request */
 	stateid_t		stid;     /* request;response */
 	clientid_t		clid;     /* response */
 	u32			access;    /* response */
@@ -84,7 +85,7 @@ struct pnfs_mds_id {
 };
 
 int nfsd_layout_recall_cb(struct super_block *, struct inode *, struct nfsd4_pnfs_cb_layout *);
-int nfs4_pnfs_cb_get_state(struct pnfs_get_state *);
+int nfs4_pnfs_cb_get_state(struct super_block *, struct pnfs_get_state *);
 void nfs4_pnfs_state_init(void);
 int nfs4_pnfs_get_layout(struct super_block *, struct svc_fh *,
 						struct nfsd4_pnfs_layoutget *);
