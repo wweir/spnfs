@@ -1269,6 +1269,42 @@ pnfs_flush_one(struct inode *inode, struct list_head *head,
 }
 
 /*
+ * Obtain a layout for the the write range, and call do_sync_write.
+ *
+ * Unlike the read path which can wait until page coalescing
+ * (pnfs_pageio_init_read) to get a layout, the write path discards the
+ * request range to form the address_mapping - so we get a layout in
+ * the file operations write method.
+ *
+ * If pnfs_update_layout fails, pages will be coalesced for MDS I/O.
+ */
+ssize_t
+pnfs_file_write(struct file *filp, const char __user *buf, size_t count,
+		loff_t *pos)
+{
+	struct inode *inode = filp->f_dentry->d_inode;
+	struct nfs_open_context *context = filp->private_data;
+	int status;
+
+	if (!pnfs_enabled_sb(NFS_SERVER(inode)))
+		goto out;
+
+	/* Retrieve and set layout if not allready cached */
+	status = pnfs_update_layout(inode,
+				    context,
+				    count,
+				    *pos,
+				    IOMODE_RW,
+				    NULL);
+	if (status) {
+		dprintk("%s: Unable to get a layout for %Zd@%llu iomode %d)\n",
+					__func__, count, *pos, IOMODE_RW);
+	}
+out:
+	return do_sync_write(filp, buf, count, pos);
+}
+
+/*
  * Call the appropriate parallel I/O subsystem write function.
  * If no I/O device driver exists, or one does match the returned
  * fstype, then return a positive status for regular NFS processing.
