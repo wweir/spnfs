@@ -345,11 +345,11 @@ filelayout_create_dserver(void)
 {
 	struct nfs4_pnfs_dserver *local;
 
-	dprintk("--> %s\n", __func__);
 	local = kzalloc(sizeof(*local), GFP_KERNEL);
 	if (!local)
 		return NULL;
 	kref_init(&local->ref);
+	dprintk("<-- %s dserver %p\n", __func__, local);
 	return local;
 }
 
@@ -364,13 +364,11 @@ static void filelayout_free_dserver(struct kref *kref)
 
 static void filelayout_release_dserver(struct nfs4_pnfs_dserver *dserver)
 {
-	dprintk("--> %s dserver %p\n", __func__, dserver);
 	kref_put(&dserver->ref, filelayout_free_dserver);
 }
 
 static void filelayout_get_dserver(struct nfs4_pnfs_dserver *dserver)
 {
-	dprintk("--> %s\n", __func__);
 	kref_get(&dserver->ref);
 }
 
