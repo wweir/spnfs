@@ -360,13 +360,13 @@ static void svc_export_request(struct cache_detail *cd,
 }
 
 #if defined(CONFIG_PNFSD)
-static int cb_get_state(void *p)
+static int cb_get_state(struct super_block *sb, void *p)
 {
 	struct pnfs_get_state *os = (struct pnfs_get_state *)p;
 
 	dprintk("cb_get_state os %p\n", os);
 
-	return nfs4_pnfs_cb_get_state(os);
+	return nfs4_pnfs_cb_get_state(sb, os);
 }
 EXPORT_SYMBOL(cb_get_state);
 
