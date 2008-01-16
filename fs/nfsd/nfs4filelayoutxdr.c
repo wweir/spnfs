@@ -47,97 +47,95 @@
 
 #define NFSDDBG_FACILITY	NFSDDBG_PNFS
 
-/* File layout export_operations->devaddr_encode()  */
+/* Encodes the nfsv4_1_file_layout_ds_addr4 structure from draft 13
+ * on the response stream.
+ * Use linux error codes (not nfs) since these values are being
+ * returned to the file system.
+ */
 int
-filelayout_encode_devaddr(u32 *p, u32 *end, int count, void *devl)
+filelayout_encode_devinfo(struct pnfs_xdr_info *resp, void *device)
 {
-	struct nfsd4_pnfs_devlist *fdev_list = devl;
-	struct pnfs_filelayout_devaddr *fdev;
-	int i, len;
-	u32 *p_in = p;
+	unsigned int i, j, len, leadcount;
+	u32 *p_in = resp->p;
+	struct pnfs_filelayout_device *fdev = device;
+	u32 index_count = fdev->fl_stripeindices_length;
+	u32 dev_count = fdev->fl_device_length;
+	int error = 0;
+	int maxcount = resp->maxcount;
 
-	p++;   /* to be set later */
+	ENCODE_HEAD;
 
-	/* encode device list indices */
-	WRITE32(count);
+	resp->bytes_written = 0; /* in case there is an error */
 
-	for (i = 0; i < count; i++)
-		WRITE32(i);
+	dprintk("%s: Begin indx_cnt: %u dev_cnt: %u\n",
+		__func__,
+		index_count,
+		dev_count);
 
-	/* encode device list */
-	WRITE32(count);
+	/* check space for length, index_count, indexes, dev count */
+	leadcount = 4 + 4 + (index_count * 4) + 4;
+	RESERVE_SPACE(leadcount);
 
-	for (i = 0; i < count; i++) {
-		fdev = (struct pnfs_filelayout_devaddr *)fdev_list[i].dev_addr;
-
-		WRITE32(1); /* no multi path for now */
-		WRITE32(fdev->r_netid.len);
-		WRITEMEM(fdev->r_netid.data, fdev->r_netid.len);
-		WRITE32(fdev->r_addr.len);
-		WRITEMEM(fdev->r_addr.data, fdev->r_addr.len);
-		filelayout_free_devaddr(fdev);
-		kfree(fdev);
+	maxcount -= leadcount;
+	if (maxcount < 0) {
+		error =  -ETOOSMALL;
+		goto out;
 	}
-
-	/* backfill in length -4 to not include length */
-	len = (p - p_in - 1) << 2;
-	*p_in = htonl(len);
-	len += 4;   /* for blob size */
-	printk("%s: count %d len %d\n", __FUNCTION__, count, len);
-
-	return len;
-}
-EXPORT_SYMBOL(filelayout_encode_devaddr);
-
-int
-filelayout_encode_devinfo(u32 *p, u32 *end, int count, void *fdevl)
-{
-	struct pnfs_filelayout_devaddr *fdev = fdevl;
-	int i, len;
-	u32 *p_in = p;
-
-	p++;   /* to be set later */
+	/* Fill in length later */
+	p++;
 
 	/* encode device list indices */
-	WRITE32(count);
+	WRITE32(index_count);
 
-	for (i = 0; i < count; i++)
-		WRITE32(i);
+	for (i = 0; i < index_count; i++)
+		WRITE32(fdev->fl_stripeindices_list[i]);
 
 	/* encode device list */
-	WRITE32(count);
+	WRITE32(dev_count);
+	ADJUST_ARGS();
+	for (i = 0; i < dev_count; i++) {
+		struct pnfs_filelayout_multipath *mp = &fdev->fl_device_list[i];
 
-	for (i = 0; i < count; i++) {
-		WRITE32(1); /* no multi path for now */
-		WRITE32(fdev[i].r_netid.len);
-		WRITEMEM(fdev[i].r_netid.data, fdev[i].r_netid.len);
-		WRITE32(fdev[i].r_addr.len);
-		WRITEMEM(fdev[i].r_addr.data, fdev[i].r_addr.len);
+		/* encode number of equivalent devices */
+		leadcount = 4 + (mp->fl_multipath_length * 20);
+		RESERVE_SPACE(leadcount);
+
+		maxcount -= leadcount;
+		if (maxcount < 0) {
+			error =  -ETOOSMALL;
+			goto out;
+		}
+
+		WRITE32(mp->fl_multipath_length);
+		for (j = 0; j < mp->fl_multipath_length; j++) {
+			struct pnfs_filelayout_devaddr *da =
+						&mp->fl_multipath_list[j];
+
+			/* Encode device info */
+			WRITE32(da->r_netid.len);
+			WRITEMEM(da->r_netid.data, da->r_netid.len);
+			WRITE32(da->r_addr.len);
+			WRITEMEM(da->r_addr.data, da->r_addr.len);
+		}
+		ADJUST_ARGS();
 	}
 
 	/* backfill in length */
 	len = (p - p_in) << 2;
 	*p_in = htonl(len);
-	len += 4;   /* for blob size */
-	printk("%s: count %d len %d\n", __FUNCTION__, count, len);
+	/* add space for blob size */
+	len += 4;
 
-	return len;
+	/* update num bytes written */
+	resp->bytes_written = len;
+
+	error = 0;
+out:
+	dprintk("%s: End err %d xdrlen %d\n",
+		__func__, error, resp->bytes_written);
+	return error;
 }
 EXPORT_SYMBOL(filelayout_encode_devinfo);
-
-/* File layout export_operations->devaddr_free()  */
-void
-filelayout_free_devaddr(void *devaddr)
-{
-	struct pnfs_filelayout_devaddr *fdev;
-
-	fdev = (struct pnfs_filelayout_devaddr *)devaddr;
-	if (!fdev)
-		return;
-	kfree(fdev->r_netid.data);
-	kfree(fdev->r_addr.data);
-}
-EXPORT_SYMBOL(filelayout_free_devaddr);
 
 static int
 filelayout_encode_layoutlist_item(u32 *p, u32 *end,
