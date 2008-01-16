@@ -232,13 +232,11 @@ static void filelayout_write_call_done(struct rpc_task *task, void *data)
 struct rpc_call_ops filelayout_read_call_ops = {
 	.rpc_call_validate_args = nfs_read_validate,
 	.rpc_call_done = filelayout_read_call_done,
-	.rpc_release = nfs_readdata_release,
 };
 
 struct rpc_call_ops filelayout_write_call_ops = {
 	.rpc_call_validate_args = nfs_write_validate,
 	.rpc_call_done = filelayout_write_call_done,
-	.rpc_release = nfs_writedata_release,
 };
 
 /* Perform sync or async reads.
