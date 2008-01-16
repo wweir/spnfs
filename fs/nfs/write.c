@@ -21,8 +21,8 @@
 #include <linux/backing-dev.h>
 
 #include <asm/uaccess.h>
-#if defined(CONFIG_PNFS)
 #include <linux/module.h>
+#if defined(CONFIG_PNFS)
 #include "pnfs.h"
 #endif
 
