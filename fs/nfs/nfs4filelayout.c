@@ -387,28 +387,28 @@ int filelayout_flush_one(struct inode *inode, struct list_head *head,
 	struct nfs4_pnfs_dserver *dserver = NULL;
 	struct nfs4_pnfs_ds *ds = NULL;  /* current stripe data server */
 	struct nfs_page *req;
-	loff_t dsoffset = 0;
-	size_t stripesz, reqcount, dstotal = 0;
-	struct list_head *dslist;
+	loff_t file_offset = 0, stripe_offset;
+	size_t stripesz, dstotal = 0;
+	struct list_head dslist;
 	int status = -ENOMEM, use_ds = 0, ndspages = 0;
 
 	dprintk("--> %s npages %d, count %Zd, ltype %p nfslay %p\n", __func__,
-		npages, count, ltype, nfslay);
+				npages, count, ltype, nfslay);
 
-	dslist = kmalloc(sizeof(*dslist), GFP_KERNEL);
-	if (!dslist)
-		return status;
-	INIT_LIST_HEAD(dslist);
-
+	INIT_LIST_HEAD(&dslist);
 	stripesz = filelayout_get_stripesize(NFS_I(inode)->current_layout);
 	dprintk("%s stripesize %Zd\n", __func__, stripesz);
+
 	/* split up the list according to DS */
 	while (!list_empty(head)) {
 next_ds:
 		req = nfs_list_entry(head->next);
 
+		file_offset = req->wb_index << PAGE_CACHE_SHIFT;
+
 		if (use_ds)
 			goto use_ds;
+
 		/* reset for new data server */
 		dstotal = 0;
 		ndspages = 0;
@@ -421,9 +421,9 @@ next_ds:
 			goto out;
 		}
 
-		/* get the data server that serves this stripe */
-		status = nfs4_pnfs_dserver_get(inode, nfslay, dsoffset,
-				stripesz, dserver);
+		/* get the data server that serves this page */
+		status = nfs4_pnfs_dserver_get(inode, nfslay, file_offset,
+						req->wb_bytes, dserver);
 
 		if (status != 0) {
 			dprintk("%s failed to get dataserver. status %d\n",
@@ -438,24 +438,23 @@ next_ds:
 use_ds:
 		filelayout_get_dserver(dserver);
 
-		reqcount = count < PAGE_SIZE? count: PAGE_SIZE;
-		count -= reqcount;
-		dstotal += reqcount;
-
 		req->wb_devip = ds->ds_ip_addr;
 		req->wb_devport = ds->ds_port;
 		req->wb_private = dserver;
 
 		/* move request to dslist */
 		nfs_list_remove_request(req);
-		nfs_list_add_request(req, dslist);
+		nfs_list_add_request(req, &dslist);
 		ndspages++;
 		npages--;
 
-		if (dstotal == stripesz)
-			dsoffset += dstotal;
+		count -= req->wb_bytes;
+		dstotal += req->wb_bytes;
 
-		if (count == 0 || npages == 0 || dstotal == stripesz) {
+		/* Are we done with this DS? */
+		stripe_offset = (file_offset + req->wb_bytes) % stripesz;
+
+		if (count == 0 || stripe_offset == 0) {
 			use_ds = 0;
 			goto send;
 		}
@@ -467,25 +466,21 @@ use_ds:
 
 send:
 	/* XXX should recover to send through MDS */
-	dprintk("%s Send: ndspages %d dstotal %Zd list_empty(head) %d \n",
-			__func__, ndspages, dstotal, list_empty(head));
-	status = nfs_flush_one(inode, dslist, ndspages, dstotal, how);
+	dprintk("%s Send: ndspages %d dstotal %Zd list_empty %d \n",
+				__func__, ndspages, dstotal, list_empty(head));
+	status = nfs_flush_one(inode, &dslist, ndspages, dstotal, how);
 	if (status < 0)
 		goto out;
 
-	/* XXX should be BUG_ON(!list_empty(dslist)); */
-	if (!list_empty(head) && npages > 0) {
-		if (!list_empty(dslist)) {
-			printk("%s ERROR! dslist NOT EMPTY\n", __func__);
-			status = -EIO;
-			goto out;
-		}
-		dprintk("%s next_ds\n", __func__);
+	/* Is there more data to process? */
+	if (!list_empty(head)) {
+		/* count and npages better not be zero! */
+		dprintk("%s next_ds count %Zd npages %d\n",
+				__func__, count, npages);
 		goto next_ds;
 	}
 
 out:
-	kfree(dslist);
 	dprintk("<-- %s npages %d (should be zero!)\n", __func__, npages);
 	return status;
 }
