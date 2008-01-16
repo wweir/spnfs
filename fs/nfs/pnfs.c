@@ -1320,7 +1320,7 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 {
 	struct nfs_writeargs *args = &wdata->args;
 	struct inode *inode = wdata->inode;
-	int numpages, status, pgcount, temp;
+	int numpages, status;
 	struct nfs_server *nfss = NFS_SERVER(inode);
 	struct nfs_inode *nfsi = NFS_I(inode);
 	struct pnfs_layout_segment *lseg;
@@ -1345,11 +1345,7 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 
 	/* Determine number of pages
 	 */
-	pgcount = args->pgbase + args->count;
-	temp = pgcount % PAGE_CACHE_SIZE;
-	numpages = pgcount / PAGE_CACHE_SIZE;
-	if (temp != 0)
-		numpages++;
+	numpages = nfs_page_array_len(args->pgbase, args->count);
 
 	dprintk("%s: Calling layout driver (how %d) write with %d pages\n",
 		__func__,
