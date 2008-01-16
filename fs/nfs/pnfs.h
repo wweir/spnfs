@@ -46,6 +46,7 @@ void pnfs_pageio_init_read(struct nfs_pageio_descriptor *, struct inode *, struc
 void pnfs_pageio_init_write(struct nfs_pageio_descriptor *, struct inode *);
 void pnfs_update_layout_commit(struct inode *, struct list_head *, pgoff_t, unsigned int);
 int pnfs_flush_one(struct inode *, struct list_head *, unsigned int, size_t, int);
+void pnfs_free_request_data(struct nfs_page *req);
 
 #endif /* CONFIG_PNFS */
 

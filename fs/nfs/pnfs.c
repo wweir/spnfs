@@ -1730,6 +1730,17 @@ out_unlock:
 	goto out;
 }
 
+void pnfs_free_request_data(struct nfs_page *req)
+{
+	struct layoutdriver_io_operations *lo;
+
+	if (!req->wb_ops || !req->wb_private)
+		return;
+	lo = (struct layoutdriver_io_operations *)req->wb_ops;
+	if (lo->free_request_data)
+		lo->free_request_data(req);
+}
+
 /* Callback operations for layout drivers.
  */
 struct pnfs_client_operations pnfs_ops = {
