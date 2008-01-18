@@ -68,6 +68,7 @@ struct pnfs_client_operations *pnfs_callback_ops;
 
 /* Forward declaration */
 ssize_t filelayout_get_stripesize(struct pnfs_layout_type *);
+struct layoutdriver_io_operations filelayout_io_operations;
 
 /* Initialize a mountpoint by retrieving the list of
  * available devices for it.
@@ -370,6 +371,19 @@ static void filelayout_get_dserver(struct nfs4_pnfs_dserver *dserver)
 	kref_get(&dserver->ref);
 }
 
+/*
+ * Called by nfs_release_request()
+ */
+void
+filelayout_free_request_data(struct nfs_page *req)
+{
+	struct nfs4_pnfs_dserver *dserver;
+
+	dserver = (struct nfs4_pnfs_dserver *)req->wb_private;
+	BUG_ON(!dserver);
+	filelayout_release_dserver(dserver);
+}
+
 static struct nfs4_pnfs_ds *
 filelayout_create_init_ds(struct inode *inode, struct nfs4_filelayout *nfslay,
 			loff_t file_offset, size_t wb_bytes,
@@ -451,12 +465,12 @@ next_ds:
 			dstotal = 0;
 			ndspages = 0;
 			use_ds = 1;
-		}
-
-		filelayout_get_dserver(dserver);
+		} else
+			filelayout_get_dserver(dserver);
 
 		req->wb_devip = ds->ds_ip_addr;
 		req->wb_devport = ds->ds_port;
+		req->wb_ops = &filelayout_io_operations;
 		req->wb_private = dserver;
 
 		/* move request to dslist */
@@ -559,8 +573,6 @@ ssize_t filelayout_write_pagelist(
 	BUG_ON(data->pnfsflags & PNFS_ISSYNC);
 	nfs_initiate_write(data, data->pnfs_client,
 			&filelayout_write_call_ops, sync);
-
-	filelayout_release_dserver(dserver);
 
 	return 0;
 }
@@ -823,6 +835,7 @@ struct layoutdriver_io_operations filelayout_io_operations = {
 	.read_pagelist           = filelayout_read_pagelist,
 	.write_pagelist          = filelayout_write_pagelist,
 	.flush_one		 = filelayout_flush_one,
+	.free_request_data	 = filelayout_free_request_data,
 	.alloc_layout            = filelayout_alloc_layout,
 	.free_layout             = filelayout_free_layout,
 	.alloc_lseg              = filelayout_alloc_lseg,
