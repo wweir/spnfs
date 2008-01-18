@@ -434,7 +434,7 @@ int filelayout_flush_one(struct inode *inode, struct list_head *head,
 	struct nfs4_pnfs_dserver *dserver = NULL;
 	struct nfs4_pnfs_ds *ds = NULL;  /* current stripe data server */
 	struct nfs_page *req;
-	loff_t file_offset = 0, stripe_offset;
+	loff_t file_offset = 0, stripe_offset, temp;
 	size_t stripesz, dstotal = 0;
 	struct list_head dslist;
 	int status = -ENOMEM, use_ds = 0, ndspages = 0;
@@ -481,7 +481,8 @@ next_ds:
 		dstotal += req->wb_bytes;
 
 		/* Are we done with this DS? */
-		stripe_offset = (file_offset + req->wb_bytes) % stripesz;
+		temp = file_offset + req->wb_bytes;
+		stripe_offset = do_div(temp, stripesz);
 
 		if (count == 0 || stripe_offset == 0) {
 			use_ds = 0;
