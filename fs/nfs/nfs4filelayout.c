@@ -505,11 +505,6 @@ next_ds:
 			goto send;
 		}
 	}
-	if (!ds) {
-		status = -EIO;
-		goto out;
-	}
-
 send:
 	/* XXX should recover to send through MDS */
 	dprintk("%s Send: ndspages %d dstotal %Zd list_empty %d \n",
