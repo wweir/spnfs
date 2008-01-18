@@ -370,6 +370,40 @@ static void filelayout_get_dserver(struct nfs4_pnfs_dserver *dserver)
 	kref_get(&dserver->ref);
 }
 
+static struct nfs4_pnfs_ds *
+filelayout_create_init_ds(struct inode *inode, struct nfs4_filelayout *nfslay,
+			loff_t file_offset, size_t wb_bytes,
+			struct nfs4_pnfs_dserver **dsp)
+{
+	struct nfs4_pnfs_dserver *dserver;
+	struct nfs4_pnfs_ds *ds;
+	int status = -ENOMEM;
+
+	*dsp = dserver = filelayout_create_dserver();
+	if (!dserver) {
+		dprintk("%s failed to get dserver. status %d\n",
+					__func__, status);
+		goto out_err;
+	}
+
+	/* get the data server that serves this page */
+	status = nfs4_pnfs_dserver_get(inode, nfslay, file_offset,
+					wb_bytes, dserver);
+
+	if (status != 0) {
+		dprintk("%s failed to get dataserver. status %d\n",
+						__func__, status);
+		status =  -EIO;
+		goto out_err;
+	}
+	/* just try the first multipath data server */
+	ds = dserver->dev->ds_list[0];
+
+	return ds;
+out_err:
+	return ERR_PTR(status);
+}
+
 /*
 * feed nfs_flush_one with per data server pages.
 *
@@ -404,36 +438,20 @@ next_ds:
 
 		file_offset = req->wb_index << PAGE_CACHE_SHIFT;
 
-		if (use_ds)
-			goto use_ds;
-
-		/* reset for new data server */
-		dstotal = 0;
-		ndspages = 0;
-
-		status = -ENOMEM;
-		dserver = filelayout_create_dserver();
-		if (!dserver) {
-			dprintk("%s failed to get dserver. status %d\n",
-				__func__, status);
-			goto out;
+		if (!use_ds) {
+			ds = filelayout_create_init_ds(inode, nfslay,
+						       file_offset,
+						       req->wb_bytes, &dserver);
+			if (IS_ERR(ds)) {
+				status = PTR_ERR(ds);
+				goto out;
+			}
+			/* reset for new data server */
+			dstotal = 0;
+			ndspages = 0;
+			use_ds = 1;
 		}
 
-		/* get the data server that serves this page */
-		status = nfs4_pnfs_dserver_get(inode, nfslay, file_offset,
-						req->wb_bytes, dserver);
-
-		if (status != 0) {
-			dprintk("%s failed to get dataserver. status %d\n",
-				__func__, status);
-			status =  -EIO;
-			goto out;
-		}
-		/* just try the first multipath data server */
-		ds = dserver->dev->ds_list[0];
-
-		use_ds = 1;
-use_ds:
 		filelayout_get_dserver(dserver);
 
 		req->wb_devip = ds->ds_ip_addr;
