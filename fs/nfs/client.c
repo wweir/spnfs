@@ -39,6 +39,7 @@
 #include <linux/nfs_xdr.h>
 #if defined(CONFIG_NFS_V4_1)
 #include <linux/nfs41_session_recovery.h>
+#include <linux/sunrpc/bc_xprt.h>
 #endif /* CONFIG_NFS_V4_1 */
 
 #include <asm/system.h>
@@ -1113,7 +1114,7 @@ error:
 
 #if defined(CONFIG_NFS_V4_1)
 /*
- * Allocate and initialize a session if required
+ * Allocate and initialize a session if required, including its backchannel.
  */
 int nfs4_init_session(struct nfs_client *clp, struct nfs4_session **spp,
 		      struct rpc_clnt *clnt)
@@ -1131,8 +1132,14 @@ int nfs4_init_session(struct nfs_client *clp, struct nfs4_session **spp,
 		session = nfs4_alloc_session();
 		if (!session)
 			error = -NFSERR_RESOURCE;
-		else
+		else {
 			session->clnt = clnt;
+
+			error = xprt_setup_backchannel(clnt->cl_xprt,
+					NFS41_BC_MIN_CALLBACKS);
+			if (error < 0)
+				nfs4_put_session(&session);
+		}
 		*spp = session;
 		break;
 	case 0:
