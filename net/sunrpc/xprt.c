@@ -1028,9 +1028,11 @@ found:
 	kref_init(&xprt->kref);
 	spin_lock_init(&xprt->transport_lock);
 	spin_lock_init(&xprt->reserve_lock);
+	rwlock_init(&xprt->bc_pa_lock);
 
 	INIT_LIST_HEAD(&xprt->free);
 	INIT_LIST_HEAD(&xprt->recv);
+	INIT_LIST_HEAD(&xprt->bc_pa_list);
 
 	if (args->svsk)
 		INIT_WORK(&xprt->task_cleanup, bc_autoclose);
