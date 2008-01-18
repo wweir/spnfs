@@ -393,6 +393,7 @@ filelayout_create_init_ds(struct inode *inode, struct nfs4_filelayout *nfslay,
 	if (status != 0) {
 		dprintk("%s failed to get dataserver. status %d\n",
 						__func__, status);
+		filelayout_release_dserver(dserver);
 		status =  -EIO;
 		goto out_err;
 	}
