@@ -193,6 +193,7 @@ static void __rpc_remove_wait_queue(struct rpc_task *task)
 	struct rpc_wait_queue *queue;
 	queue = task->u.tk_wait.rpc_waitq;
 
+BUG_ON(queue == NULL);
 	if (RPC_IS_PRIORITY(queue))
 		__rpc_remove_wait_queue_priority(task);
 	else
@@ -808,14 +809,11 @@ EXPORT_SYMBOL_GPL(rpc_free);
 /*
  * Creation and deletion of RPC task structures
  */
-void rpc_init_task(struct rpc_task *task, struct rpc_clnt *clnt, int flags, const struct rpc_call_ops *tk_ops, void *calldata)
+void rpc_init_task_common(struct rpc_task *task, int flags,
+			  const struct rpc_call_ops *tk_ops, void *calldata)
 {
 	memset(task, 0, sizeof(*task));
-	init_timer(&task->tk_timer);
-	task->tk_timer.data     = (unsigned long) task;
-	task->tk_timer.function = (void (*)(unsigned long)) rpc_run_timer;
 	atomic_set(&task->tk_count, 1);
-	task->tk_client = clnt;
 	task->tk_flags  = flags;
 	task->tk_ops = tk_ops;
 	if (tk_ops->rpc_call_prepare != NULL)
@@ -823,15 +821,31 @@ void rpc_init_task(struct rpc_task *task, struct rpc_clnt *clnt, int flags, cons
 	task->tk_calldata = calldata;
 	INIT_LIST_HEAD(&task->tk_task);
 
-	/* Initialize retry counters */
-	task->tk_garb_retry = 2;
-	task->tk_cred_retry = 2;
-
 	task->tk_priority = RPC_PRIORITY_NORMAL;
 	task->tk_cookie = (unsigned long)current;
 
 	/* Initialize workqueue for async tasks */
 	task->tk_workqueue = rpciod_workqueue;
+
+	/* starting timestamp */
+	task->tk_start = jiffies;
+}
+
+/*
+ * Initialize an RPC structure
+ */
+void rpc_init_task(struct rpc_task *task, struct rpc_clnt *clnt, int flags,
+		   const struct rpc_call_ops *tk_ops, void *calldata)
+{
+	rpc_init_task_common(task, flags, tk_ops, calldata);
+	init_timer(&task->tk_timer);
+	task->tk_timer.data     = (unsigned long) task;
+	task->tk_timer.function = (void (*)(unsigned long)) rpc_run_timer;
+	task->tk_client = clnt;
+
+	/* Initialize retry counters */
+	task->tk_garb_retry = 2;
+	task->tk_cred_retry = 2;
 
 	if (clnt) {
 		kref_get(&clnt->cl_kref);
@@ -843,10 +857,22 @@ void rpc_init_task(struct rpc_task *task, struct rpc_clnt *clnt, int flags, cons
 
 	BUG_ON(task->tk_ops == NULL);
 
-	/* starting timestamp */
-	task->tk_start = jiffies;
-
 	dprintk("RPC:       new task initialized, procpid %u\n",
+				task_pid_nr(current));
+}
+
+/*
+ * Initialize an RPC Backchannel structure
+ */
+void rpc_init_bc_task(struct rpc_task *task, struct rpc_rqst *req, int flags,
+		     const struct rpc_call_ops *tk_ops, void *calldata)
+{
+	rpc_init_task_common(task, flags, tk_ops, calldata);
+	task->tk_rqstp = req;
+
+	/* XXX Should we have a list of backchannel tasks? */
+
+	dprintk("RPC:       new backchannel task initialized, procpid %u\n",
 				task_pid_nr(current));
 }
 
@@ -875,6 +901,27 @@ struct rpc_task *rpc_new_task(struct rpc_clnt *clnt, int flags, const struct rpc
 		goto out;
 
 	rpc_init_task(task, clnt, flags, tk_ops, calldata);
+
+	dprintk("RPC:       allocated task %p\n", task);
+	task->tk_flags |= RPC_TASK_DYNAMIC;
+out:
+	return task;
+}
+
+/*
+ * Create a new backchannel task for the specified client.
+ */
+struct rpc_task *rpc_new_bc_task(struct rpc_rqst *req, int flags,
+				 const struct rpc_call_ops *tk_ops,
+				 void *calldata)
+{
+	struct rpc_task	*task;
+
+	task = rpc_alloc_task();
+	if (!task)
+		goto out;
+
+	rpc_init_bc_task(task, req, flags, tk_ops, calldata);
 
 	dprintk("RPC:       allocated task %p\n", task);
 	task->tk_flags |= RPC_TASK_DYNAMIC;
