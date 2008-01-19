@@ -241,9 +241,14 @@ struct rpc_wait_queue {
  */
 struct rpc_task *rpc_new_task(struct rpc_clnt *, int flags,
 				const struct rpc_call_ops *ops, void *data);
+struct rpc_task *rpc_new_bc_task(struct rpc_rqst *, int flags,
+				const struct rpc_call_ops *ops, void *data);
 struct rpc_task *rpc_run_task(struct rpc_clnt *clnt, int flags,
 				const struct rpc_call_ops *ops, void *data);
 void		rpc_init_task(struct rpc_task *task, struct rpc_clnt *clnt,
+				int flags, const struct rpc_call_ops *ops,
+				void *data);
+void		rpc_init_bc_task(struct rpc_task *task, struct rpc_rqst *req,
 				int flags, const struct rpc_call_ops *ops,
 				void *data);
 void		rpc_put_task(struct rpc_task *);
