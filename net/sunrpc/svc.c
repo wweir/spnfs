@@ -24,6 +24,7 @@
 #include <linux/sunrpc/stats.h>
 #include <linux/sunrpc/svcsock.h>
 #include <linux/sunrpc/clnt.h>
+#include <linux/sunrpc/bc_xprt.h>
 
 #define RPCDBG_FACILITY	RPCDBG_SVCDSP
 
@@ -1069,6 +1070,48 @@ err_bad_dir:
 	svc_authorise(rqstp);
 	svc_drop(rqstp);
 	return 0;
+}
+
+/*
+ * Process a backchannel RPC request that arrived over an existing
+ * outbound connection
+ */
+int
+bc_svc_process(struct svc_serv *serv, struct rpc_rqst *req,
+	       struct svc_rqst *rqstp)
+{
+	struct kvec	*argv = &rqstp->rq_arg.head[0];
+	struct kvec	*resv = &rqstp->rq_res.head[0];
+	int 		error;
+
+	/* Build the svc_rqst used by the common processing routine */
+	rqstp->rq_xid = req->rq_xid;
+	rqstp->rq_prot = req->rq_xprt->prot;
+	rqstp->rq_server = serv;
+
+	rqstp->rq_addrlen = sizeof(req->rq_xprt->addr);
+	memcpy(&rqstp->rq_addr, &req->rq_xprt->addr, rqstp->rq_addrlen);
+	memcpy(&rqstp->rq_arg, &req->rq_private_buf, sizeof(rqstp->rq_arg));
+	memcpy(&rqstp->rq_res, &req->rq_snd_buf, sizeof(rqstp->rq_res));
+
+	if (rqstp->rq_prot != IPPROTO_TCP) {
+		printk(KERN_ERR "No support for Non-TCP transports!\n");
+		BUG();
+	}
+
+	/*
+	 * Skip the next two words because they've already been
+	 * processed in the trasport
+	 */
+	svc_getu32(argv);	/* XID */
+	svc_getnl(argv);	/* CALLDIR */
+
+	error = svc_process_common(rqstp, argv, resv);
+	if (error <= 0)
+		return error;
+
+	memcpy(&req->rq_snd_buf, &rqstp->rq_res, sizeof(req->rq_snd_buf));
+	return bc_send(req);
 }
 
 /*
