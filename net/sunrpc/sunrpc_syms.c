@@ -71,6 +71,7 @@ EXPORT_SYMBOL(svc_exit_thread);
 EXPORT_SYMBOL(svc_destroy);
 EXPORT_SYMBOL(svc_drop);
 EXPORT_SYMBOL(svc_process);
+EXPORT_SYMBOL(bc_svc_process);
 EXPORT_SYMBOL(svc_recv);
 EXPORT_SYMBOL(svc_wake_up);
 EXPORT_SYMBOL(svc_makesock);
