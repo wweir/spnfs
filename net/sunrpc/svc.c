@@ -801,20 +801,18 @@ svc_printk(struct svc_rqst *rqstp, const char *fmt, ...)
 }
 
 /*
- * Process the RPC request.
+ * Common routine for processing the RPC request.
  */
-int
-svc_process(struct svc_rqst *rqstp)
+static int
+svc_process_common(struct svc_rqst *rqstp, struct kvec *argv, struct kvec *resv)
 {
 	struct svc_program	*progp;
 	struct svc_version	*versp = NULL;	/* compiler food */
 	struct svc_procedure	*procp = NULL;
-	struct kvec *		argv = &rqstp->rq_arg.head[0];
-	struct kvec *		resv = &rqstp->rq_res.head[0];
 	struct svc_serv		*serv = rqstp->rq_server;
 	kxdrproc_t		xdr;
 	__be32			*statp;
-	u32			dir, prog, vers, proc;
+	u32			prog, vers, proc;
 	__be32			auth_stat, rpc_stat;
 	int			auth_res;
 	__be32			*reply_statp;
@@ -824,36 +822,19 @@ svc_process(struct svc_rqst *rqstp)
 	if (argv->iov_len < 6*4)
 		goto err_short_len;
 
-	/* setup response xdr_buf.
-	 * Initially it has just one page
-	 */
-	rqstp->rq_resused = 1;
-	resv->iov_base = page_address(rqstp->rq_respages[0]);
-	resv->iov_len = 0;
-	rqstp->rq_res.pages = rqstp->rq_respages + 1;
-	rqstp->rq_res.len = 0;
-	rqstp->rq_res.page_base = 0;
-	rqstp->rq_res.page_len = 0;
-	rqstp->rq_res.buflen = PAGE_SIZE;
-	rqstp->rq_res.tail[0].iov_base = NULL;
-	rqstp->rq_res.tail[0].iov_len = 0;
 	/* Will be turned off only in gss privacy case: */
 	rqstp->rq_splice_ok = 1;
 	/* tcp needs a space for the record length... */
 	if (rqstp->rq_prot == IPPROTO_TCP)
 		svc_putnl(resv, 0);
 
-	rqstp->rq_xid = svc_getu32(argv);
 	svc_putu32(resv, rqstp->rq_xid);
 
-	dir  = svc_getnl(argv);
 	vers = svc_getnl(argv);
 
 	/* First words of reply: */
 	svc_putnl(resv, 1);		/* REPLY */
 
-	if (dir != 0)		/* direction != CALL */
-		goto err_bad_dir;
 	if (vers != 2)		/* RPC version number */
 		goto err_bad_rpc;
 
@@ -978,7 +959,7 @@ svc_process(struct svc_rqst *rqstp)
  sendit:
 	if (svc_authorise(rqstp))
 		goto dropit;
-	return svc_send(rqstp);
+	return 1;		/* Caller can now send it */
 
  dropit:
 	svc_authorise(rqstp);	/* doesn't hurt to call this twice */
@@ -990,12 +971,6 @@ err_short_len:
 	svc_printk(rqstp, "short len %Zd, dropping request\n",
 			argv->iov_len);
 
-	goto dropit;			/* drop request */
-
-err_bad_dir:
-	svc_printk(rqstp, "bad direction %d, dropping request\n", dir);
-
-	serv->sv_stats->rpcbadfmt++;
 	goto dropit;			/* drop request */
 
 err_bad_rpc:
@@ -1047,6 +1022,53 @@ err_bad:
 	serv->sv_stats->rpcbadfmt++;
 	svc_putnl(resv, ntohl(rpc_stat));
 	goto sendit;
+}
+
+/*
+ * Process the RPC request.
+ */
+int
+svc_process(struct svc_rqst *rqstp)
+{
+	struct kvec		*argv = &rqstp->rq_arg.head[0];
+	struct kvec		*resv = &rqstp->rq_res.head[0];
+	struct svc_serv		*serv = rqstp->rq_server;
+	u32			dir;
+	int			error;
+
+	/*
+	 * Setup response xdr_buf.
+	 * Initially it has just one page
+	 */
+	rqstp->rq_resused = 1;
+	resv->iov_base = page_address(rqstp->rq_respages[0]);
+	resv->iov_len = 0;
+	rqstp->rq_res.pages = rqstp->rq_respages + 1;
+	rqstp->rq_res.len = 0;
+	rqstp->rq_res.page_base = 0;
+	rqstp->rq_res.page_len = 0;
+	rqstp->rq_res.buflen = PAGE_SIZE;
+	rqstp->rq_res.tail[0].iov_base = NULL;
+	rqstp->rq_res.tail[0].iov_len = 0;
+
+	rqstp->rq_xid = svc_getu32(argv);
+
+	dir  = svc_getnl(argv);
+	if (dir != 0)		/* direction != CALL */
+		goto err_bad_dir;
+
+	error = svc_process_common(rqstp, argv, resv);
+	if (error <= 0)
+		return error;
+	return svc_send(rqstp);
+
+err_bad_dir:
+	svc_printk(rqstp, "bad direction %d, dropping request\n", dir);
+
+	serv->sv_stats->rpcbadfmt++;
+	svc_authorise(rqstp);
+	svc_drop(rqstp);
+	return 0;
 }
 
 /*
