@@ -237,25 +237,6 @@ int nfs41_recover_session_async(struct rpc_task *task,
 	return ret;
 }
 
-int nfs41_recover_expired_session1(struct rpc_clnt *clnt,
-				  struct nfs_client *clp,
-				  struct nfs4_session *session)
-{
-	int ret;
-
-	while (1) {
-		ret = nfs41_wait_session_recover_sync(clnt, session);
-		if (ret)
-			return ret;
-
-		if (!nfs41_set_session_valid(session))
-			break;
-		ret = nfs41_recover_session_sync(clnt, clp, session);
-	}
-
-	return ret;
-}
-
 int nfs41_recover_expired_session(struct rpc_task *task,
 				  struct nfs_client *clp,
 				  struct nfs4_session *session)
