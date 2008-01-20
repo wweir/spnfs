@@ -35,7 +35,6 @@ static inline int nfs41_test_session_expired(struct nfs4_session *session)
 int nfs41_set_session_valid(struct nfs4_session *);
 int nfs41_recover_session(struct nfs_client *, struct nfs4_session *);
 int nfs41_recover_session_sync(struct rpc_clnt *, struct nfs_client *, struct nfs4_session *);
-int nfs41_recover_session_async(struct rpc_task *, struct nfs_server *);
 int nfs41_recover_expired_session(struct rpc_task *, struct nfs_client *, struct nfs4_session *);
 
 #endif	/* CONFIG_NFS_V4_1 */
