@@ -410,10 +410,12 @@ static int nfs4_setup_sequence(struct nfs_client *clp,
 		__func__, clp, session, clp->cl_minorversion);
 	switch (clp->cl_minorversion) {
 	case 1:
-		ret = nfs41_recover_expired_session(task, clp, session);
-		if (ret) {
-			memset(res, 0, sizeof(*res));
-			break;
+		if (nfs41_test_session_expired(session)) {
+			ret = nfs41_recover_expired_session(task, clp, session);
+			if (ret) {
+				memset(res, 0, sizeof(*res));
+				break;
+			}
 		}
 		ret = nfs41_setup_sequence(session, args,
 				res, cache_reply, task);
