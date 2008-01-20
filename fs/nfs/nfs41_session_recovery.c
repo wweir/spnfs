@@ -224,19 +224,6 @@ int nfs41_recover_session_sync(struct rpc_clnt *clnt, struct nfs_client *clp,
 }
 EXPORT_SYMBOL(nfs41_recover_session_sync);
 
-int nfs41_recover_session_async(struct rpc_task *task,
-				struct nfs_server *server)
-{
-	int ret;
-
-	rpc_sleep_on(&server->session->recovery_waitq, task, NULL, NULL);
-	ret = nfs41_recover_session(server->nfs_client, server->session);
-
-	ret = nfs41_wait_session_recover_async(task, server->session);
-
-	return ret;
-}
-
 int nfs41_recover_expired_session(struct rpc_task *task,
 				  struct nfs_client *clp,
 				  struct nfs4_session *session)
