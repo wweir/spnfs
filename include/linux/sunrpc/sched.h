@@ -114,7 +114,7 @@ typedef void			(*rpc_action)(struct rpc_task *);
 struct rpc_call_ops {
 	void (*rpc_call_prepare)(struct rpc_task *, void *);
 #if defined(CONFIG_NFS_V4_1)
-	void (*rpc_call_validate_args)(struct rpc_task *, void *);
+	int (*rpc_call_validate_args)(struct rpc_task *, void *);
 #endif /* CONFIG_NFS_V4_1 */
 	void (*rpc_call_done)(struct rpc_task *, void *);
 	void (*rpc_release)(void *);
