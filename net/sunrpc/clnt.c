@@ -724,15 +724,6 @@ void rpc_force_rebind(struct rpc_clnt *clnt)
 }
 EXPORT_SYMBOL_GPL(rpc_force_rebind);
 
-void
-rpc_start_call(struct rpc_task *task)
-{
-	if (RPC_ASSASSINATED(task))
-		return;
-
-	task->tk_action = call_start;
-}
-
 /*
  * Restart an (async) RPC call. Usually called from within the
  * exit handler.
