@@ -618,10 +618,20 @@ EXPORT_SYMBOL(rpc_run_task);
 void
 rpc_call_validate_args(struct rpc_task *task)
 {
-	if (task->tk_ops->rpc_call_validate_args)
-		task->tk_ops->rpc_call_validate_args(task, task->tk_calldata);
-	else
+	int res;
+
+	if (!task->tk_ops->rpc_call_validate_args) {
 		task->tk_action = call_start;
+		return;
+	}
+
+	res = task->tk_ops->rpc_call_validate_args(task, task->tk_calldata);
+	if (!res)
+		task->tk_action = call_start;
+	else if (res != -EAGAIN) {
+		task->tk_status = res;
+		task->tk_action = NULL;
+	}
 }
 #else /* CONFIG_NFS_V4_1 */
 #define rpc_call_validate_args	call_start
@@ -715,15 +725,6 @@ void rpc_force_rebind(struct rpc_clnt *clnt)
 		xprt_clear_bound(clnt->cl_xprt);
 }
 EXPORT_SYMBOL_GPL(rpc_force_rebind);
-
-void
-rpc_start_call(struct rpc_task *task)
-{
-	if (RPC_ASSASSINATED(task))
-		return;
-
-	task->tk_action = call_start;
-}
 
 /*
  * Restart an (async) RPC call. Usually called from within the
