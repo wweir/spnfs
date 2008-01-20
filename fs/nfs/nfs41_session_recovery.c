@@ -213,11 +213,14 @@ int nfs41_recover_session_sync(struct rpc_clnt *clnt, struct nfs_client *clp,
 {
 	int ret;
 
-	ret = nfs41_recover_session(clp, session);
-	if (ret)
-		return ret;
+	dprintk("--> %s\n", __func__);
 
-	return nfs41_wait_session_recover_sync(clnt, session);
+	ret = nfs41_recover_session(clp, session);
+	if (!ret)
+		ret = nfs41_wait_session_recover_sync(clnt, session);
+
+	dprintk("<-- %s: status=%d\n", __func__, ret);
+	return ret;
 }
 EXPORT_SYMBOL(nfs41_recover_session_sync);
 
