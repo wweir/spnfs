@@ -59,20 +59,10 @@ static int nfs41_end_session_recovery(struct nfs4_session *session)
 	smp_mb__after_clear_bit();
 
 	/*
-	 * Wake up async tasks
-	 */
-	rpc_wake_up(&session->recovery_waitq);
-
-	/*
 	 * Wake up sync tasks
 	 */
 	wake_up_bit(&session->session_state, NFS41_SESSION_RECOVER);
 	return 0;
-}
-
-static int nfs41_recovery_complete(struct nfs4_session *session)
-{
-	return (!test_bit(NFS41_SESSION_RECOVER, &session->session_state));
 }
 
 extern int nfs4_wait_bit_interruptible(void *word);
@@ -91,17 +81,6 @@ static int nfs41_wait_session_recover_sync(struct rpc_clnt *clnt,
 	rpc_clnt_sigunmask(clnt, &oldset);
 
 	return ret;
-}
-
-static int nfs41_wait_session_recover_async(struct rpc_task *task,
-					    struct nfs4_session *session)
-{
-	if (nfs41_recovery_complete(session)) {
-		rpc_wake_up_task(task);
-		return 0;
-	}
-
-	return -EAGAIN;
 }
 
 int nfs4_proc_create_session(struct nfs_client *clp,
@@ -223,29 +202,5 @@ int nfs41_recover_session_sync(struct rpc_clnt *clnt, struct nfs_client *clp,
 	return ret;
 }
 EXPORT_SYMBOL(nfs41_recover_session_sync);
-
-int nfs41_recover_expired_session(struct rpc_task *task,
-				  struct nfs_client *clp,
-				  struct nfs4_session *session)
-{
-	int ret = 0;
-
-	dprintk("--> %s\n", __func__);
-	while (1) {
-		rpc_sleep_on(&session->recovery_waitq, task, NULL, NULL);
-
-		ret = nfs41_wait_session_recover_async(task, session);
-		if (ret == -EAGAIN)
-			break;
-		ret = nfs41_set_session_valid(session);
-		if (!ret)
-			break;
-
-		nfs41_recover_session(clp, session);
-	}
-
-	dprintk("<-- %s: status=%d\n", __func__, ret);
-	return ret;
-}
 
 #endif /* CONFIG_NFS_V4_1 */
