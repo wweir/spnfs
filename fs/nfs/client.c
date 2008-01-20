@@ -1003,11 +1003,8 @@ int nfs4_init_session(struct nfs_client *clp, struct nfs4_session **spp,
 		session = nfs4_alloc_session();
 		if (!session)
 			error = -NFSERR_RESOURCE;
-		else {
+		else
 			session->clnt = clnt;
-			rpc_init_wait_queue(&session->recovery_waitq,
-				"Session recovery wait queue");
-		}
 		*spp = session;
 		break;
 	case 0:
