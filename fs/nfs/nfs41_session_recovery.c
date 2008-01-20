@@ -52,23 +52,21 @@ struct reclaimer_arg {
 	struct nfs4_session *session;
 };
 
-static int nfs41_end_session_recovery(struct reclaimer_arg *rec)
+static int nfs41_end_session_recovery(struct nfs4_session *session)
 {
 	smp_mb__before_clear_bit();
-	clear_bit(NFS41_SESSION_RECOVER, &rec->session->session_state);
+	clear_bit(NFS41_SESSION_RECOVER, &session->session_state);
 	smp_mb__after_clear_bit();
 
 	/*
 	 * Wake up async tasks
 	 */
-	rpc_wake_up(&rec->session->recovery_waitq);
+	rpc_wake_up(&session->recovery_waitq);
 
 	/*
 	 * Wake up sync tasks
 	 */
-	wake_up_bit(&rec->session->session_state, NFS41_SESSION_RECOVER);
-
-	kfree(rec);
+	wake_up_bit(&session->session_state, NFS41_SESSION_RECOVER);
 	return 0;
 }
 
@@ -122,7 +120,8 @@ static int session_reclaimer(void *arg)
 		goto out_error;
 
 out:
-	nfs41_end_session_recovery(rec);
+	nfs41_end_session_recovery(rec->session);
+	kfree(rec);
 	module_put_and_exit(0);
 	dprintk("<-- %s: status=%d\n", __func__, ret);
 	return ret;
@@ -169,16 +168,10 @@ static int nfs41_schedule_session_recovery(struct reclaimer_arg *rec)
  */
 int nfs41_recover_session(struct nfs_client *clp, struct nfs4_session *session)
 {
-	struct reclaimer_arg *rec;
-	int ret = -ENOMEM;
+	struct reclaimer_arg *rec = NULL;
+	int ret;
 
 	dprintk("--> %s\n", __func__);
-	/* freed in nfs41_end_session_recovery */
-	rec = kmalloc(sizeof(*rec), GFP_KERNEL);
-	if (!rec)
-		goto out;
-	rec->clp = clp;
-	rec->session = session;
 
 	ret = nfs41_start_session_recovery(session);
 
@@ -189,20 +182,30 @@ int nfs41_recover_session(struct nfs_client *clp, struct nfs4_session *session)
 	if (ret) {
 		dprintk("%s: session_recovery already started\n", __func__);
 		ret = 0;
-		goto out;
+		goto err;
 	}
 
+	ret = -ENOMEM;
+	rec = kmalloc(sizeof(*rec), GFP_KERNEL);
+	if (!rec)
+		goto err;
+	rec->clp = clp;
+	rec->session = session;
+
 	ret = nfs41_schedule_session_recovery(rec);
-	if (!ret)
-		goto out;
 	/*
 	 * We got an error creating the reclaiming thread, so end the recovery
 	 * and bail out
 	 */
-	nfs41_end_session_recovery(rec);
+	if (ret)
+		goto err;
 out:
 	dprintk("<-- %s status=%d\n", __func__, ret);
 	return ret;
+err:
+	nfs41_end_session_recovery(session);
+	kfree(rec);
+	goto out;
 }
 
 int nfs41_recover_session_sync(struct rpc_clnt *clnt, struct nfs_client *clp,
