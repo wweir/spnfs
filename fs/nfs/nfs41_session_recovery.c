@@ -26,29 +26,6 @@
 #define NFSDBG_FACILITY		NFSDBG_PROC
 
 /*
- * Session state bits
- */
-enum nfs41_session_state {
-	NFS41_SESSION_EXPIRED = 0,
-	NFS41_SESSION_RECOVER,
-};
-
-/*
- * Set the session state expired
- */
-int nfs41_set_session_expired(struct nfs4_session *session)
-{
-	set_bit(NFS41_SESSION_EXPIRED, &session->session_state);
-
-	return 0;
-}
-
-int nfs41_test_session_expired(struct nfs4_session *session)
-{
-	return test_bit(NFS41_SESSION_EXPIRED, &session->session_state);
-}
-
-/*
  * Set the session state == valid. Returns previous value of the session state
  */
 int nfs41_set_session_valid(struct nfs4_session *session)
