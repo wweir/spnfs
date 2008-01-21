@@ -520,9 +520,6 @@ pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range)
 	if (lo == NULL)
 		return 0;
 
-	pnfs_free_layout(lo, &arg.lseg);
-	put_unlock_current_layout(nfsi, lo);
-
 	arg.reclaim = 0;
 	arg.layout_type = server->pnfs_curr_ld->id;
 	arg.return_type = RETURN_FILE;
@@ -534,6 +531,9 @@ pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range)
 		arg.lseg.length = ~0;
 	}
 	arg.inode = ino;
+
+	pnfs_free_layout(lo, &arg.lseg);
+	put_unlock_current_layout(nfsi, lo);
 
 	status = pnfs_return_layout_rpc(server, &arg);
 
