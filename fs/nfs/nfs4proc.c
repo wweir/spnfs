@@ -3081,7 +3081,7 @@ static int pnfs4_write_done(struct rpc_task *task, struct nfs_write_data *data)
 
 	/*
 	 * MDS write: renew lease
-	 * DS write: update lastbyte written mark for layoutcommit
+	 * DS write: update lastbyte written
 	 */
 	if (task->tk_status > 0) {
 		if (!data->ds_nfs_client) {
@@ -3089,7 +3089,9 @@ static int pnfs4_write_done(struct rpc_task *task, struct nfs_write_data *data)
 							data->res.fattr);
 			renew_lease(mds_svr, data->timestamp);
 		} else
-			pnfs_writeback_done_update(data);
+			pnfs_update_last_write(NFS_I(data->inode),
+					       data->args.offset,
+					       data->res.count);
 	}
 	return 0;
 }
