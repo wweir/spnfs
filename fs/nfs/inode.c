@@ -1184,6 +1184,8 @@ struct inode *nfs_alloc_inode(struct super_block *sb)
 	nfsi->pnfs_layout_state = 0;
 	nfsi->current_layout = NULL;
 	nfsi->layoutcommit_ctx = NULL;
+	nfsi->pnfs_write_begin_pos = 0;
+	nfsi->pnfs_write_end_pos = 0;
 #endif /* CONFIG_PNFS */
 	return &nfsi->vfs_inode;
 }
