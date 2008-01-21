@@ -1247,6 +1247,18 @@ pnfs_writeback_done(struct nfs_write_data *data)
 {
 	dprintk("%s: Begin (status %d)\n", __func__, data->task.tk_status);
 
+	/* update last write offset and need layout commit
+	 * for non-files layout types (files layout calls
+	 * pnfs_writeback_done_update for this
+	 */
+	if (pnfs_get_type(data->inode) != LAYOUT_NFSV4_FILES &&
+	    data->task.tk_status >= 0 && data->res.count > 0) {
+		struct nfs_inode *nfsi = NFS_I(data->inode);
+
+		pnfs_update_last_write(nfsi, data->args.offset, data->res.count);
+		pnfs_need_layoutcommit(nfsi, data->args.context);
+	}
+
 	put_lseg(data->lseg);
 	data->call_ops->rpc_call_done(&data->task, data);
 	data->call_ops->rpc_release(data);
