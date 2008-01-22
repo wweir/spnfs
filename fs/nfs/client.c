@@ -142,6 +142,10 @@ static struct nfs_client *nfs_alloc_client(const char *hostname,
 	clp->cl_minorversion = NFS4_MAX_MINOR_VERSION;
 #endif
 
+#if defined(CONFIG_PNFS)
+	INIT_LIST_HEAD(&clp->cl_lo_inodes);
+#endif
+
 	return clp;
 
 error_3:
