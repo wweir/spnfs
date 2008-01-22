@@ -342,6 +342,8 @@ static inline void
 put_unlock_current_layout(struct nfs_inode *nfsi,
 			    struct pnfs_layout_type *lo)
 {
+	struct nfs_client *clp;
+
 	BUG_ON_UNLOCKED_LO(lo);
 	BUG_ON(lo->refcount <= 0);
 
@@ -353,6 +355,18 @@ put_unlock_current_layout(struct nfs_inode *nfsi,
 		io_ops->free_layout(lo);
 
 		nfsi->current_layout = NULL;
+
+		/* Unlist the inode.
+		 * Note that nfsi->lo_lock must be released before getting
+		 * cl_sem as the latter can sleep
+		 */
+		clp = NFS_SERVER(&nfsi->vfs_inode)->nfs_client;
+		spin_unlock(&nfsi->lo_lock);
+		down_write(&clp->cl_sem);
+		spin_lock(&nfsi->lo_lock);
+		if (!nfsi->current_layout)
+			list_del_init(&nfsi->lo_inodes);
+		up_write(&clp->cl_sem);
 	}
 	spin_unlock(&nfsi->lo_lock);
 }
@@ -733,9 +747,15 @@ get_lock_alloc_layout(struct inode *ino,
 
 		lo = alloc_init_layout(ino, io_ops);
 		if (lo) {
+			struct nfs_client *clp = NFS_SERVER(ino)->nfs_client;
+
 			/* must grab the layout lock */
 			spin_lock(&nfsi->lo_lock);
 			nfsi->current_layout = lo;
+
+			down_write(&clp->cl_sem);
+			list_add_tail(&nfsi->lo_inodes, &clp->cl_lo_inodes);
+			up_write(&clp->cl_sem);
 		} else
 			lo = ERR_PTR(-ENOMEM);
 
