@@ -1180,6 +1180,7 @@ struct inode *nfs_alloc_inode(struct super_block *sb)
 	nfsi->nfs4_acl = NULL;
 #endif /* CONFIG_NFS_V4 */
 #ifdef CONFIG_PNFS
+	INIT_LIST_HEAD(&nfsi->lo_inodes);
 	nfsi->pnfs_layout_state = 0;
 	nfsi->current_layout = NULL;
 	nfsi->layoutcommit_ctx = NULL;
