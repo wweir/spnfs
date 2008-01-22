@@ -12,6 +12,10 @@
 #include "delegation.h"
 #include "internal.h"
 
+#if defined(CONFIG_PNFS)
+#include <linux/writeback.h>
+#endif
+
 #ifdef NFS_DEBUG
 #define NFSDBG_FACILITY NFSDBG_CALLBACK
 #endif
@@ -101,6 +105,49 @@ out:
 	dprintk("%s: exit with status = %d\n", __FUNCTION__, ntohl(res));
 	return res;
 }
+
+#if defined(CONFIG_PNFS)
+
+/*
+ * Retrieve an inode based on layout recall parameters
+ *
+ * Note: caller must iput(inode) to dereference the inode.
+ */
+static struct inode *
+nfs_layoutrecall_find_inode(struct nfs_client *clp,
+			    const struct cb_pnfs_layoutrecallargs *args)
+{
+	struct nfs_inode *nfsi;
+	struct nfs_server *server;
+	struct inode *ino = NULL;
+
+	dprintk("%s: Begin recall_type=%d\n", __func__, args->cbl_recall_type);
+
+	down_read(&clp->cl_sem);
+	list_for_each_entry(nfsi, &clp->cl_lo_inodes, lo_inodes) {
+		if (args->cbl_recall_type == RECALL_FILE) {
+		    if (nfs_compare_fh(&args->cbl_fh, &nfsi->fh))
+			continue;
+		} else if (args->cbl_recall_type == RECALL_FSID) {
+			server = NFS_SERVER(&nfsi->vfs_inode);
+			if (server->fsid.major != args->cbl_fsid.major ||
+			    server->fsid.minor != args->cbl_fsid.minor)
+				continue;
+		}
+
+		ino = &nfsi->vfs_inode;
+		spin_lock(&inode_lock);
+		__iget(ino);
+		spin_unlock(&inode_lock);
+		break;
+	}
+	up_read(&clp->cl_sem);
+
+	dprintk("%s: Return inode=%p\n", __func__, ino);
+	return ino;
+}
+
+#endif /* defined(CONFIG_PNFS) */
 
 #if defined(CONFIG_NFS_V4_1)
 
