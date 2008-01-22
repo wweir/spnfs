@@ -151,6 +151,10 @@ static struct nfs_client *nfs_alloc_client(const struct nfs_client_initdata *cl_
 	clp->cl_state = 1 << NFS4CLNT_LEASE_EXPIRED;
 #endif
 
+#if defined(CONFIG_PNFS)
+	INIT_LIST_HEAD(&clp->cl_lo_inodes);
+#endif
+
 	return clp;
 
 error_cleanup:
