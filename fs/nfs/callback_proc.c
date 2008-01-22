@@ -101,3 +101,33 @@ out:
 	dprintk("%s: exit with status = %d\n", __FUNCTION__, ntohl(res));
 	return res;
 }
+
+#if defined(CONFIG_NFS_V4_1)
+
+/* FIXME: validate args->cbs_{sequence,slot}id */
+/* FIXME: referring calls should be processed */
+unsigned nfs4_callback_sequence(struct cb_sequenceargs *args,
+				struct cb_sequenceres *res)
+{
+	int i;
+	unsigned status = 0;
+
+	for (i = 0; i < args->csa_nrclists; i++)
+		kfree(args->csa_rclists[i].rcl_refcalls);
+	kfree(args->csa_rclists);
+
+	memcpy(&res->csr_sessionid, &args->csa_sessionid,
+	       sizeof(res->csr_sessionid));
+	res->csr_sequenceid = args->csa_sequenceid;
+	res->csr_slotid = args->csa_slotid;
+	res->csr_highestslotid = NFS41_BC_MAX_CALLBACKS;
+	if (res->csr_highestslotid > args->csa_highestslotid)
+		res->csr_highestslotid = args->csa_highestslotid;
+	res->csr_target_highestslotid = NFS41_BC_MAX_CALLBACKS;
+
+	dprintk("%s: exit with status = %d\n", __func__, ntohl(status));
+	res->csr_status = status;
+	return status;
+}
+
+#endif /* CONFIG_NFS_V4_1 */
