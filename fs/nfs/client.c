@@ -149,6 +149,10 @@ static struct nfs_client *nfs_alloc_client(const struct nfs_client_initdata *cl_
 	rpc_init_wait_queue(&clp->cl_rpcwaitq, "NFS client");
 #endif
 
+#if defined(CONFIG_PNFS)
+	INIT_LIST_HEAD(&clp->cl_lo_inodes);
+#endif
+
 	return clp;
 
 error_cleanup:
