@@ -176,6 +176,9 @@ struct nfs_inode {
 
 	/* pNFS layout information */
 #if defined(CONFIG_PNFS)
+	/* Inodes having layouts */
+	struct list_head	lo_inodes;
+
 	unsigned long pnfs_layout_state;
 #define NFS_INO_LAYOUT_FAILED	0x0001	/* get layout failed, stop trying */
 #define NFS_INO_LAYOUT_ALLOC	0x0002	/* get layout failed, stop trying */
