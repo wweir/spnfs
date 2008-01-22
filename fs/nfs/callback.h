@@ -121,6 +121,10 @@ extern void nfs_callback_down(void);
  * so we limit their concurrency to 1.
  */
 #define NFS41_BC_MIN_CALLBACKS 1
+#define NFS41_BC_MAX_CALLBACKS 1
+
+extern unsigned nfs4_callback_sequence(struct cb_sequenceargs *args,
+				       struct cb_sequenceres *res);
 #endif /* CONFIG_NFS_V4_1 */
 
 extern unsigned int nfs_callback_set_tcpport;
