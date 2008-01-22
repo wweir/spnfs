@@ -84,6 +84,7 @@ struct nfs_client {
 #endif
 #ifdef CONFIG_PNFS
 	struct nfs4_session *	cl_ds_session; /* pNFS data server session */
+	struct list_head	cl_lo_inodes;	/* Inodes having layouts */
 #endif /* CONFIG_PNFS */
 };
 
