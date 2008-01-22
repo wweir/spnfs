@@ -1784,6 +1784,10 @@ static void bc_connect(struct rpc_task *task)
 	BUG();
 }
 
+struct rpc_buffer {
+	size_t	len;
+	char	data[];
+};
 /*
  * Allocate a bunch of pages for a scratch buffer for the rpc code. The reason
  * we allocate pages instead doing a kmalloc like rpc_malloc is because we want
@@ -1792,18 +1796,18 @@ static void bc_connect(struct rpc_task *task)
 void *bc_malloc(struct rpc_task *task, size_t size)
 {
 	struct page *page;
-	struct rpc_rqst *req = task->tk_rqstp;
+	struct rpc_buffer *buf;
 
-	BUG_ON(size > PAGE_SIZE);
+	BUG_ON(size > PAGE_SIZE - sizeof(struct rpc_buffer));
 	page = alloc_page(GFP_KERNEL);
 
 	if (!page)
 		return NULL;
 
-	req->rq_buffer = page_address(page);
-	req->rq_bufsize = PAGE_SIZE;
+	buf = page_address(page);
+	buf->len = PAGE_SIZE;
 
-	return req->rq_buffer;
+	return buf->data;
 }
 
 /*
@@ -1811,14 +1815,13 @@ void *bc_malloc(struct rpc_task *task, size_t size)
  */
 void bc_free(void *buffer)
 {
-	struct rpc_rqst *req = container_of(buffer, struct rpc_rqst, rq_buffer);
+	struct rpc_buffer *buf;
 
-	free_pages((unsigned long)req->rq_buffer, get_order(req->rq_bufsize));
+	if (!buffer)
+		return;
 
-	req->rq_buffer = NULL;
-	req->rq_bufsize = 0;
-
-	return;
+	buf = container_of(buffer, struct rpc_buffer, data);
+	free_pages((unsigned long)buf, get_order(buf->len));
 }
 
 /*
