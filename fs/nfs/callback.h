@@ -72,6 +72,18 @@ struct cb_recallargs {
 
 #if defined(CONFIG_NFS_V4_1)
 
+#if defined(CONFIG_PNFS)
+struct cb_pnfs_layoutrecallargs {
+	struct sockaddr		*cbl_addr;
+	struct nfs_fh		cbl_fh;
+	struct nfs4_pnfs_layout_segment cbl_seg;
+	struct nfs_fsid		cbl_fsid;
+	uint32_t		cbl_recall_type;
+	uint32_t		cbl_layout_type;
+	uint32_t		cbl_layoutchanged;
+};
+#endif /* CONFIG_PNFS */
+
 struct referring_call {
 	uint32_t			rc_sequenceid;
 	uint32_t			rc_slotid;
