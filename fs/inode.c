@@ -81,6 +81,7 @@ static struct hlist_head *inode_hashtable __read_mostly;
  * the i_state of an inode while it is in use..
  */
 DEFINE_SPINLOCK(inode_lock);
+EXPORT_SYMBOL(inode_lock);
 
 /*
  * iprune_mutex provides exclusion between the kswapd or try_to_free_pages
@@ -245,6 +246,7 @@ void __iget(struct inode * inode)
 		list_move(&inode->i_list, &inode_in_use);
 	inodes_stat.nr_unused--;
 }
+EXPORT_SYMBOL(__iget);
 
 /**
  * clear_inode - clear an inode
