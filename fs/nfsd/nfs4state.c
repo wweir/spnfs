@@ -1185,6 +1185,9 @@ move_to_close_lru(struct nfs4_stateowner *sop)
 {
 	dprintk("NFSD: move_to_close_lru nfs4_stateowner %p\n", sop);
 
+	if (list_empty(&sop->so_close_lru))
+		return;
+
 	list_move_tail(&sop->so_close_lru, &close_lru);
 	sop->so_time = get_seconds();
 }
