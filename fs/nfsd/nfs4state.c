@@ -1044,11 +1044,11 @@ unhash_stateowner(struct nfs4_stateowner *sop)
 {
 	struct nfs4_stateid *stp;
 
-	list_del(&sop->so_idhash);
-	list_del(&sop->so_strhash);
+	list_del_init(&sop->so_idhash);
+	list_del_init(&sop->so_strhash);
 	if (sop->so_is_open_owner)
-		list_del(&sop->so_perclient);
-	list_del(&sop->so_perstateid);
+		list_del_init(&sop->so_perclient);
+	list_del_init(&sop->so_perstateid);
 	while (!list_empty(&sop->so_stateids)) {
 		stp = list_entry(sop->so_stateids.next,
 			struct nfs4_stateid, st_perstateowner);
