@@ -3080,6 +3080,9 @@ static int pnfs4_commit_done(struct rpc_task *task, struct nfs_write_data *data)
 
 	dprintk("--> %s task->tk_status %d\n", __func__, task->tk_status);
 
+	if (data->pnfsflags & PNFS_NO_RPC)
+		return 0;
+
 	/* Is this a DS session */
 	if (data->ds_nfs_client) {
 		dprintk("%s DS read\n", __func__);
