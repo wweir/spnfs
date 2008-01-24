@@ -248,6 +248,8 @@ struct rpc_clnt *rpc_create(struct rpc_create_args *args)
 		.timeout = args->timeout,
 #if defined(CONFIG_NFSD_V4_1)
 		.svsk = args->svsk
+#else
+		.svsk = NULL
 #endif
 	};
 	char servername[20];
