@@ -558,6 +558,14 @@ static __be32 process_op(uint32_t minorversion, int nop,
 		__func__, minorversion, nop, op_nr);
 #if defined(CONFIG_NFS_V4_1)
 	if (minorversion == 1) {
+		if (op_nr == OP_CB_SEQUENCE) {
+			if (nop != 1) {
+				status = htonl(NFS4ERR_SEQUENCE_POS);
+				goto out;
+			}
+		} else if (nop == 1)
+			status = htonl(NFS4ERR_OP_NOT_IN_SESSION);
+
 		switch (op_nr) {
 		case OP_CB_GETATTR:
 		case OP_CB_RECALL:
