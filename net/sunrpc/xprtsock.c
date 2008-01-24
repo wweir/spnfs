@@ -2061,7 +2061,7 @@ static int bc_send_request(struct rpc_task *task)
 	struct svc_sock         *svsk;
 	u32                     len;
 
-	dprintk("sending request with xid: %u\n", req->rq_xid);
+	dprintk("sending request with xid: %08x\n", ntohl(req->rq_xid));
 	/*
 	 * Get the server socket associated with this callback xprt
 	 */
