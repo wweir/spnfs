@@ -1063,7 +1063,7 @@ static void
 release_stateowner(struct nfs4_stateowner *sop)
 {
 	unhash_stateowner(sop);
-	list_del(&sop->so_close_lru);
+	list_del_init(&sop->so_close_lru);
 	nfs4_put_stateowner(sop);
 }
 
