@@ -4143,9 +4143,11 @@ alloc_init_layoutrecall(struct nfs4_layoutrecall *clone)
 
 	dprintk("NFSD %s clr %p clone %p\n", __FUNCTION__, clr, clone);
 
-	if (clone)
+	if (clone) {
 		memcpy(clr, clone, sizeof(*clr));
-	else
+		if (clr->clr_file)
+			get_nfs4_file(clr->clr_file);
+	} else
 		memset(clr, 0, sizeof(*clr));
 	kref_init(&clr->clr_ref);
 	INIT_LIST_HEAD(&clr->clr_perclnt);
@@ -4163,8 +4165,6 @@ hash_layoutrecall(struct nfs4_layoutrecall *clr)
 	dprintk("NFSD %s clr %p clp %p fp %p\n", __FUNCTION__, clr, clp, fp);
 	list_add(&clr->clr_perclnt, &clp->cl_layoutrecalls);
 	kref_get(&clr->clr_ref);
-	if (fp)
-		get_nfs4_file(fp);
 	dprintk("NFSD %s exit\n", __FUNCTION__);
 }
 
