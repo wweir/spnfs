@@ -2003,8 +2003,9 @@ static int bc_sendto(struct rpc_rqst *req)
 	if (total_len == xbufp->head[0].iov_len)
 		flags = 0;
 
-	len = sock->ops->sendpage(sock, virt_to_page(req->rq_buffer), 0,
-				  xbufp->head[0].iov_len, flags);
+	len = sock->ops->sendpage(sock, virt_to_page(xbufp->head[0].iov_base),
+			(unsigned long)xbufp->head[0].iov_base & ~PAGE_MASK,
+			xbufp->head[0].iov_len, flags);
 
 	if (len != xbufp->head[0].iov_len)
 		goto out;
@@ -2036,10 +2037,10 @@ static int bc_sendto(struct rpc_rqst *req)
 	 */
 	if (xbufp->tail[0].iov_len) {
 		result = sock->ops->sendpage(sock,
-					     virt_to_page(req->rq_buffer),
-					     xbufp->head[0].iov_len,
-					     xbufp->tail[0].iov_len,
-					     0);
+			xbufp->tail[0].iov_base,
+			(unsigned long)xbufp->tail[0].iov_base & ~PAGE_MASK,
+			xbufp->tail[0].iov_len,
+			0);
 
 		if (result > 0)
 			len += result;
