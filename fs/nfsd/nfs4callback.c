@@ -342,7 +342,7 @@ nfs41_xdr_enc_cb_recall(struct rpc_rqst *req, u32 *p,
 	struct nfs4_cb_recall *args = rpc_args->args_op;
 	struct nfs4_cb_compound_hdr hdr = {
 		.ident = args->cbr_ident,
-		.nops   = 1,
+		.nops   = 2,
 	};
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
