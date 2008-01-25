@@ -92,8 +92,8 @@ enum nfs_cb_opnum4 {
 					op_dec_sz)
 #if defined(CONFIG_PNFSD)
 #define NFS4_enc_cb_layout_sz		(cb_compound_enc_hdr_sz +       \
-					1 + enc_stateid_sz +            \
-					enc_nfs4_fh_sz)
+					1 + 3 +                         \
+					enc_nfs4_fh_sz + 4)
 
 #define NFS4_dec_cb_layout_sz		(cb_compound_dec_hdr_sz  +      \
 					op_dec_sz)
@@ -308,35 +308,44 @@ encode_cb_sequence(struct xdr_stream *xdr, struct nfs41_cb_sequence *args)
 
 #if defined(CONFIG_PNFSD)
 static int
-encode_cb_layout(struct xdr_stream *xdr, struct nfs4_cb_layout *lr)
+encode_cb_layout(struct xdr_stream *xdr, struct nfs4_layoutrecall *clr)
 {
 	u32 *p;
-	int len = lr->cbl_fhlen;
+	int len = clr->cb.cbl_recall_type == RECALL_FILE ?
+		  clr->clr_file->fi_fhlen : 0;
 
-	RESERVE_SPACE(48 + len);
+	RESERVE_SPACE(40 + len);
 
 	WRITE32(OP_CB_LAYOUT);
-	WRITE32(lr->cbl_layout_type);
-	WRITE32(lr->cbl_iomode);
-	WRITE32(lr->cbl_layoutchanged);
-	WRITE32(lr->cbl_recall_type);
-	if (lr->cbl_recall_type == RECALL_FSID) {
-		WRITE64(lr->cbl_fsid.major);
-		WRITE64(lr->cbl_fsid.minor);
-		dprintk("%s: type %d iomode %d changed %d recall_type %d fsid 0x%llx-0x%llx\n",
-			__FUNCTION__, lr->cbl_layout_type, lr->cbl_iomode,
-			lr->cbl_layoutchanged, lr->cbl_recall_type,
-			lr->cbl_fsid.major, lr->cbl_fsid.minor);
-	} else if (lr->cbl_recall_type == RECALL_FILE) {
+	WRITE32(clr->cb.cbl_seg.layout_type);
+	WRITE32(clr->cb.cbl_seg.iomode);
+	WRITE32(clr->cb.cbl_layoutchanged);
+	WRITE32(clr->cb.cbl_recall_type);
+	if (unlikely(clr->cb.cbl_recall_type == RECALL_FSID)) {
+		struct nfs4_fsid fsid = clr->clr_file->fi_fsid;
+		WRITE64(fsid.major);
+		WRITE64(fsid.minor);
+		dprintk("%s: type %x iomode %d changed %d recall_type %d "
+			"fsid 0x%llx-0x%llx\n",
+			__func__, clr->cb.cbl_seg.layout_type,
+			clr->cb.cbl_seg.iomode, clr->cb.cbl_layoutchanged,
+			clr->cb.cbl_recall_type, fsid.major, fsid.minor);
+	} else if (clr->cb.cbl_recall_type == RECALL_FILE) {
 		WRITE32(len);
-		WRITEMEM(lr->cbl_fhval, len);
-		WRITE64(lr->cbl_offset);
-		WRITE64(lr->cbl_length);
-		dprintk("%s: type %d iomode %d changed %d recall_type %d offset %lld length %lld\n",
-			__FUNCTION__, lr->cbl_layout_type, lr->cbl_iomode,
-			lr->cbl_layoutchanged, lr->cbl_recall_type,
-			lr->cbl_offset,	lr->cbl_length);
-	}
+		WRITEMEM(clr->clr_file->fi_fhval, len);
+		WRITE64(clr->cb.cbl_seg.offset);
+		WRITE64(clr->cb.cbl_seg.length);
+		dprintk("%s: type %x iomode %d changed %d recall_type %d "
+			"offset %lld length %lld\n",
+			__func__, clr->cb.cbl_seg.layout_type,
+			clr->cb.cbl_seg.iomode, clr->cb.cbl_layoutchanged,
+			clr->cb.cbl_recall_type,
+			clr->cb.cbl_seg.offset, clr->cb.cbl_seg.length);
+	} else
+		dprintk("%s: type %x iomode %d changed %d recall_type %d\n",
+			__func__, clr->cb.cbl_seg.layout_type,
+			clr->cb.cbl_seg.iomode, clr->cb.cbl_layoutchanged,
+			clr->cb.cbl_recall_type);
 	return 0;
 }
 #endif /* CONFIG_PNFSD */
@@ -369,12 +378,12 @@ nfs4_xdr_enc_cb_recall(struct rpc_rqst *req, __be32 *p, struct nfs4_cb_recall *a
 #if defined(CONFIG_PNFSD)
 static int
 nfs4_xdr_enc_cb_layout(struct rpc_rqst *req, u32 *p,
-		       struct nfs4_cb_layout *args)
+		       struct nfs4_layoutrecall *args)
 {
 	struct xdr_stream xdr;
 
 	struct nfs4_cb_compound_hdr hdr = {
-		.ident = args->cbl_ident,
+		.ident = 0,
 		.nops   = 1,
 	};
 
@@ -835,45 +844,31 @@ out_put_cred:
  * called with dp->dl_count inc'ed.
  * nfs4_lock_state() may or may not have been called.
  */
-void
-nfsd4_cb_layout(struct nfs4_cb_layout *cbl)
+int
+nfsd4_cb_layout(struct nfs4_layoutrecall *clr)
 {
-	struct nfs4_client *clp = cbl->cbl_client;
+	struct nfs4_client *clp = clr->clr_client;
 	struct rpc_clnt *clnt = NULL;
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_cb_procedures[NFSPROC4_CLNT_CB_LAYOUT],
-		.rpc_argp = cbl,
+		.rpc_argp = clr,
 	};
-	int retries = 1;
-	int status = 0;
 
 	if (clp)
 		clnt = clp->cl_callback.cb_client;
 
+	clr->clr_status = -EIO;
 	if ((!atomic_read(&clp->cl_callback.cb_set)) || !clnt)
-		return;
+		goto out;
 
-	status = rpc_call_sync(clnt, &msg, RPC_TASK_SOFT);
-	while (retries--) {
-		switch (status) {
-		case -EIO:
-			/* Network partition? */
-		case -EBADHANDLE:
-			break;
-		default:
-			goto out_put_cred;
-		}
-		ssleep(2);
-		status = rpc_call_sync(clnt, &msg, RPC_TASK_SOFT);
-	}
+	clr->clr_status = rpc_call_sync(clnt, &msg, RPC_TASK_SOFT);
 
-out_put_cred:
-	if (status == -EIO)
+	if (clr->clr_status == -EIO)
 		atomic_set(&clp->cl_callback.cb_set, 0);
+out:
 	/* Success or failure, now we're either waiting for lease expiration
 	   or layout_return. */
-	dprintk("NFSD: nfsd4_cb_layout: status %d\n", status);
-
-	return;
+	dprintk("NFSD: nfsd4_cb_layout: status %d\n", clr->clr_status);
+	return clr->clr_status;
 }
 #endif /* CONFIG_PNFSD */
