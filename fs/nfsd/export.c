@@ -383,13 +383,11 @@ EXPORT_SYMBOL(cb_change_state);
 static int cb_layout_recall(struct super_block *sb, struct inode *inode,
 			    void *p)
 {
-	struct nfs4_cb_layout *lr = (struct nfs4_cb_layout *)p;
+	struct nfsd4_pnfs_cb_layout *lr = p;
 
 	dprintk("cb_layout_recall lr %p\n", lr);
 
-	nfsd_layout_recall_cb(lr);
-
-	return 0;
+	return nfsd_layout_recall_cb(inode, lr);
 }
 EXPORT_SYMBOL(cb_layout_recall);
 #endif /* CONFIG_PNFSD */

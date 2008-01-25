@@ -216,6 +216,8 @@ struct nfs4_client {
 	struct list_head	cl_delegations;
 #if defined(CONFIG_PNFSD)
 	struct list_head	cl_layouts;	/* outstanding layouts */
+	struct list_head	cl_layoutrecalls; /* outstanding layoutrecall
+						     callbacks */
 #endif /* CONFIG_PNFSD */
 #if defined(CONFIG_NFSD_V4_1)
 	struct list_head	cl_sessions;
@@ -253,29 +255,24 @@ struct nfs4_fsid {
 
 #include <linux/nfsd/nfsd4_pnfs.h>
 
-struct nfs4_cb_layout {
-	struct super_block	*cbl_sb;
-	struct nfs4_client	*cbl_client;
-	u32			cbl_ident;
-	u32			cbl_recall_type;
-	u32			cbl_layout_type;
-	u32			cbl_iomode;
-	u32			cbl_layoutchanged;
-	u64			cbl_offset;
-	u64			cbl_length;
-	struct nfs_fsid		cbl_fsid;
-	u32			cbl_fhlen;
-	u32			cbl_fhval[NFS4_FHSIZE];
-};
-
 /* outstanding layout */
 struct nfs4_layout {
 	struct list_head	lo_perfile;	/* hash by f_id */
 	struct list_head	lo_perclnt;	/* hash by clientid */
-	struct list_head	lo_recall_lru; /* when in recall */
 	struct nfs4_file	*lo_file;	/* backpointer */
 	struct nfs4_client	*lo_client;
 	struct nfsd4_layout_seg lo_seg;
+};
+
+/* layoutrecall request (from exported filesystem) */
+struct nfs4_layoutrecall {
+	struct kref			clr_ref;
+	struct nfsd4_pnfs_cb_layout	cb;	/* request */
+	struct list_head		clr_perclnt; /* on cl_layoutrecalls */
+	struct nfs4_client	       *clr_client;
+	struct nfs4_file	       *clr_file;
+	int				clr_status;
+	struct timespec			clr_time;	/* last activity */
 };
 
 #endif /* CONFIG_PNFSD */
@@ -457,7 +454,7 @@ extern void nfs4_free_stateowner(struct kref *kref);
 extern void nfsd4_probe_callback(struct nfs4_client *clp);
 extern void nfsd4_cb_recall(struct nfs4_delegation *dp);
 #if defined(CONFIG_PNFSD)
-extern void nfsd4_cb_layout(struct nfs4_cb_layout *lp);
+extern int nfsd4_cb_layout(struct nfs4_layoutrecall *lp);
 #endif /* CONFIG_PNFSD */
 extern void nfs4_put_delegation(struct nfs4_delegation *dp);
 extern __be32 nfs4_make_rec_clidname(char *clidname, struct xdr_netobj *clname);
