@@ -445,11 +445,11 @@ static int check_export(struct inode *inode, int flags, unsigned char *uuid)
 		if (!inode->i_sb->s_export_op->layout_type)
 			inode->i_sb->s_export_op->layout_type =
 				spnfs_layout_type;
-		if (!inode->i_sb->s_export_op->get_devicelist)
-			inode->i_sb->s_export_op->get_devicelist =
-				spnfs_getdevicelist;
-		if (!inode->i_sb->s_export_op->get_deviceinfo)
-			inode->i_sb->s_export_op->get_deviceinfo =
+		if (!inode->i_sb->s_export_op->get_device_iter)
+			inode->i_sb->s_export_op->get_device_iter =
+				spnfs_getdeviceiter;
+		if (!inode->i_sb->s_export_op->get_device_info)
+			inode->i_sb->s_export_op->get_device_info =
 				spnfs_getdeviceinfo;
 		if (!inode->i_sb->s_export_op->propagate_open)
 			inode->i_sb->s_export_op->propagate_open =
