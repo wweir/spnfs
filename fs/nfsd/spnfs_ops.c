@@ -45,6 +45,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <linux/nfs_fs.h>
 #include <linux/nfs4.h>
+#include <linux/exportfs.h>
 #include <linux/nfsd4_spnfs.h>
 #include <linux/nfsd/state.h>
 #include <linux/nfsd/nfsd4_pnfs.h>
@@ -123,7 +124,9 @@ spnfs_layoutget(struct inode *inode, void *pnfs_layout_get_p)
 		lp->dev_layout_type = lgp->lg_type; /* XXX Should ask daemon */
 #endif
 		lp->dev_id = res.layoutget_res.flist[i].dev_id;
+#if 0
 		lp->dev_index = res.layoutget_res.flist[i].dev_index;
+#endif
 /*
 		lp->fhp = kmalloc(sizeof(*lp->fhp), GFP_KERNEL);
 		if (lp->fhp == NULL) {
@@ -174,128 +177,149 @@ spnfs_layoutreturn(struct inode *inode, void *pnfs_layout_return_p)
 }
 
 int
-spnfs_getdevicelist(struct super_block *sb, void *get_dev_list_arg_p)
+spnfs_getdeviceiter(struct super_block *sb, struct pnfs_deviter_arg *iter)
 {
 	struct spnfs *spnfs = global_spnfs;   /* XXX keep up the pretence */
 	struct spnfs_msg im;
 	union spnfs_msg_res res;
-
-	struct nfsd4_pnfs_getdevlist *gdlp = NULL;
-	struct nfsd4_pnfs_devlist *dlp = NULL, *item = NULL;
-	struct pnfs_filelayout_devaddr *fldap = NULL;
 	int status = 0;
-	int i = 0, count = 0, len = 0;
-	char *strp = NULL;
 
-	im.im_type = SPNFS_TYPE_GETDEVICELIST;
-	im.im_args.getdevicelist_args.inode = sb->s_root->d_inode->i_ino;
+	im.im_type = SPNFS_TYPE_GETDEVICEITER;
+	im.im_args.getdeviceiter_args.cookie = iter->cookie;
 
 	/* call function to queue the msg for upcall */
-	if (spnfs_upcall(spnfs, &im, &res) != 0) {
-		dprintk("failed spnfs upcall: getdevicelist\n");
-		status = -EIO;
-		goto gdevl_cleanup;
+	status = spnfs_upcall(spnfs, &im, &res);
+	if (status != 0) {
+		dprintk("%s spnfs upcall failure: %d\n", __FUNCTION__, status);
+		return -EIO;
 	}
-	count = res.getdevicelist_res.count;
+	status = res.getdeviceiter_res.status;
 
-	dlp = kmalloc(count * sizeof(*dlp), GFP_KERNEL);
-	if (!dlp) {
+	if (res.getdeviceiter_res.eof)
+		iter->eof = 1;
+	else {
+		iter->devid = res.getdeviceiter_res.devid;
+		iter->cookie = res.getdeviceiter_res.cookie;
+		iter->verf = res.getdeviceiter_res.verf;
+		iter->eof = 0;
+	}
+
+	return status;
+}
+
+/*
+ * Fill in an nfs4_1_file_layout_ds_addr4 structure with the device info
+ * that was gathered from userspace
+ */
+static int
+filldeviceinfo(struct spnfs_device *dev, struct pnfs_filelayout_device *fldev)
+{
+	struct pnfs_filelayout_multipath *mp = NULL;
+	struct pnfs_filelayout_devaddr *fldap = NULL;
+	int status = 0;
+	int i, len;
+
+	if (fldev == NULL)
+		return -EIO;
+
+	fldev->fl_stripeindices_list = NULL;
+	fldev->fl_device_list = NULL;
+
+	/*
+	 * Stripe count is the same as data server count for our purposes
+	 */
+	fldev->fl_stripeindices_length = dev->dscount;
+	fldev->fl_device_length = dev->dscount;
+
+	/* Set stripe indices */
+	fldev->fl_stripeindices_list =
+		kmalloc(fldev->fl_stripeindices_length * sizeof(u32),
+			GFP_KERNEL);
+	if (fldev->fl_stripeindices_list == NULL) {
 		status = -ENOMEM;
-		goto gdevl_cleanup;
+		goto cleanup;
 	}
+	for (i = 0; i < fldev->fl_stripeindices_length; i++)
+		fldev->fl_stripeindices_list[i] = i + 1;
 
-	gdlp = (struct nfsd4_pnfs_getdevlist *)get_dev_list_arg_p;
-	gdlp->gd_type = 1L;
-	gdlp->gd_cookie = 0LL;
-	gdlp->gd_verf = 0LL;
-	gdlp->gd_ops = sb->s_export_op;
-	gdlp->gd_devlist_len = res.getdevicelist_res.count;
-	gdlp->gd_devlist = dlp;
-	gdlp->gd_eof = 1;
-
-	item = dlp;
-	for (i = 0; i < count; i++) {
-		/*
-		 * Copy the device ID
-		 */
-		item->dev_id = res.getdevicelist_res.dlist[i].devid;
-
-		/*
-		 * Build the device address
-		 */
-		fldap = kmalloc(sizeof(*fldap), GFP_KERNEL);
-		if (!fldap) {
+	/*
+	 * Set the device's data server addresses  No multipath for spnfs,
+	 * so mp length is always 1.
+	 *
+	 */
+	fldev->fl_device_list =
+		kmalloc(fldev->fl_device_length *
+			sizeof(struct pnfs_filelayout_multipath),
+			GFP_KERNEL);
+	if (fldev->fl_device_list == NULL) {
+		status = -ENOMEM;
+		goto cleanup;
+	}
+	for (i = 0; i < fldev->fl_device_length; i++) {
+		mp = &fldev->fl_device_list[i];
+		mp->fl_multipath_length = 1;
+		mp->fl_multipath_list =
+			kmalloc(sizeof(struct pnfs_filelayout_devaddr),
+				GFP_KERNEL);
+		if (mp->fl_multipath_list == NULL) {
 			status = -ENOMEM;
-			goto gdevl_cleanup;
+			goto cleanup;
 		}
+		fldap = mp->fl_multipath_list;
 
 		/*
 		 * Copy the netid into the device address, for example: "tcp"
 		 */
-		strp = res.getdevicelist_res.dlist[i].netid;
-		len = strlen(strp);
+		len = strlen(dev->dslist[i].netid);
 		fldap->r_netid.data = kmalloc(len, GFP_KERNEL);
-		if (fldap->r_netid.data == NULL)
-			goto gdevl_cleanup;
-		memcpy(fldap->r_netid.data,
-			res.getdevicelist_res.dlist[i].netid, len);
+		if (fldap->r_netid.data == NULL) {
+			status = -ENOMEM;
+			goto cleanup;
+		}
+		memcpy(fldap->r_netid.data, dev->dslist[i].netid, len);
 		fldap->r_netid.len = len;
 
 		/*
 		 * Copy the network address into the device address,
 		 * for example: "10.35.9.16.08.01"
 		 */
-		strp = res.getdevicelist_res.dlist[i].addr;
-		len = strlen(strp);
+		len = strlen(dev->dslist[i].addr);
 		fldap->r_addr.data = kmalloc(len, GFP_KERNEL);
-		if (fldap->r_addr.data == NULL)
-			goto gdevl_cleanup;
-		memcpy(fldap->r_addr.data,
-		       res.getdevicelist_res.dlist[i].addr, len);
+		if (fldap->r_addr.data == NULL) {
+			status = -ENOMEM;
+			goto cleanup;
+		}
+		memcpy(fldap->r_addr.data, dev->dslist[i].addr, len);
 		fldap->r_addr.len = len;
-
-		item->dev_addr = fldap;
-
-		/*
-		 * Work on the next devlist item
-		 */
-		item++;
 	}
 
-	return status;
-
-gdevl_cleanup:
-	if (dlp) {
-		item = dlp;
-		for (i = 0; i < count; i++) {
-			fldap = item->dev_addr;
-			if (fldap) {
-				kfree(fldap->r_netid.data);
-				kfree(fldap->r_addr.data);
-			}
+cleanup:
+	kfree(fldev->fl_stripeindices_list);
+	if (fldev->fl_device_list) {
+		for (i = 0; i < fldev->fl_device_length; i++) {
+			fldap = fldev->fl_device_list[i].fl_multipath_list;
+			kfree(fldap->r_netid.data);
+			kfree(fldap->r_addr.data);
 			kfree(fldap);
-			item++;
 		}
-		kfree(dlp);
+		kfree(fldev->fl_device_list);
 	}
 
 	return status;
 }
 
 int
-spnfs_getdeviceinfo(struct super_block *sb, void *p)
+spnfs_getdeviceinfo(struct super_block *sb, struct pnfs_devinfo_arg *info)
 {
 	struct spnfs *spnfs = global_spnfs;
-	struct nfsd4_pnfs_getdevinfo *gdinfo;
 	struct spnfs_msg im;
 	union spnfs_msg_res res;
-	struct pnfs_filelayout_devaddr *fldap = NULL;
-	int len, status;
-	char *strp;
+	struct pnfs_filelayout_device *fldev = NULL;
+	int status;
 
-	gdinfo = (struct nfsd4_pnfs_getdevinfo *)p;
 	im.im_type = SPNFS_TYPE_GETDEVICEINFO;
-	im.im_args.getdeviceinfo_args.devid = gdinfo->gd_dev_id;
+	im.im_args.getdeviceinfo_args.devid = info->devid;
+
 	/* call function to queue the msg for upcall */
 	status = spnfs_upcall(spnfs, &im, &res);
 	if (status != 0) {
@@ -303,48 +327,23 @@ spnfs_getdeviceinfo(struct super_block *sb, void *p)
 		status = -EIO;
 		goto getdeviceinfo_out;
 	}
-	status = res.open_res.status;
+	status = res.getdeviceinfo_res.status;
 
-	gdinfo->gd_type = 1L;
-	gdinfo->gd_devlist_len = 1L; /* DMXXX why is there a len here? */
-
-	fldap = kmalloc(sizeof(*fldap), GFP_KERNEL);
-	if (!fldap) {
-		status = -ENOMEM;
-		fldap = NULL;
-		goto getdeviceinfo_out;
-	}
-	strp = res.getdeviceinfo_res.dinfo.netid;
-	len = strlen(strp);
-	fldap->r_netid.data = kmalloc(len, GFP_KERNEL);
-	if (fldap->r_netid.data == NULL) {
-		kfree(fldap);
-		status = -ENOMEM;
-		fldap = NULL;
-		goto getdeviceinfo_out;
-	}
-	memcpy(fldap->r_netid.data, res.getdeviceinfo_res.dinfo.netid, len);
-	fldap->r_netid.len = len;
-
-	/*
-	 * Copy the network address into the device address,
-	 * for example: "10.35.9.16.08.01"
-	 */
-	strp = res.getdeviceinfo_res.dinfo.addr;
-	len = strlen(strp);
-	fldap->r_addr.data = kmalloc(len, GFP_KERNEL);
-	if (fldap->r_addr.data == NULL) {
-		kfree(fldap->r_netid.data);
-		kfree(fldap);
-		fldap = NULL;
+	/* fill in the device data, i.e., nfs4_1_file_layout_ds_addr4 */
+	fldev = kmalloc(sizeof(struct pnfs_filelayout_device), GFP_KERNEL);
+	if (fldev == NULL) {
 		status = -ENOMEM;
 		goto getdeviceinfo_out;
 	}
-	memcpy(fldap->r_addr.data, res.getdeviceinfo_res.dinfo.addr, len);
-	fldap->r_addr.len = len;
+	status = filldeviceinfo(&res.getdeviceinfo_res.devinfo, fldev);
+	if (status != 0)
+		goto getdeviceinfo_out;
+
+	/* encode the device data */
+	status = info->func(&info->xdr, fldev);
 
 getdeviceinfo_out:
-	gdinfo->gd_devaddr = (void *)fldap;
+	kfree(fldev);
 	return status;
 }
 
