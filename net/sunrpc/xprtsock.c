@@ -923,7 +923,9 @@ static inline void xs_tcp_read_xid(struct sock_xprt *transport, struct xdr_skb_r
 	transport->tcp_flags &= ~TCP_RCV_COPY_XID;
 	transport->tcp_flags |= TCP_RCV_COPY_CALLDIR;
 	transport->tcp_copied = 4;
-	dprintk("RPC:       reading reply for XID %08x\n",
+	dprintk("RPC:       reading %s XID %08x\n",
+			(transport->tcp_calldir == RPC_REPLY) ? "reply for"
+							      : "request with",
 			ntohl(transport->tcp_xid));
 	xs_tcp_check_fraghdr(transport);
 }
@@ -952,7 +954,9 @@ static inline void xs_tcp_read_calldir(struct sock_xprt *transport,
 	transport->tcp_flags &= ~TCP_RCV_COPY_CALLDIR;
 	transport->tcp_flags |= TCP_RCV_COPY_DATA;
 	transport->tcp_copied += 4;
-	dprintk("RPC:       reading reply for CALL/REPLY flag %08x\n",
+	dprintk("RPC:       reading %s CALL/REPLY flag %08x\n",
+			(transport->tcp_calldir == RPC_REPLY) ? "reply for"
+							      : "request with",
 						ntohl(transport->tcp_calldir));
 	xs_tcp_check_fraghdr(transport);
 }
