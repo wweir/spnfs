@@ -229,7 +229,8 @@ struct sock_xprt {
 	 * State of TCP reply receive
 	 */
 	__be32			tcp_fraghdr,
-				tcp_xid;
+				tcp_xid,
+				tcp_calldir;	/* Is this a call or a reply? */
 
 	u32			tcp_offset,
 				tcp_reclen;
@@ -265,6 +266,7 @@ struct sock_xprt {
 #define TCP_RCV_COPY_FRAGHDR	(1UL << 1)
 #define TCP_RCV_COPY_XID	(1UL << 2)
 #define TCP_RCV_COPY_DATA	(1UL << 3)
+#define TCP_RCV_COPY_CALLDIR	(1UL << 4)
 
 static inline struct sockaddr *xs_addr(struct rpc_xprt *xprt)
 {
@@ -894,7 +896,7 @@ static inline void xs_tcp_read_fraghdr(struct rpc_xprt *xprt, struct xdr_skb_rea
 	transport->tcp_offset = 0;
 
 	/* Sanity check of the record length */
-	if (unlikely(transport->tcp_reclen < 4)) {
+	if (unlikely(transport->tcp_reclen < 8)) {
 		dprintk("RPC:       invalid TCP record fragment length\n");
 		xprt_force_disconnect(xprt);
 		return;
@@ -929,10 +931,43 @@ static inline void xs_tcp_read_xid(struct sock_xprt *transport, struct xdr_skb_r
 	if (used != len)
 		return;
 	transport->tcp_flags &= ~TCP_RCV_COPY_XID;
-	transport->tcp_flags |= TCP_RCV_COPY_DATA;
+	transport->tcp_flags |= TCP_RCV_COPY_CALLDIR;
 	transport->tcp_copied = 4;
-	dprintk("RPC:       reading reply for XID %08x\n",
+	dprintk("RPC:       reading %s XID %08x\n",
+			(transport->tcp_calldir == RPC_REPLY) ? "reply for"
+							      : "request with",
 			ntohl(transport->tcp_xid));
+	xs_tcp_check_fraghdr(transport);
+}
+
+static inline void xs_tcp_read_calldir(struct sock_xprt *transport,
+				       struct xdr_skb_reader *desc)
+{
+	size_t len, used;
+	u32 offset;
+	char *p;
+
+	/*
+	 * We want transport->tcp_offset to be 8 at the end of this routine
+	 * (4 bytes for the xid and 4 bytes for the call/reply flag).
+	 * When this function is called for the first time,
+	 * transport->tcp_offset is 4 (after having already read the xid).
+	 */
+	offset = transport->tcp_offset - sizeof(transport->tcp_xid);
+	len = sizeof(transport->tcp_calldir) - offset;
+	dprintk("RPC:       reading CALL/REPLY flag (%Zu bytes)\n", len);
+	p = ((char *) &transport->tcp_calldir) + offset;
+	used = xdr_skb_read_bits(desc, p, len);
+	transport->tcp_offset += used;
+	if (used != len)
+		return;
+	transport->tcp_flags &= ~TCP_RCV_COPY_CALLDIR;
+	transport->tcp_flags |= TCP_RCV_COPY_DATA;
+	transport->tcp_copied += 4;
+	dprintk("RPC:       reading %s CALL/REPLY flag %08x\n",
+			(transport->tcp_calldir == RPC_REPLY) ? "reply for"
+							      : "request with",
+						ntohl(transport->tcp_calldir));
 	xs_tcp_check_fraghdr(transport);
 }
 
@@ -1050,6 +1085,11 @@ static int xs_tcp_data_recv(read_descriptor_t *rd_desc, struct sk_buff *skb, uns
 		/* Read in the xid if necessary */
 		if (transport->tcp_flags & TCP_RCV_COPY_XID) {
 			xs_tcp_read_xid(transport, &desc);
+			continue;
+		}
+		/* Read in the call/reply flag */
+		if (transport->tcp_flags & TCP_RCV_COPY_CALLDIR) {
+			xs_tcp_read_calldir(transport, &desc);
 			continue;
 		}
 		/* Read in the request data */
