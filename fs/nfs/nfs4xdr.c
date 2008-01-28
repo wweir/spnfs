@@ -1660,7 +1660,7 @@ static int encode_sequence(struct xdr_stream *xdr,
 		__func__, args->sa_seqid, args->sa_slotid, args->sa_max_slotid,
 		args->sa_cache_this);
 	RESERVE_SPACE(NFS4_MAX_SESSIONID_LEN + 16);
-	WRITEMEM(args->sa_sessionid, NFS4_MAX_SESSIONID_LEN);
+	WRITEMEM(args->sa_sessionid.data, NFS4_MAX_SESSIONID_LEN);
 	WRITE32(args->sa_seqid);
 	WRITE32(args->sa_slotid);
 	WRITE32(args->sa_max_slotid);
@@ -4988,7 +4988,7 @@ static int decode_sequence(struct xdr_stream *xdr,
 		return status;
 
 	READ_BUF(NFS4_MAX_SESSIONID_LEN + 20);
-	COPYMEM(res->sr_sessionid, NFS4_MAX_SESSIONID_LEN);
+	COPYMEM(res->sr_sessionid.data, NFS4_MAX_SESSIONID_LEN);
 	READ32(res->sr_seqid);
 	READ32(res->sr_slotid);
 	READ32(res->sr_max_slotid);
