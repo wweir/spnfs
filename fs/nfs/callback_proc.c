@@ -146,9 +146,10 @@ struct recall_layout_threadargs {
 
 static int pnfs_recall_layout(void *data)
 {
-	struct inode *ino;
+	struct inode *inode, *ino;
 	struct nfs_client *clp;
 	struct nfs_server *server = NULL;
+	struct cb_pnfs_layoutrecallargs rl;
 	struct recall_layout_threadargs *args =
 		(struct recall_layout_threadargs *)data;
 	struct nfs4_pnfs_layoutreturn_arg lr_arg;
@@ -161,8 +162,13 @@ static int pnfs_recall_layout(void *data)
 		args->rl.cbl_fsid.major, args->rl.cbl_fsid.minor);
 
 	clp = args->clp;
+	inode = args->inode;
+	server = NFS_SERVER(inode);
+	rl = args->rl;
 	args->result = 0;
 	complete(&args->started);
+	args = NULL;
+	/* Note: args must not be used after this point!!! */
 
 /* FIXME: need barrier here:
    pause I/O to data servers
@@ -173,37 +179,37 @@ static int pnfs_recall_layout(void *data)
    then return layouts, resume after layoutreturns complete
  */
 
-	if (args->rl.cbl_recall_type == RECALL_FILE) {
-		pnfs_return_layout(args->inode, &args->rl.cbl_seg);
+	if (rl.cbl_recall_type == RECALL_FILE) {
+		pnfs_return_layout(inode, &rl.cbl_seg);
 		goto out;
 	}
 
-	args->rl.cbl_seg.offset = 0;
-	args->rl.cbl_seg.length = NFS4_LENGTH_EOF;
+	rl.cbl_seg.offset = 0;
+	rl.cbl_seg.length = NFS4_LENGTH_EOF;
 
 	/* FIXME: This loop is inefficient, running in O(|s_inodes|^2) */
-	while ((ino = nfs_layoutrecall_find_inode(clp, &args->rl)) != NULL) {
-		pnfs_return_layout(ino, &args->rl.cbl_seg);
+	while ((ino = nfs_layoutrecall_find_inode(clp, &rl)) != NULL) {
+		pnfs_return_layout(ino, &rl.cbl_seg);
 		iput(ino);
 	}
 
 	/* send final layoutreturn */
 	lr_arg.reclaim = 0;
-	lr_arg.layout_type = NFS_SERVER(args->inode)->pnfs_curr_ld->id;
-	lr_arg.return_type = args->rl.cbl_recall_type;
-	lr_arg.lseg = args->rl.cbl_seg;
-	lr_arg.inode = args->inode;
+	lr_arg.layout_type = server->pnfs_curr_ld->id;
+	lr_arg.return_type = rl.cbl_recall_type;
+	lr_arg.lseg = rl.cbl_seg;
+	lr_arg.inode = inode;
 
 	status = pnfs_return_layout_rpc(server, &lr_arg);
 	if (status)
 		printk(KERN_INFO
 		       "%s: ignoring pnfs_return_layout_rpc status=%d\n",
 		       __func__, status);
-	iput(args->inode);
+	iput(inode);
 
 out:
 	module_put_and_exit(0);
-	dprintk("%s: exit status %d\n", __func__, args->result);
+	dprintk("%s: exit status %d\n", __func__, 0);
 	return 0;
 }
 
