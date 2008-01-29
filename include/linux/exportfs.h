@@ -75,6 +75,15 @@ struct pnfs_deviter_arg {
 	u32 devid;	/* response */
 	u32 eof;	/* response */
 };
+
+struct nfsd4_layout_seg {
+	u64	clientid;
+	u32	layout_type;
+	u32	iomode;
+	u64	offset;
+	u64	length;
+};
+
 #endif /* CONFIG_PNFSD */
 
 struct fid {
