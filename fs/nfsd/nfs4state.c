@@ -4059,7 +4059,7 @@ init_layout(struct nfs4_layout *lp,
 	    struct nfs4_file *fp,
 	    struct nfs4_client *clp,
 	    struct svc_fh *current_fh,
-	    struct nfsd4_pnfs_layoutget *lg)
+	    struct nfsd4_layout_seg *seg)
 {
 	dprintk("pNFS %s: lp %p clp %p fp %p ino %p\n", __func__,
 		lp, clp, fp, fp->fi_inode);
@@ -4067,7 +4067,7 @@ init_layout(struct nfs4_layout *lp,
 	get_nfs4_file(fp);
 	lp->lo_client = clp;
 	lp->lo_file = fp;
-	memcpy(&lp->lo_seg, &lg->lg_seg, sizeof(lp->lo_seg));
+	memcpy(&lp->lo_seg, seg, sizeof(lp->lo_seg));
 	list_add_tail(&lp->lo_perclnt, &clp->cl_layouts);
 	list_add_tail(&lp->lo_perfile, &fp->fi_layouts);
 	dprintk("pNFS %s end\n", __func__);
@@ -4259,13 +4259,14 @@ same_fsid(struct nfs4_fsid *fsid, struct svc_fh *current_fh)
  * find a layout recall conflicting with the specified layoutget
  */
 static int
-is_layout_recalled(struct nfs4_client *clp, struct svc_fh *current_fh,
-		   struct nfsd4_pnfs_layoutget *lgp)
+is_layout_recalled(struct nfs4_client *clp,
+		   struct svc_fh *current_fh,
+		   struct nfsd4_layout_seg *seg)
 {
 	struct nfs4_layoutrecall *clr;
 
 	list_for_each_entry (clr, &clp->cl_layoutrecalls, clr_perclnt) {
-		if (clr->cb.cbl_seg.layout_type != lgp->lg_seg.layout_type)
+		if (clr->cb.cbl_seg.layout_type != seg->layout_type)
 			continue;
 		if (clr->cb.cbl_recall_type == RECALL_ALL)
 			return 1;
@@ -4276,8 +4277,8 @@ is_layout_recalled(struct nfs4_client *clp, struct svc_fh *current_fh,
 				continue;
 		}
 		BUG_ON(clr->cb.cbl_recall_type != RECALL_FILE);
-		if (clr->cb.cbl_seg.clientid == lgp->lg_seg.clientid &&
-		    lo_seg_overlapping(&clr->cb.cbl_seg, &lgp->lg_seg))
+		if (clr->cb.cbl_seg.clientid == seg->clientid &&
+		    lo_seg_overlapping(&clr->cb.cbl_seg, seg))
 			return 1;
 	}
 	return 0;
@@ -4324,17 +4325,18 @@ extend_layout(struct nfsd4_layout_seg *lo, struct nfsd4_layout_seg *lg)
 }
 
 static struct nfs4_layout *
-merge_layout(struct nfs4_file *fp, struct nfs4_client *clp,
-	     struct nfsd4_pnfs_layoutget *lgp)
+merge_layout(struct nfs4_file *fp,
+	     struct nfs4_client *clp,
+	     struct nfsd4_layout_seg *seg)
 {
 	struct nfs4_layout *lp;
 
 	list_for_each_entry (lp, &fp->fi_layouts, lo_perfile)
-		if (lp->lo_seg.layout_type == lgp->lg_seg.layout_type &&
-		    lp->lo_seg.clientid == lgp->lg_seg.clientid &&
-		    lp->lo_seg.iomode == lgp->lg_seg.iomode &&
-		    lo_seg_mergeable(&lp->lo_seg, &lgp->lg_seg)) {
-			extend_layout(&lp->lo_seg, &lgp->lg_seg);
+		if (lp->lo_seg.layout_type == seg->layout_type &&
+		    lp->lo_seg.clientid == seg->clientid &&
+		    lp->lo_seg.iomode == seg->iomode &&
+		    lo_seg_mergeable(&lp->lo_seg, seg)) {
+			extend_layout(&lp->lo_seg, seg);
 			return lp;
 		}
 
@@ -4360,7 +4362,7 @@ int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
 	if (!fp || !clp)
 		goto out;
 
-	if (is_layout_recalled(clp, current_fh, lgp)) {
+	if (is_layout_recalled(clp, current_fh, &lgp->lg_seg)) {
 		status = nfserr_recallconflict;
 		goto out;
 	}
@@ -4407,11 +4409,11 @@ int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
 	 * Can the new layout be merged into an existing one?
 	 * If so, free unused layout struct
 	 */
-	if (can_merge && merge_layout(fp, clp, lgp))
+	if (can_merge && merge_layout(fp, clp, &lgp->lg_seg))
 		goto out_freelayout;
 
 	/* Can't merge, so let's initialize this new layout */
-	init_layout(lp, fp, clp, current_fh, lgp);
+	init_layout(lp, fp, clp, current_fh, &lgp->lg_seg);
 out:
 	if (fp)
 		put_nfs4_file(fp);
