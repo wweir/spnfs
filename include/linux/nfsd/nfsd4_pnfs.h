@@ -60,14 +60,6 @@ struct nfsd4_pnfs_getdevinfo {
 	struct svc_fh	*gd_fhp;	/* response */
 };
 
-struct nfsd4_layout_seg {
-	u64			clientid;
-	u32			layout_type;
-	u32			iomode;
-	u64			offset;
-	u64			length;
-};
-
 struct nfsd4_pnfs_layoutget {
 	struct nfsd4_layout_seg	lg_seg;		/* request/response */
 	u32			lg_signal;	/* request */
