@@ -1044,12 +1044,10 @@ nfsd4_layoutget(struct svc_rqst *rqstp,
 		goto out;
 	}
 
-	/* set the export ops for encoding the devaddr */
-	lgp->lg_ops = sb->s_export_op;
-
+	/* Set up arguments so layout can be retrieved at encode time */
+	lgp->lg_fhp = current_fh;
 	lgp->lg_seg.clientid = *(u64 *)&current_ses->cs_sid.clientid;
-
-	status = nfs4_pnfs_get_layout(sb, current_fh, lgp);
+	status = nfs_ok;
 out:
 	return status;
 }
