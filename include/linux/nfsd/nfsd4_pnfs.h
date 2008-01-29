@@ -61,15 +61,11 @@ struct nfsd4_pnfs_getdevinfo {
 };
 
 struct nfsd4_pnfs_layoutget {
-	struct nfsd4_layout_seg	lg_seg;		/* request/response */
+	struct nfsd4_layout_seg	lg_seg;		/* request */
 	u32			lg_signal;	/* request */
 	u64			lg_minlength;	/* request */
-	u32			lg_mxcnt;	/* request */
-	struct export_operations *lg_ops;
-
-	struct knfsd_fh		*lg_fh;
-	u32			lg_return_on_close; /* response */
-	void			*lg_layout;	/* response callback encoded */
+	u32			lg_maxcount;	/* request */
+	struct svc_fh		*lg_fhp;	/* response */
 };
 
 struct nfsd4_pnfs_layoutcommit {
