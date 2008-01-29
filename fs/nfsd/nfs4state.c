@@ -4344,11 +4344,13 @@ merge_layout(struct nfs4_file *fp,
 	return NULL;
 }
 
-int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
-				struct nfsd4_pnfs_layoutget *lgp)
+int
+nfs4_pnfs_get_layout(struct svc_fh *current_fh,
+		     struct pnfs_layoutget_arg *args)
 {
 	int status = nfserr_layouttrylater;
 	struct inode *ino = current_fh->fh_dentry->d_inode;
+	struct super_block *sb = ino->i_sb;
 	int can_merge;
 	struct nfs4_file *fp;
 	struct nfs4_client *clp;
@@ -4358,18 +4360,18 @@ int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
 
 	nfs4_lock_state();
 	fp = find_alloc_file(ino, current_fh);
-	clp = find_confirmed_client((clientid_t *)&lgp->lg_seg.clientid);
+	clp = find_confirmed_client((clientid_t *)&args->seg.clientid);
 	dprintk("pNFS %s: fp %p clp %p \n", __FUNCTION__, fp, clp);
 	if (!fp || !clp)
 		goto out;
 
-	if (is_layout_recalled(clp, current_fh, &lgp->lg_seg)) {
+	if (is_layout_recalled(clp, current_fh, &args->seg)) {
 		status = nfserr_recallconflict;
 		goto out;
 	}
 
 	can_merge = sb->s_export_op->can_merge_layouts != NULL &&
-		    sb->s_export_op->can_merge_layouts(lgp->lg_seg.layout_type);
+		    sb->s_export_op->can_merge_layouts(args->seg.layout_type);
 
 	/* pre-alloc layout in case we can't merge after we call
 	 * the file system
@@ -4378,14 +4380,17 @@ int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
 	if (!lp)
 		goto out;
 
-	lgp->lg_fh = &current_fh->fh_handle;
-	status = sb->s_export_op->layout_get(current_fh->fh_dentry->d_inode,
-					     (void *)lgp);
-
-	dprintk("pNFS %s: status %d type %d maxcount %d "
+	dprintk("pNFS %s: pre-export type %d maxcount %d "
 		"iomode %d offset %llu length %lld\n",
-		__FUNCTION__, status, lgp->lg_seg.layout_type, lgp->lg_mxcnt,
-		lgp->lg_seg.iomode, lgp->lg_seg.offset, lgp->lg_seg.length);
+		__func__, args->seg.layout_type, args->xdr.maxcount,
+		args->seg.iomode, args->seg.offset, args->seg.length);
+
+	status = sb->s_export_op->layout_get(ino, args);
+
+	dprintk("pNFS %s: post-export status %d "
+		"iomode %u offset %llu length %llu\n",
+		__func__, status, args->seg.iomode,
+		args->seg.offset, args->seg.length);
 
 	if (status) {
 		switch (status) {
@@ -4410,11 +4415,11 @@ int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
 	 * Can the new layout be merged into an existing one?
 	 * If so, free unused layout struct
 	 */
-	if (can_merge && merge_layout(fp, clp, &lgp->lg_seg))
+	if (can_merge && merge_layout(fp, clp, &args->seg))
 		goto out_freelayout;
 
 	/* Can't merge, so let's initialize this new layout */
-	init_layout(lp, fp, clp, current_fh, &lgp->lg_seg);
+	init_layout(lp, fp, clp, current_fh, &args->seg);
 out:
 	if (fp)
 		put_nfs4_file(fp);
