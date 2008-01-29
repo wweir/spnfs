@@ -61,6 +61,7 @@
 #if defined(CONFIG_PNFSD)
 #include <linux/exportfs.h>
 #include <linux/nfs_xdr.h>
+#include <linux/nfsd/pnfsd.h>
 #endif /* CONFIG_PNFSD */
 
 #define NFSDDBG_FACILITY		NFSDDBG_XDR
@@ -1302,7 +1303,7 @@ nfsd4_decode_layoutget(struct nfsd4_compoundargs *argp,
 	READ64(lgp->lg_seg.offset);
 	READ64(lgp->lg_seg.length);
 	READ64(lgp->lg_minlength);
-	READ32(lgp->lg_mxcnt);
+	READ32(lgp->lg_maxcount);
 
 	DECODE_TAIL;
 }
@@ -3484,37 +3485,87 @@ u32            pnfs_layouttype4        type;
 u32  + len     opaque                  layout<>;
 */
 static __be32
-nfsd4_encode_layoutget(struct nfsd4_compoundres *resp, int nfserr,
+nfsd4_encode_layoutget(struct nfsd4_compoundres *resp,
+		       int nfserr,
 		       struct nfsd4_pnfs_layoutget *lgp)
 {
-	int len;
+	int maxcount, leadcount;
+	struct super_block *sb;
+	unsigned int *p_start = resp->p;
+	struct pnfs_layoutget_arg args;
 	ENCODE_HEAD;
 
+	dprintk("%s: err %d\n", __func__, nfserr);
 	if (nfserr)
 		return nfserr;
 
-	RESERVE_SPACE(32);
-	WRITE32(lgp->lg_return_on_close);
-	WRITE64(lgp->lg_seg.offset);
-	WRITE64(lgp->lg_seg.length);
-	WRITE32(lgp->lg_seg.iomode);
-	WRITE32(lgp->lg_seg.layout_type);
+	sb = lgp->lg_fhp->fh_dentry->d_inode->i_sb;
+	maxcount = PAGE_SIZE;
+	if (maxcount > lgp->lg_maxcount)
+		maxcount = lgp->lg_maxcount;
+
+	/* Check for space on xdr stream */
+	leadcount = 28;
+	RESERVE_SPACE(leadcount);
+	/* encode layout metadata after file system encodes layout */
+	p += XDR_QUADLEN(leadcount);
 	ADJUST_ARGS();
-	if (lgp->lg_ops->layout_encode == NULL &&
-	    lgp->lg_seg.layout_type == LAYOUT_NFSV4_FILES) {
-		len = filelayout_encode_layout(p, resp->end, lgp->lg_layout);
-		filelayout_free_layout(lgp->lg_layout);
-	} else {
-		len = lgp->lg_ops->layout_encode(p, resp->end, lgp->lg_layout);
-		lgp->lg_ops->layout_free(lgp->lg_layout);
+
+	/* Ensure have room for ret_on_close, off, len, iomode, type */
+	maxcount -= leadcount;
+	if (maxcount < 0) {
+		printk(KERN_ERR "%s: buffer too small\n", __func__);
+		return nfserr_toosmall;
 	}
-	if (len > 0) {
-		p += XDR_QUADLEN(len);
-		ADJUST_ARGS();
-	} else if (len < 0) /* check for error from underlying file system */
-		return nfserrno(len);
-	else
-		return nfserr_layoutunavailable;
+
+	/* Set the file layout encoding function.  Once other layout
+	 * types are added to the kernel they can be set here
+	 */
+	if (lgp->lg_seg.layout_type == LAYOUT_NFSV4_FILES)
+		args.func = filelayout_encode_layout;
+
+	/* Set args for call to fs */
+	args.minlength = lgp->lg_minlength;
+	args.seg = lgp->lg_seg;
+	args.fh = &lgp->lg_fhp->fh_handle;
+
+	/* Set xdr info so file system can encode layout */
+	args.xdr.p   = resp->p;
+	args.xdr.end = resp->end;
+	args.xdr.maxcount = maxcount;
+
+	/* Retrieve, encode, and merge layout */
+	nfserr = nfs4_pnfs_get_layout(lgp->lg_fhp, &args);
+	if (nfserr) {
+		printk(KERN_ERR "%s: export ERROR %d\n", __func__, nfserr);
+		return nfserrno(nfserr);
+	}
+
+	/* Ensure file system returned enough bytes for the client
+	 * to access.
+	 */
+	if (args.seg.length < lgp->lg_minlength)
+		return nfserr_badlayout;
+
+	/* The file system should never write 0 bytes without
+	 * returning an error
+	 */
+	BUG_ON(args.xdr.bytes_written <= 0);
+
+	/* Rewind to beginning and encode attrs */
+	p = p_start;
+	WRITE32(args.return_on_close);
+	WRITE64(args.seg.offset);
+	WRITE64(args.seg.length);
+	WRITE32(args.seg.iomode);
+	WRITE32(args.seg.layout_type);
+	ADJUST_ARGS();
+
+	/* Update the xdr stream with the number of bytes written
+	 * by the file system
+	 */
+	p += XDR_QUADLEN(args.xdr.bytes_written);
+	ADJUST_ARGS();
 
 	return nfs_ok;
 }
