@@ -4054,21 +4054,14 @@ free_layout(struct nfs4_layout *lp)
 	kmem_cache_free(pnfs_layout_slab, lp);
 }
 
-static struct nfs4_layout *
-alloc_init_layout(struct nfs4_layout *lp,
-		  struct nfs4_file *fp,
-		  struct nfs4_client *clp,
-		  struct svc_fh *current_fh,
-		  struct nfsd4_pnfs_layoutget *lg)
+static void
+init_layout(struct nfs4_layout *lp,
+	    struct nfs4_file *fp,
+	    struct nfs4_client *clp,
+	    struct svc_fh *current_fh,
+	    struct nfsd4_pnfs_layoutget *lg)
 {
-	dprintk("NFSD %s\n", __FUNCTION__);
-	if (!lp) {
-		lp = alloc_layout();
-		if (!lp)
-			return NULL;
-	}
-
-	dprintk("pNFS %s: lp %p clp %p fp %p ino %p\n", __FUNCTION__,
+	dprintk("pNFS %s: lp %p clp %p fp %p ino %p\n", __func__,
 		lp, clp, fp, fp->fi_inode);
 
 	get_nfs4_file(fp);
@@ -4077,8 +4070,7 @@ alloc_init_layout(struct nfs4_layout *lp,
 	memcpy(&lp->lo_seg, &lg->lg_seg, sizeof(lp->lo_seg));
 	list_add_tail(&lp->lo_perclnt, &clp->cl_layouts);
 	list_add_tail(&lp->lo_perfile, &fp->fi_layouts);
-	dprintk("NFSD %s return %p\n", __FUNCTION__, lp);
-	return lp;
+	dprintk("pNFS %s end\n", __func__);
 }
 
 static void
@@ -4358,9 +4350,8 @@ int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
 	struct nfs4_file *fp;
 	struct nfs4_client *clp;
 	struct nfs4_layout *lp = NULL;
-	struct nfsd4_pnfs_layoutreturn lr;
 
-	dprintk("NFSD: nfs4_pnfs_get_layout\n");
+	dprintk("NFSD: %s Begin\n", __func__);
 
 	nfs4_lock_state();
 	fp = find_alloc_file(ino, current_fh);
@@ -4377,16 +4368,16 @@ int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
 	can_merge = sb->s_export_op->can_merge_layouts != NULL &&
 		    sb->s_export_op->can_merge_layouts(lgp->lg_seg.layout_type);
 
-	if (!can_merge || list_empty(&fp->fi_layouts)) {
-		lp = alloc_layout();
-		if (!lp)
-			goto out;
-	}
+	/* pre-alloc layout in case we can't merge after we call
+	 * the file system
+	 */
+	lp = alloc_layout();
+	if (!lp)
+		goto out;
 
-	BUG_ON(!sb->s_export_op->layout_get);
 	lgp->lg_fh = &current_fh->fh_handle;
 	status = sb->s_export_op->layout_get(current_fh->fh_dentry->d_inode,
-				(void *)lgp);
+					     (void *)lgp);
 
 	dprintk("pNFS %s: status %d type %d maxcount %d "
 		"iomode %d offset %llu length %lld\n",
@@ -4409,42 +4400,27 @@ int nfs4_pnfs_get_layout(struct super_block *sb, struct svc_fh *current_fh,
 		default:
 			status = nfserr_layoutunavailable;
 		}
-		goto out;
+		goto out_freelayout;
 	}
 
-	/* can the new layout be merged into an existing one? */
+	/* SUCCESS!
+	 * Can the new layout be merged into an existing one?
+	 * If so, free unused layout struct
+	 */
 	if (can_merge && merge_layout(fp, clp, lgp))
-		goto out;
+		goto out_freelayout;
 
-	lp = alloc_init_layout(lp, fp, clp, current_fh, lgp);
-	if (lp) {
-		lp = NULL;	/* so it won't get freed */
-		goto out;	/* success! */
-	}
-
-	status = nfserr_layouttrylater;
-
-	/* free filesystem layout "cookie" */
-	if (lgp->lg_ops->layout_encode != NULL)
-		lgp->lg_ops->layout_free(lgp->lg_layout);
-	else if (lgp->lg_seg.layout_type == LAYOUT_NFSV4_FILES)
-		filelayout_free_layout(lgp->lg_layout);
-
-	/* simulate a layoutreturn for the newly layout */
-	memset(&lr, 0, sizeof(lr));
-	lr.lr_return_type = RETURN_FILE;
-	memcpy(&lr.lr_seg, &lgp->lg_seg, sizeof(lr.lr_seg));
-	lr.lr_flags = LR_FLAG_INTERN;
-	if (sb->s_export_op->layout_return)
-		sb->s_export_op->layout_return(ino, &lr);
+	/* Can't merge, so let's initialize this new layout */
+	init_layout(lp, fp, clp, current_fh, lgp);
 out:
-	if (lp)
-		free_layout(lp);
 	if (fp)
 		put_nfs4_file(fp);
 	nfs4_unlock_state();
 	dprintk("pNFS %s: lp %p exit status %d\n", __FUNCTION__, lp, status);
 	return status;
+out_freelayout:
+	free_layout(lp);
+	goto out;
 }
 
 static void
