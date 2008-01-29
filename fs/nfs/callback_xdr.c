@@ -268,7 +268,7 @@ static unsigned decode_pnfs_layoutrecall_args(struct svc_rqst *rqstp,
 		READ64(args->cbl_fsid.major);
 		READ64(args->cbl_fsid.minor);
 	}
-	dprintk("%s: ltype %d iomode %d changed %d recall_type %d "
+	dprintk("%s: ltype 0x%x iomode %d changed %d recall_type %d "
 		"fsid %llx-%llx\n", __func__,
 		args->cbl_layout_type, args->cbl_seg.iomode,
 		args->cbl_layoutchanged, args->cbl_recall_type,
