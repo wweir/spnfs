@@ -137,24 +137,47 @@ out:
 }
 EXPORT_SYMBOL(filelayout_encode_devinfo);
 
-/* File layout export_operations->layout_encode()  */
-__be32
-filelayout_encode_layout(u32 *p, u32 *end, void *layout)
+/* Encodes the loc_body structure from draft 13
+ * on the response stream.
+ * Use linux error codes (not nfs) since these values are being
+ * returned to the file system.
+ */
+int
+filelayout_encode_layout(struct pnfs_xdr_info *resp, void *layout)
 {
 	struct pnfs_filelayout_layout *flp = (struct pnfs_filelayout_layout *)layout;
-	u32 len = 0, *layoutlen_p, nfl_util, fhlen, i;
+	u32 len = 0, nfl_util, fhlen, i, leadcount;
+	u32 *layoutlen_p = resp->p;
+	int maxcount = resp->maxcount;
+	int error = 0, maxsize, fhmaxsize;
+	ENCODE_HEAD;
 
-	dprintk("filelayout_encode_layout: devid %u, fsi %u, numfh %u\n",
+	resp->bytes_written = 0; /* in case there is an error */
+
+	dprintk("%s: devid %u, fsi %u, numfh %u\n",
+		__func__,
 		flp->device_id,
 		flp->lg_first_stripe_index,
 		flp->lg_fh_length);
 
 	/* Ensure room for len, devid, util, and first_stripe_index */
-	if (p + XDR_QUADLEN(16) > end)
-		return -ENOMEM;
+	leadcount = 20;
+	RESERVE_SPACE(leadcount);
+
+	/* Ensure that there is enough space assuming the largest
+	 * possible file handle space is utilized
+	 */
+	fhmaxsize = flp->lg_fh_length * (4 + sizeof(struct knfsd_fh));
+	maxsize = leadcount + fhmaxsize;
+	maxcount -= maxsize;
+	if (maxcount < 0) {
+		dprintk("%s: Space_avail: %d Space_req: %d\n",
+			__func__, resp->maxcount, maxsize);
+		error = -ETOOSMALL;
+		goto out;
+	}
 
 	/* save spot for opaque file layout length, fill-in later*/
-	layoutlen_p = p;
 	p++;
 	len += 4;
 
@@ -178,43 +201,37 @@ filelayout_encode_layout(u32 *p, u32 *end, void *layout)
 	/* Ensure file system added at least one file handle */
 	if (flp->lg_fh_length <= 0) {
 		printk("%s: File Layout has no file handles!!\n", __FUNCTION__);
-		return -NFSERR_LAYOUTUNAVAILABLE;
+		error = -NFSERR_LAYOUTUNAVAILABLE;
+		goto out;
 	}
 
 	/* encode number of file handles */
-	if (p + XDR_QUADLEN(4) > end)
-		return -ENOMEM;
 	WRITE32(flp->lg_fh_length);
 	len += 4;
+	ADJUST_ARGS();
 
 	/* encode file handles */
 	for (i = 0; i < flp->lg_fh_length; i++) {
 		fhlen = flp->lg_fh_list[i].fh_size;
-		if (p + XDR_QUADLEN(4 + fhlen) > end)
-			return -ENOMEM;
+		RESERVE_SPACE(4 + fhlen);
 		WRITE32(fhlen);
 		WRITEMEM(&flp->lg_fh_list[i].fh_base, fhlen);
+		ADJUST_ARGS();
 		len += (4 + fhlen);
 	}
 
 	/* Set number of bytes encoded =  total_bytes_encoded - length var */
 	*layoutlen_p = htonl(len - 4);
 
-	return len;
+	/* update num bytes written */
+	resp->bytes_written = len;
+
+	error = 0;
+out:
+	dprintk("%s: End err %d xdrlen %d\n",
+		__func__, error, resp->bytes_written);
+	return error;
 }
 EXPORT_SYMBOL(filelayout_encode_layout);
-
-/* File layout export_operations->layout_free()  */
-void
-filelayout_free_layout(void *layout)
-{
-	struct pnfs_filelayout_layout *flp = (struct pnfs_filelayout_layout *)layout;
-
-	if (!flp || !flp->lg_fh_list)
-		return;
-
-	kfree(flp->lg_fh_list);
-}
-EXPORT_SYMBOL(filelayout_free_layout);
 
 #endif /* CONFIG_PNFSD */

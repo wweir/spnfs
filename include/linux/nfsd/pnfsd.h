@@ -87,8 +87,7 @@ struct pnfs_mds_id {
 int nfsd_layout_recall_cb(struct super_block *, struct inode *, struct nfsd4_pnfs_cb_layout *);
 int nfs4_pnfs_cb_get_state(struct super_block *, struct pnfs_get_state *);
 void nfs4_pnfs_state_init(void);
-int nfs4_pnfs_get_layout(struct super_block *, struct svc_fh *,
-						struct nfsd4_pnfs_layoutget *);
+int nfs4_pnfs_get_layout(struct svc_fh *, struct pnfs_layoutget_arg *);
 int nfs4_pnfs_return_layout(struct super_block *, struct svc_fh *,
 					struct nfsd4_pnfs_layoutreturn *);
 

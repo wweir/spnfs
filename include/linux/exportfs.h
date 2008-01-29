@@ -84,6 +84,24 @@ struct nfsd4_layout_seg {
 	u64	length;
 };
 
+/* Used by layout_get to encode layout (loc_body var in spec)
+ * Args:
+ * xdr - xdr stream
+ * layout - pointer to layout to be encoded
+ * TODO: use common func with dev?
+ */
+typedef int (*pnfs_encodelayout_t)(struct pnfs_xdr_info *xdr, void *layout);
+
+/* Arguments for layoutget */
+struct pnfs_layoutget_arg {
+	u64			minlength;	/* request */
+	pnfs_encodelayout_t 	func;		/* request */
+	struct knfsd_fh		*fh;		/* request/response */
+	struct nfsd4_layout_seg	seg;		/* request/response */
+	struct pnfs_xdr_info	xdr;		/* request/response */
+	u32			return_on_close;/* response */
+};
+
 #endif /* CONFIG_PNFSD */
 
 struct fid {
@@ -180,22 +198,17 @@ struct export_operations {
 	/* Retrieve all available devices via an iterator */
 	int (*get_device_iter) (struct super_block *sb,
 				struct pnfs_deviter_arg *arg);
-		/* pNFS: encodes opaque layout
-		 * Arg: resp - xdr buffer pointer
-		        layout - file system defined
-		 * Ret: new value of xdr buffer pointer
-		*/
-	int (*layout_encode)(u32 *p, u32 *end, void *layout);
-		/* pNFS: free's opaque layout
-		 * Arg: layout - file system defined
-		 */
-	void (*layout_free)(void *layout);
 		/* can layout segments be merged for this layout type? */
 	int (*can_merge_layouts)(u32 layout_type);
-		/* pNFS: returns the opaque layout
-		 * Arg: buf - struct nfsd4_pnfs_layoutget
-		 */
-	int (*layout_get) (struct inode *inode, void *buf);
+	/* Retrieve and encode a layout onto the xdr stream.
+	 * Args:
+	 * inode - inode for which to retrieve layout
+	 * arg.xdr - xdr stream for encoding
+	 * arg.func - Optional function called by file system to encode
+	 * layout on xdr stream.
+	 */
+	int (*layout_get) (struct inode *inode,
+			   struct pnfs_layoutget_arg *arg);
 		/* pNFS: commit changes to layout */
 	int (*layout_commit) (struct inode *inode, void *p);
 		/* pNFS: returns the layout */
