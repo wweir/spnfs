@@ -35,6 +35,7 @@ struct rpc_rqst *xprt_alloc_bc_request(struct rpc_xprt *xprt);
 void xprt_free_bc_request(struct rpc_rqst *req);
 int xprt_setup_backchannel(struct rpc_xprt *, unsigned int min_reqs);
 void xprt_destroy_backchannel(struct rpc_xprt *, int max_reqs);
+int bc_send(struct rpc_rqst *req);
 #endif /* CONFIG_NFS_V4_1 */
 #endif /* _LINUX_SUNRPC_BC_XPRT_H */
 
