@@ -1931,6 +1931,20 @@ static int nfs4_get_sb(struct file_system_type *fs_type,
 	}
 
 	if (s->s_fs_info != server) {
+#if defined(CONFIG_NFS_V4_1)
+		switch (server->nfs_client->cl_minorversion) {
+		case 1:
+			if (server->session) {
+				dprintk("%s Destroy session %p server %p\n",
+					__func__, server->session, server);
+				nfs4_proc_destroy_session(server);
+			}
+			break;
+		default:
+			/* Fall-through */
+			break;
+		}
+#endif /* CONFIG_NFS_V4_1 */
 		nfs_free_server(server);
 		server = NULL;
 	}
