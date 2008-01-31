@@ -165,8 +165,8 @@ EXPORT_SYMBOL_GPL(xprt_unregister_transport);
  */
 int xprt_reserve_xprt(struct rpc_task *task)
 {
-	struct rpc_xprt	*xprt = task->tk_xprt;
 	struct rpc_rqst *req = task->tk_rqstp;
+	struct rpc_xprt	*xprt = req->rq_xprt;
 
 	if (test_and_set_bit(XPRT_LOCKED, &xprt->state)) {
 		if (task == xprt->snd_task)
@@ -816,7 +816,7 @@ out_unlock:
 
 void xprt_end_transmit(struct rpc_task *task)
 {
-	xprt_release_write(task->tk_xprt, task);
+	xprt_release_write(task->tk_rqstp->rq_xprt, task);
 }
 
 /**
