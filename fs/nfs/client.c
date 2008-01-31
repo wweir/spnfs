@@ -121,12 +121,6 @@ static struct nfs_client *nfs_alloc_client(const struct nfs_client_initdata *cl_
 
 	clp->rpc_ops = cl_init->rpc_ops;
 
-	if (cl_init->rpc_ops->version == 4) {
-		if (nfs_callback_up() < 0)
-			goto error_2;
-		__set_bit(NFS_CS_CALLBACK, &clp->cl_res_state);
-	}
-
 	atomic_set(&clp->cl_count, 1);
 	clp->cl_cons_state = NFS_CS_INITING;
 
@@ -136,7 +130,7 @@ static struct nfs_client *nfs_alloc_client(const struct nfs_client_initdata *cl_
 	if (cl_init->hostname) {
 		clp->cl_hostname = kstrdup(cl_init->hostname, GFP_KERNEL);
 		if (!clp->cl_hostname)
-			goto error_3;
+			goto error_cleanup;
 	}
 
 	INIT_LIST_HEAD(&clp->cl_superblocks);
@@ -154,10 +148,7 @@ static struct nfs_client *nfs_alloc_client(const struct nfs_client_initdata *cl_
 
 	return clp;
 
-error_3:
-	if (__test_and_clear_bit(NFS_CS_CALLBACK, &clp->cl_res_state))
-		nfs_callback_down();
-error_2:
+error_cleanup:
 	kfree(clp);
 error_0:
 	return NULL;
@@ -1002,7 +993,15 @@ static int nfs4_init_client(struct nfs_client *clp,
 		goto error;
 	memcpy(clp->cl_ipaddr, ip_addr, sizeof(clp->cl_ipaddr));
 
-	/* XXX TODO: Need to start the callback server here */
+	/* Start the callback server */
+	error = nfs_callback_up(clp->cl_minorversion,
+		clp->cl_rpcclient->cl_xprt);
+	if (error < 0) {
+		dprintk("%s: failed to start callback. Error = %d\n",
+			__func__, error);
+		goto error;
+	}
+	__set_bit(NFS_CS_CALLBACK, &clp->cl_res_state);
 
 	error = nfs_idmap_new(clp);
 	if (error < 0) {
