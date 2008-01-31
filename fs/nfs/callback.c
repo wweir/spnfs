@@ -15,6 +15,9 @@
 #include <linux/nfs_fs.h>
 #include <linux/mutex.h>
 #include <linux/freezer.h>
+#if defined(CONFIG_NFS_V4_1)
+#include <linux/sunrpc/bc_xprt.h>
+#endif
 
 #include <net/inet_sock.h>
 
@@ -101,6 +104,62 @@ static void nfs4_callback_svc(struct svc_rqst *rqstp)
 	module_put_and_exit(0);
 }
 
+#if defined(CONFIG_NFS_V4_1)
+
+/*
+ * The callback service for NFSv4.1 callbacks
+ */
+static void nfs41_callback_svc(struct svc_rqst *rqstp)
+{
+	struct svc_serv *serv = rqstp->rq_server;
+	struct rpc_rqst *req;
+	int error;
+	DEFINE_WAIT(wq);
+
+	__module_get(THIS_MODULE);
+
+	lock_kernel();
+
+	nfs_callback_info.pid = current->pid;
+	daemonize("nfsv41-svc");
+	/* Process request with signals blocked, but allow SIGKILL.  */
+	allow_signal(SIGKILL);
+
+	complete(&nfs_callback_info.started);
+
+	for (;;) {
+		if (signalled()) {
+			if (nfs_callback_info.users == 0)
+				break;
+			flush_signals(current);
+		}
+
+		prepare_to_wait(&serv->sv_cb_waitq, &wq, TASK_INTERRUPTIBLE);
+		spin_lock_bh(&serv->sv_cb_lock);
+		if (!list_empty(&serv->sv_cb_list)) {
+			req = list_first_entry(&serv->sv_cb_list,
+					struct rpc_rqst, rq_bc_list);
+			list_del(&req->rq_bc_list);
+			spin_unlock_bh(&serv->sv_cb_lock);
+			dprintk("Invoking bc_svc_process()\n");
+			error = bc_svc_process(serv, req, rqstp);
+			dprintk("bc_svc_process() returned w/ error code= %d\n",
+				error);
+		} else {
+			spin_unlock_bh(&serv->sv_cb_lock);
+			schedule();
+		}
+		finish_wait(&serv->sv_cb_waitq, &wq);
+	}
+
+	svc_exit_thread(rqstp);
+	nfs_callback_info.pid = 0;
+	complete(&nfs_callback_info.stopped);
+	unlock_kernel();
+	module_put_and_exit(0);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 
 /*
  * Bring up the NFSv4 callback service
@@ -121,6 +180,25 @@ int nfs4_callback_up(struct svc_serv *serv)
 	return svc_create_thread(nfs4_callback_svc, serv);
 }
 
+#if defined(CONFIG_NFS_V4_1)
+/*
+ * Bring up the NFSv4.1 callback service
+ */
+int nfs41_callback_up(struct svc_serv *serv, struct rpc_xprt *xprt)
+{
+	/*
+	 * Save the svc_serv in the transport so that it can
+	 * be referenced when the session backchannel is initialized
+	 */
+	xprt->bc_serv = serv;
+
+	INIT_LIST_HEAD(&serv->sv_cb_list);
+	spin_lock_init(&serv->sv_cb_lock);
+	init_waitqueue_head(&serv->sv_cb_waitq);
+	return svc_create_thread(nfs41_callback_svc, serv);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 /*
  * Bring up the server process if it is not already up.
  */
@@ -128,6 +206,9 @@ int nfs_callback_up(int minorversion, void *args)
 {
 	struct svc_serv *serv = NULL;
 	int ret = 0;
+#if defined(CONFIG_NFS_V4_1)
+	struct rpc_xprt *xprt = (struct rpc_xprt *)args;
+#endif
 
 	lock_kernel();
 	mutex_lock(&nfs_callback_mutex);
@@ -144,6 +225,11 @@ int nfs_callback_up(int minorversion, void *args)
 	case 0:
 		ret = nfs4_callback_up(serv);
 		break;
+#if defined(CONFIG_NFS_V4_1)
+	case 1:
+		ret = nfs41_callback_up(serv, xprt);
+		break;
+#endif /* CONFIG_NFS_V4_1 */
 	}
 	if (ret < 0)
 		goto out_err;
