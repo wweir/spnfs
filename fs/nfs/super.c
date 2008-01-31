@@ -35,6 +35,7 @@
 #include <linux/sunrpc/metrics.h>
 #include <linux/sunrpc/xprtsock.h>
 #include <linux/sunrpc/xprtrdma.h>
+#include <linux/sunrpc/bc_xprt.h>
 #include <linux/nfs_fs.h>
 #include <linux/nfs_mount.h>
 #include <linux/nfs4_mount.h>
@@ -1935,6 +1936,11 @@ static int nfs4_get_sb(struct file_system_type *fs_type,
 		switch (server->nfs_client->cl_minorversion) {
 		case 1:
 			if (server->session) {
+				dprintk("%s Destroy backchannel for xprt %p\n",
+					__func__, server->client->cl_xprt);
+				xprt_destroy_backchannel(
+					server->client->cl_xprt,
+					NFS41_BC_MIN_CALLBACKS);
 				dprintk("%s Destroy session %p server %p\n",
 					__func__, server->session, server);
 				nfs4_proc_destroy_session(server);
@@ -1994,6 +2000,10 @@ static void nfs4_kill_super(struct super_block *sb)
 	switch (server->nfs_client->cl_minorversion) {
 	case 1:
 		if (server->session) {
+			dprintk("%s Destroy backchannel for xprt%p\n",
+				__func__, server->client->cl_xprt);
+			xprt_destroy_backchannel(server->client->cl_xprt,
+				NFS41_BC_MIN_CALLBACKS);
 			dprintk("%s Destroy session %p for nfs_server %p\n",
 				__func__, server->session, server);
 			nfs4_proc_destroy_session(server);
