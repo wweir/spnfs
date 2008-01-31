@@ -1732,6 +1732,11 @@ static int nfs4_get_sb(struct file_system_type *fs_type,
 		switch (server->nfs_client->cl_minorversion) {
 		case 1:
 			if (server->session) {
+				dprintk("%s Destroy backchannel for xprt%p\n",
+					__FUNCTION__, server->client->cl_xprt);
+				xprt_destroy_backchannel(
+					server->client->cl_xprt,
+					NFS41_BC_MIN_CALLBACKS);
 				dprintk("%s Destroy session %p/%p\n",
 					__FUNCTION__, server->session, server);
 				nfs4_proc_destroy_session(server);
@@ -1790,6 +1795,10 @@ static void nfs4_kill_super(struct super_block *sb)
 	switch (server->nfs_client->cl_minorversion) {
 	case 1:
 		if (server->session) {
+			dprintk("%s Destroy backchannel for xprt%p\n",
+				__FUNCTION__, server->client->cl_xprt);
+			xprt_destroy_backchannel(server->client->cl_xprt,
+				NFS41_BC_MIN_CALLBACKS);
 			dprintk("%s Destroy session %p/%p\n",
 				__FUNCTION__, server->session, server);
 			nfs4_proc_destroy_session(server);
