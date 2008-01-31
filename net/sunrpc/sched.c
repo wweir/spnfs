@@ -197,6 +197,7 @@ static void __rpc_remove_wait_queue(struct rpc_task *task)
 	BUG_ON(queue == NULL);
 	BUG_ON(entry->prev == NULL);
 	BUG_ON(entry->next == NULL);
+
 	if (RPC_IS_PRIORITY(queue))
 		__rpc_remove_wait_queue_priority(task);
 	else
@@ -885,7 +886,6 @@ struct rpc_task *rpc_new_task(struct rpc_clnt *clnt, int flags, const struct rpc
 out:
 	return task;
 }
-
 
 void rpc_put_task(struct rpc_task *task)
 {
