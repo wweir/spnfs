@@ -116,6 +116,7 @@ static void nfs41_callback_svc(struct svc_rqst *rqstp)
 {
 	struct svc_serv *serv = rqstp->rq_server;
 	struct rpc_rqst *req;
+	int error;
 	DEFINE_WAIT(wq);
 
 	__module_get(THIS_MODULE);
@@ -140,12 +141,13 @@ static void nfs41_callback_svc(struct svc_rqst *rqstp)
 		spin_lock_bh(&serv->sv_cb_lock);
 		if (!list_empty(&serv->sv_cb_list)) {
 			req = list_first_entry(&serv->sv_cb_list,
-					struct rpc_rqst, rq_list);
-			list_del(&req->rq_list);
+					struct rpc_rqst, rq_bc_list);
+			list_del(&req->rq_bc_list);
 			spin_unlock_bh(&serv->sv_cb_lock);
-			dprintk("Need to invoke bc_process() here\n");
-			dprintk("Freeing the bc_request for now\n");
-			xprt_free_bc_request(req);
+			dprintk("Invoking bc_svc_process()\n");
+			error = bc_svc_process(serv, req, rqstp);
+			dprintk("bc_svc_process() returned w/ error code= %d\n",
+				error);
 		} else {
 			spin_unlock_bh(&serv->sv_cb_lock);
 			schedule();
