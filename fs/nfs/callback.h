@@ -70,6 +70,14 @@ extern void nfs_callback_down(void);
 #define nfs_callback_down()	do {} while(0)
 #endif
 
+#ifdef CONFIG_NFS_V4_1
+/*
+ * Callbacks are expected to not cause substantial latency,
+ * so we limit their concurrency to 1.
+ */
+#define NFS41_BC_MIN_CALLBACKS 1
+#endif /* CONFIG_NFS_V4_1 */
+
 extern unsigned int nfs_callback_set_tcpport;
 extern unsigned short nfs_callback_tcpport;
 
