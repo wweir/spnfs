@@ -3292,7 +3292,7 @@ nfsd4_encode_devlist_iterator(struct nfsd4_compoundres *resp,
 		/* Check for err or not enough space to enc a single dev */
 		nfserr = nfserrno(nfserr);
 		switch (nfserr) {
-		case NFS4_OK:
+		case nfs_ok:
 			/* tally the number of total bytes written so far */
 			*bytes_written += info_arg.xdr.bytes_written;
 			(*dev_count)++;
@@ -3305,7 +3305,7 @@ nfsd4_encode_devlist_iterator(struct nfsd4_compoundres *resp,
 			gdevl->gd_cookie = iter_arg.cookie;
 			gdevl->gd_verf = iter_arg.verf;
 			break;
-		case NFSERR_TOOSMALL:
+		case nfserr_toosmall:
 			/* Not enough space for current device
 			 * If we have encoded > 1 device, ok
 			 * If we haven't encoded at least 1 device, error
