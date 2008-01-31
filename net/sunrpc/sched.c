@@ -191,8 +191,12 @@ static void __rpc_remove_wait_queue_priority(struct rpc_task *task)
 static void __rpc_remove_wait_queue(struct rpc_task *task)
 {
 	struct rpc_wait_queue *queue;
+	struct list_head *entry = &task->u.tk_wait.list;
 	queue = task->u.tk_wait.rpc_waitq;
 
+	BUG_ON(queue == NULL);
+	BUG_ON(entry->prev == NULL);
+	BUG_ON(entry->next == NULL);
 	if (RPC_IS_PRIORITY(queue))
 		__rpc_remove_wait_queue_priority(task);
 	else
