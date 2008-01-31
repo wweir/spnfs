@@ -4758,9 +4758,37 @@ out:
 	return status;
 }
 
+/*
+ * Issue the over-the-wire RPC DESTROY_SESSION.
+ * The caller must serialize access to this routine.
+ */
 int nfs4_proc_destroy_session(struct nfs_server *sp)
 {
-	return -1;	/* stub */
+	int status = 0;
+	struct rpc_message msg;
+
+	dprintk("--> nfs4_proc_destroy_session\n");
+	BUG_ON(sp == NULL);
+	BUG_ON(sp->session == NULL);
+
+	msg.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_DESTROY_SESSION];
+	msg.rpc_argp = sp->session;
+	msg.rpc_resp = NULL;
+	msg.rpc_cred = NULL;
+	status = rpc_call_sync(sp->nfs_client->cl_rpcclient, &msg, 0);
+
+	if (status)
+		printk(KERN_WARNING
+		      "Got error %d from the server on DESTROY_SESSION. "
+		      "Session has been destroyed regardless...\n", status);
+	/*
+	 * Since the caller has serialized access to this routine I don't
+	 * grab a lock to modify the expired value.
+	 */
+	nfs41_set_session_expired(sp->session);	/* Mark session as expired */
+
+	dprintk("<-- nfs4_proc_destroy_session\n");
+	return status;
 }
 
 static int nfs4_proc_sequence(struct nfs_client *clp, struct rpc_cred *cred)
