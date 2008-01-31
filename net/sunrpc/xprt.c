@@ -12,8 +12,9 @@
  *  -	Next, the caller puts together the RPC message, stuffs it into
  *	the request struct, and calls xprt_transmit().
  *  -	xprt_transmit sends the message and installs the caller on the
- *	transport's wait list. At the same time, it installs a timer that
- *	is run after the packet's timeout has expired.
+ *	transport's wait list. At the same time, if a reply is expected,
+ *	it installs a timer that is run after the packet's timeout has
+ *	expired.
  *  -	When a packet arrives, the data_ready handler walks the list of
  *	pending requests for that transport. If a matching XID is found, the
  *	caller is woken up, and the timer removed.
@@ -45,6 +46,8 @@
 
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/metrics.h>
+
+#include "sunrpc.h"
 
 /*
  * Local variables
@@ -834,7 +837,10 @@ void xprt_transmit(struct rpc_task *task)
 	dprintk("RPC: %5u xprt_transmit(%u)\n", task->tk_pid, req->rq_slen);
 
 	if (!req->rq_received) {
-		if (list_empty(&req->rq_list)) {
+		if (list_empty(&req->rq_list) && rpc_reply_expected(task)) {
+			/*
+			 * Add to the list only if we're expecting a reply
+			 */
 			spin_lock_bh(&xprt->transport_lock);
 			/* Update the softirq receive buffer */
 			memcpy(&req->rq_private_buf, &req->rq_rcv_buf,
@@ -863,8 +869,13 @@ void xprt_transmit(struct rpc_task *task)
 		/* Don't race with disconnect */
 		if (!xprt_connected(xprt))
 			task->tk_status = -ENOTCONN;
-		else if (!req->rq_received)
+		else if ((!req->rq_received) && rpc_reply_expected(task)) {
+			/*
+			 * Sleep on the pending queue since
+			 * we're expecting a reply.
+			 */
 			rpc_sleep_on(&xprt->pending, task, NULL, xprt_timer);
+		}
 		spin_unlock_bh(&xprt->transport_lock);
 		return;
 	}
@@ -947,11 +958,15 @@ static void xprt_request_init(struct rpc_task *task, struct rpc_xprt *xprt)
  */
 void xprt_release(struct rpc_task *task)
 {
-	struct rpc_xprt	*xprt = task->tk_xprt;
+	struct rpc_xprt	*xprt;
 	struct rpc_rqst	*req;
+	int prealloc;
 
+	BUG_ON(atomic_read(&task->tk_count) < 0);
 	if (!(req = task->tk_rqstp))
 		return;
+	prealloc = bc_prealloc(req);	/* Preallocated backchannel request? */
+	xprt = req->rq_xprt;
 	rpc_count_iostats(task);
 	spin_lock_bh(&xprt->transport_lock);
 	xprt->ops->release_xprt(xprt, task);
@@ -964,10 +979,19 @@ void xprt_release(struct rpc_task *task)
 		mod_timer(&xprt->timer,
 				xprt->last_used + xprt->idle_timeout);
 	spin_unlock_bh(&xprt->transport_lock);
-	xprt->ops->buf_free(req->rq_buffer);
+	if (!bc_prealloc(req))
+		xprt->ops->buf_free(req->rq_buffer);
 	task->tk_rqstp = NULL;
 	if (req->rq_release_snd_buf)
 		req->rq_release_snd_buf(req);
+
+	/*
+	 * Early exit if this is a backchannel preallocated request.
+	 * There is no need to have it added to the RPC slot list.
+	 */
+	if (prealloc)
+		return;
+
 	memset(req, 0, sizeof(*req));	/* mark unused */
 
 	dprintk("RPC: %5u release request %p\n", task->tk_pid, req);
