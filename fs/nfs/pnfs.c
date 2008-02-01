@@ -344,6 +344,31 @@ put_unlock_current_layout(struct nfs_inode *nfsi,
 	spin_unlock(&nfsi->lo_lock);
 }
 
+static inline void
+init_lseg(struct pnfs_layout_type *lo, struct pnfs_layout_segment *lseg)
+{
+	INIT_LIST_HEAD(&lseg->fi_list);
+	kref_init(&lseg->kref);
+	lseg->layout = lo;
+}
+
+static void
+destroy_lseg(struct kref *kref)
+{
+	struct pnfs_layout_segment *lseg =
+		container_of(kref, struct pnfs_layout_segment, kref);
+
+	PNFS_LD_IO_OPS(lseg->layout)->free_lseg(lseg);
+}
+
+static inline void
+put_lseg(struct pnfs_layout_segment *lseg)
+{
+	if (!lseg)
+		return;
+	kref_put(&lseg->kref, destroy_lseg);
+}
+
 /*
 * Get layout from server.
 *    for now, assume that whole file layouts are requested.
