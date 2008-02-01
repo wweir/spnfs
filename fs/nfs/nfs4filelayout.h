@@ -127,4 +127,24 @@ nfs4_pnfs_device_item_get(struct inode *inode, u32 dev_id);
 	p += XDR_QUADLEN(nbytes);		\
 } while (0)
 
+extern void nfs_execute_read(struct nfs_read_data *);
+extern void nfs_readdata_release(void *);
+extern int nfs_flush_task_priority(int);
+extern void nfs_writedata_release(void *);
+extern void nfs_execute_write(struct nfs_write_data *);
+extern void nfs_commit_rpcsetup(struct nfs_write_data *, int);
+extern struct nfs_write_data *nfs_commit_alloc(void);
+extern void nfs_commit_free(struct nfs_write_data *);
+extern void nfs_initiate_write(struct nfs_write_data *, struct rpc_clnt *,
+			       const struct rpc_call_ops *, int);
+extern void nfs_initiate_read(struct nfs_read_data *, struct rpc_clnt *,
+			      const struct rpc_call_ops *);
+extern void nfs_initiate_commit(struct nfs_write_data *, struct rpc_clnt *,
+				int);
+extern int nfs_read_validate(struct rpc_task *, void *);
+extern void nfs_readdata_release(void *);
+extern int nfs_write_validate(struct rpc_task *, void *);
+extern int nfs_flush_one(struct inode *, struct list_head *, unsigned int,
+			 size_t, int);
+
 #endif /* FS_NFS_NFS4FILELAYOUT_H */
