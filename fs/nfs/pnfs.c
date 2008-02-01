@@ -493,8 +493,8 @@ pnfs_update_layout(struct inode *ino,
 
 	result = get_layout(ino, ctx, &arg, &res);
 	if (result) {
-		printk(KERN_ERR "%s: ERROR retrieving layout %d\n",
-		       __func__, result);
+		dprintk("%s: ERROR retrieving layout %d\n",
+			__func__, result);
 
 		switch (result) {
 		case -ENOENT:	/* NFS4ERR_BADLAYOUT */
@@ -1016,8 +1016,7 @@ pnfs_readpages(struct nfs_read_data *rdata)
 				    args->offset,
 				    IOMODE_READ);
 	if (status) {
-		printk(KERN_WARNING
-		       "%s: ERROR %d from virtual_update_layout\n",
+		dprintk("%s: ERROR %d from pnfs_update_layout\n",
 			__func__, status);
 		status = 1;
 		goto out;
