@@ -370,9 +370,8 @@ destroy_lseg(struct kref *kref)
 {
 	struct pnfs_layout_segment *lseg =
 		container_of(kref, struct pnfs_layout_segment, kref);
-	struct pnfs_layout_type *lo = lseg->layout;
 
-	PNFS_LD_IO_OPS(lo)->free_lseg(lo, lseg);
+	PNFS_LD_IO_OPS(lseg->layout)->free_lseg(lseg);
 }
 
 static inline void
