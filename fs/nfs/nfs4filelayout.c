@@ -664,10 +664,9 @@ filelayout_alloc_lseg(struct pnfs_layout_type *layoutid,
 }
 
 static void
-filelayout_free_lseg(struct pnfs_layout_type *layoutid,
-		     struct pnfs_layout_segment *lseg)
+filelayout_free_lseg(struct pnfs_layout_segment *lseg)
 {
-	struct nfs4_filelayout *flo = PNFS_LD_DATA(layoutid);
+	struct nfs4_filelayout *flo = PNFS_LD_DATA(lseg->layout);
 	struct nfs4_filelayout_segment *fls = LSEG_LD_DATA(&flo->pnfs_lseg);
 
 	memset(fls, 0, sizeof(*fls));
