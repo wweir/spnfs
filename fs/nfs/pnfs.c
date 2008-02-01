@@ -859,7 +859,7 @@ pnfs_update_layout(struct inode *ino,
 	BUG_ON(nfsi->current_layout != layout_new);
 
 	if (result) {
-		printk(KERN_ERR "%s: ERROR retrieving layout %d\n",
+		dprintk("%s: ERROR retrieving layout %d\n",
 		       __FUNCTION__, result);
 
 		switch (result) {
@@ -1440,8 +1440,7 @@ pnfs_readpages(struct nfs_read_data *rdata)
 				    IOMODE_READ,
 				    &lseg);
 	if (status) {
-		printk(KERN_WARNING
-		       "%s: ERROR %d from pnfs_update_layout\n",
+		dprintk("%s: ERROR %d from pnfs_update_layout\n",
 			__FUNCTION__, status);
 		status = 1;
 		goto out;
