@@ -214,7 +214,6 @@ struct export_operations {
 		/* pNFS: returns the layout */
 	int (*layout_return) (struct inode *inode, void *p);
 
-
 		/* callback from fs on MDS only */
 	int (*cb_get_state) (struct super_block *sb, void *state);
 	int (*cb_layout_recall) (struct super_block *sb, struct inode *inode, void *p);

@@ -173,6 +173,21 @@ struct nfs_inode {
 	struct nfs_delegation	*delegation;
 	int			 delegation_state;
 	struct rw_semaphore	rwsem;
+
+	/* pNFS layout information */
+#if defined(CONFIG_PNFS)
+	u32 pnfs_layout_state;
+#define NFS_INO_LAYOUT_FAILED	0x0001	/* get layout failed, stop trying */
+	time_t pnfs_layout_suspend;
+	struct pnfs_layout_type *current_layout;
+	/* use rpc_creds in this open_context to send LAYOUTCOMMIT to MDS */
+	struct nfs_open_context *layoutcommit_ctx;
+	/* DH: These vars keep track of the maximum write range
+	 * so the values can be used for layoutcommit.
+	 */
+	loff_t			pnfs_write_begin_pos;
+	loff_t			pnfs_write_end_pos;
+#endif /* CONFIG_PNFS */
 #endif /* CONFIG_NFS_V4*/
 	struct inode		vfs_inode;
 };
@@ -579,6 +594,9 @@ extern void * nfs_root_data(void);
 #define NFSDBG_CALLBACK		0x0100
 #define NFSDBG_CLIENT		0x0200
 #define NFSDBG_MOUNT		0x0400
+#define NFSDBG_PNFS		0x0800
+#define NFSDBG_FILELAYOUT	0x1000
+#define NFSDBG_IO		0x2000
 #define NFSDBG_ALL		0xFFFF
 
 #ifdef __KERNEL__
