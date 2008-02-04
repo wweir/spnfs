@@ -4998,4 +4998,33 @@ err:
 	return status;
 }
 
+int nfs4_pnfs_propagate_open(struct super_block *sb, struct svc_fh *current_fh,
+				void *p)
+{
+	int status = 0;
+	struct nfsd4_pnfs_open poa;
+	struct nfsd4_open *openp = NULL;
+
+	if (sb->s_export_op->propagate_open) {
+		openp = (struct nfsd4_open *)p;
+		poa.op_create = openp->op_create;
+		poa.op_createmode = openp->op_createmode;
+		poa.op_truncate = openp->op_truncate;
+		status = sb->s_export_op->propagate_open(
+			current_fh->fh_dentry->d_inode, &poa);
+		if (status) {
+			printk(KERN_WARNING
+			"nfsd: pNFS could not be enabled for inode: %ld\n",
+			current_fh->fh_dentry->d_inode->i_ino);
+			/*
+			* XXX When there's a failure then need to indicate to
+			* future ops that no pNFS is available.  Should I
+			* save the status in the inode?  It's kind of a big
+			* hammer.  But there may be no stripes available?
+			*/
+		}
+	}
+	return status;
+}
+
 #endif /* CONFIG_PNFSD */

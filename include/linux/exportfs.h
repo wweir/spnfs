@@ -235,6 +235,9 @@ struct export_operations {
 	int (*get_state) (struct inode *inode, void *fh, void *state);
 		/* callback from fs on DS only */
 	int (*cb_change_state) (void *p);
+
+		/* pNFS: spnfs calls */
+	int (*propagate_open) (struct inode *inode, void *p);
 #endif /* CONFIG_PNFSD */
 };
 

@@ -237,6 +237,35 @@ getdeviceinfo_out:
 	return status;
 }
 
+int
+spnfs_open(struct inode *inode, void *p)
+{
+	struct spnfs *spnfs = global_spnfs; /* keep up the pretence */
+	struct spnfs_msg im;
+	union spnfs_msg_res res;
+	struct nfsd4_pnfs_open *poa;
+	int status = 0;
+
+	poa = (struct nfsd4_pnfs_open *)p;
+	im.im_type = SPNFS_TYPE_OPEN;
+	im.im_args.open_args.inode = inode->i_ino;
+	im.im_args.open_args.create = poa->op_create;
+	im.im_args.open_args.createmode = poa->op_createmode;
+	im.im_args.open_args.truncate = poa->op_truncate;
+
+	/* call function to queue the msg for upcall */
+	status = spnfs_upcall(spnfs, &im, &res);
+	if (status != 0) {
+		dprintk("%s spnfs upcall failure: %d\n", __FUNCTION__, status);
+		status = -EIO;
+		goto open_out;
+	}
+	status = res.open_res.status;
+
+open_out:
+	return status;
+}
+
 /* DMXXX: this is only a test function atm.  Unrelated to close. */
 int
 spnfs_close(void)
