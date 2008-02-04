@@ -14,6 +14,7 @@
 struct nfs_iostats;
 struct nlm_host;
 
+
 /*
  * The nfs_client identifies our client state to the server.
  */
@@ -81,6 +82,9 @@ struct nfs_client {
 	u32			cl_exchange_flags;
 	struct rpc_cred		*cl_ex_cred;	/* exchange_id credential */
 #endif
+#ifdef CONFIG_PNFS
+	struct nfs4_session *	cl_ds_session; /* pNFS data server session */
+#endif /* CONFIG_PNFS */
 };
 
 /*
@@ -131,6 +135,20 @@ struct nfs_server {
 #ifdef CONFIG_NFS_V4_1
 	struct nfs4_session    *session;	/* NFSv4.1 session */
 #endif
+
+#ifdef CONFIG_PNFS
+	u32				pnfs_fs_ltype;/* fs_layouttype attr */
+	struct pnfs_layoutdriver_type  *pnfs_curr_ld; /* Active layout driver */
+	struct pnfs_mount_type         *pnfs_mountid; /* Mount identifier for
+							 layout driver */
+	/* Data server values will equal NFS server values if
+	 * no pNFS layout driver exists for the mountpoint
+	 */
+	unsigned int	ds_rsize;	/* Data server read size */
+	unsigned int	ds_rpages;	/* Data server read size (in pages) */
+	unsigned int	ds_wsize;	/* Data server write size */
+	unsigned int	ds_wpages;	/* Data server write size (in pages) */
+#endif /* CONFIG_PNFS */
 
 	void (*destroy)(struct nfs_server *);
 

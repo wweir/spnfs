@@ -24,26 +24,28 @@ struct nfs4_pnfs_layout {
 	void *buf;
 };
 
+struct nfs4_pnfs_layout_segment {
+	u32 iomode;
+	u64 offset;
+	u64 length;
+};
+
 struct nfs4_pnfs_layoutget_arg {
 	__u32 type;
-	__u32 iomode;
-	__u64 offset;
-	__u64 length;
+	struct nfs4_pnfs_layout_segment lseg;
 	__u64 minlength;
 	__u32 maxcount;
 	struct nfs_open_context *ctx;
 	struct inode *inode;
-	void *minorversion_info;
+	struct nfs41_sequence_args	seq_args;
 };
 
 struct nfs4_pnfs_layoutget_res {
 	__u32 return_on_close;
-	__u64 offset;
-	__u64 length;
-	__u32 iomode;
+	struct nfs4_pnfs_layout_segment lseg;
 	__u32 type;
 	struct nfs4_pnfs_layout layout;
-	void *minorversion_info;
+	struct nfs41_sequence_res	seq_res;
 };
 
 struct nfs4_pnfs_layoutget {
@@ -61,12 +63,11 @@ struct pnfs_layoutcommit_arg {
 	struct nfs_fh *fh;
 
 	/* Values set by layout driver */
-	__u64 offset;
-	__u64 length;
+	struct nfs4_pnfs_layout_segment lseg;
 	__u32 layout_type;
 	__u32 new_layout_size;
 	void *new_layout;
-	void *minorversion_info;
+	struct nfs41_sequence_args	seq_args;
 };
 
 struct pnfs_layoutcommit_res {
@@ -74,7 +75,7 @@ struct pnfs_layoutcommit_res {
 	__u64 newsize;
 	struct nfs_fattr *fattr;
 	const struct nfs_server *server;
-	void *minorversion_info;
+	struct nfs41_sequence_res	seq_res;
 };
 
 struct pnfs_layoutcommit_data {
@@ -90,16 +91,14 @@ struct pnfs_layoutcommit_data {
 struct nfs4_pnfs_layoutreturn_arg {
 	__u32	reclaim;
 	__u32	layout_type;
-	__u32	iomode;
-	__u32   return_type;
-	__u64	offset;
-	__u64	length;
+	__u32	return_type;
+	struct nfs4_pnfs_layout_segment lseg;
 	struct inode *inode;
-	void *minorversion_info;
+	struct nfs41_sequence_args	seq_args;
 };
 
 struct nfs4_pnfs_layoutreturn_res {
-	void *minorversion_info;
+	struct nfs41_sequence_res	seq_res;
 };
 
 struct nfs4_pnfs_layoutreturn {
@@ -112,24 +111,24 @@ struct nfs4_pnfs_layoutreturn {
 struct nfs4_pnfs_getdevicelist_arg {
 	const struct nfs_fh *fh;
 	u32 layoutclass;
-	void *minorversion_info;
+	struct nfs41_sequence_args	seq_args;
 };
 
 struct nfs4_pnfs_getdevicelist_res {
 	struct pnfs_devicelist *devlist;
-	void *minorversion_info;
+	struct nfs41_sequence_res	seq_res;
 };
 
 struct nfs4_pnfs_getdeviceinfo_arg {
 	const struct nfs_fh *fh;
 	u32 layoutclass;
 	u32 dev_id;
-	void *minorversion_info;
+	struct nfs41_sequence_args	seq_args;
 };
 
 struct nfs4_pnfs_getdeviceinfo_res {
 	struct pnfs_device *dev;
-	void *minorversion_info;
+	struct nfs41_sequence_res	seq_res;
 };
 
 #endif /* CONFIG_PNFS */
