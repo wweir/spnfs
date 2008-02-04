@@ -240,6 +240,11 @@ nfsd4_open(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	struct current_session *current_ses = cstate->current_ses;
 #endif
 	__be32 status;
+#if defined(CONFIG_PNFSD)
+	__be32 pstatus;
+	struct super_block *sb;
+#endif
+
 	dprintk("NFSD: nfsd4_open filename %.*s op_stateowner %p\n",
 		(int)open->op_fname.len, open->op_fname.data,
 		open->op_stateowner);
@@ -334,6 +339,27 @@ nfsd4_open(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	 * set, (2) sets open->op_stateid, (3) sets open->op_delegation.
 	 */
 	status = nfsd4_process_open2(rqstp, &cstate->current_fh, open);
+#if defined(CONFIG_PNFSD)
+	if (!status) {
+		sb = cstate->current_fh.fh_dentry->d_inode->i_sb;
+		if (sb->s_export_op->propagate_open) {
+			pstatus = nfs4_pnfs_propagate_open(sb,
+				&cstate->current_fh, open);
+			if (pstatus) {
+				dprintk(
+		       "nfsd: pNFS could not be enabled for inode: %ld\n",
+		       (long int)&cstate->current_fh.fh_dentry->d_inode->i_ino);
+				/*
+				 * XXX When there's a failure then need to
+				 * indicate to future ops that no pNFS is
+				 * available.  Should I save the status in
+				 * the inode?  It's kind of a big hammer.
+				 * But there may be no stripes available?
+				 */
+			}
+		}
+	}
+#endif /* CONFIG_PNFSD */
 out:
 	if (open->op_stateowner) {
 		nfs4_get_stateowner(open->op_stateowner);
