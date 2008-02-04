@@ -90,6 +90,7 @@ void nfs4_pnfs_state_init(void);
 int nfs4_pnfs_get_layout(struct svc_fh *, struct pnfs_layoutget_arg *);
 int nfs4_pnfs_return_layout(struct super_block *, struct svc_fh *,
 					struct nfsd4_pnfs_layoutreturn *);
+int nfs4_pnfs_propagate_open(struct super_block *, struct svc_fh *, void *);
 
 #endif /* CONFIG_PNFSD */
 
