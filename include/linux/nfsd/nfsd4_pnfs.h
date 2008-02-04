@@ -99,6 +99,12 @@ struct nfsd4_pnfs_layoutreturn {
 	u32			lrs_present;	/* response */
 };
 
+struct nfsd4_pnfs_open {
+	u32			op_create;
+	u32			op_createmode;
+	int			op_truncate;
+};
+
 struct nfsd4_pnfs_cb_layout {
 	u32			cbl_recall_type;	/* request */
 	struct nfsd4_layout_seg cbl_seg;		/* request */
