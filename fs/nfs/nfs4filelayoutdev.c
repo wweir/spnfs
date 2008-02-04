@@ -150,7 +150,8 @@ device_destroy(struct nfs4_pnfs_dev_item *dev)
 	     EXCHGID4_FLAG_USE_PNFS_DS) &&
 	    !(dev->server->nfs_client->cl_exchange_flags &
 	      EXCHGID4_FLAG_USE_PNFS_MDS)) {
-		nfs4_proc_destroy_session(dev->server);
+		nfs4_proc_destroy_session(dev->server->session,
+					  dev->server->client);
 		/* BUG_ON(!atomic_sub_and_test(0, &dev->count)); */
 		rpc_shutdown_client(dev->server->client);
 		dev->server->client = NULL;

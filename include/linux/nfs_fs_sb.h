@@ -14,6 +14,7 @@
 struct nfs_iostats;
 struct nlm_host;
 
+
 /*
  * The nfs_client identifies our client state to the server.
  */
@@ -81,6 +82,9 @@ struct nfs_client {
 	u32			cl_exchange_flags;
 	struct rpc_cred		*cl_ex_cred;	/* exchange_id credential */
 #endif
+#ifdef CONFIG_PNFS
+	struct nfs4_session *	cl_ds_session; /* pNFS data server session */
+#endif /* CONFIG_PNFS */
 };
 
 /*
