@@ -37,7 +37,6 @@ struct cb_compound_hdr_arg {
 	unsigned int taglen;
 	const char *tag;
 	unsigned int minorversion;
-	unsigned int callback_ident;
 	unsigned nops;
 };
 
