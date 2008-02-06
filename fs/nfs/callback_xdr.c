@@ -172,7 +172,7 @@ static __be32 decode_compound_hdr_arg(struct xdr_stream *xdr, struct cb_compound
 		p = read_buf(xdr, 8);
 		if (unlikely(p == NULL))
 			return htonl(NFS4ERR_RESOURCE);
-		hdr->callback_ident = ntohl(*p++);
+		p++;	/* skip callback_ident */
 	} else {
 		printk(KERN_WARNING "%s: NFSv4 server callback with "
 			"illegal minor version %u!\n",
