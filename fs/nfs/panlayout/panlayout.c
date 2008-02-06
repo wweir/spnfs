@@ -120,8 +120,7 @@ panlayout_alloc_lseg(struct pnfs_layout_type *pnfslay,
  * Free a layout segement
  */
 static void
-panlayout_free_lseg(struct pnfs_layout_type *pnfslay,
-		    struct pnfs_layout_segment *lseg)
+panlayout_free_lseg(struct pnfs_layout_segment *lseg)
 {
 	struct panlayout_segment *panlseg;
 
