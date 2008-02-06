@@ -336,7 +336,16 @@ static int
 nfs41_xdr_enc_cb_recall(struct rpc_rqst *req, u32 *p,
 			struct nfs41_rpc_args *rpc_args)
 {
-	return -1;	/* stub */
+	struct xdr_stream xdr;
+	struct nfs4_cb_recall *args = rpc_args->args_op;
+	struct nfs4_cb_compound_hdr hdr = {
+		.nops   = 2,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_cb_compound41_hdr(&xdr, &hdr);
+	encode_cb_sequence(&xdr, rpc_args->args_seq);
+	return encode_cb_recall(&xdr, args);
 }
 #endif /* defined(CONFIG_NFSD_V4_1) */
 
@@ -420,7 +429,20 @@ static int
 nfs41_xdr_dec_cb_recall(struct rpc_rqst *rqstp, u32 *p,
 			struct nfs41_rpc_res *rpc_res)
 {
-	return -1;	/* stub */
+	struct xdr_stream xdr;
+	struct nfs4_cb_compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_cb_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_cb_sequence(&xdr, rpc_res->res_seq);
+	if (status)
+		goto out;
+	status = decode_cb_op_hdr(&xdr, OP_CB_RECALL);
+out:
+	return status;
 }
 #endif /* defined(CONFIG_NFSD_V4_1) */
 
@@ -607,6 +629,74 @@ nfs41_cb_sequence_done(struct nfs4_client *clp, struct nfs41_cb_sequence *res)
 }
 #endif /* CONFIG_NFSD_V4_1 */
 
+static int
+_nfsd4_cb_recall(struct nfs4_delegation *dp, struct rpc_message *msg)
+{
+	struct nfs4_client *clp = dp->dl_client;
+	struct rpc_clnt *clnt = clp->cl_callback.cb_client;
+	struct nfs4_cb_recall *cbr = &dp->dl_recall;
+	int retries = 1;
+	int status = 0;
+
+	msg->rpc_proc = &nfs4_cb_procedures[NFSPROC4_CLNT_CB_RECALL];
+	msg->rpc_argp = cbr;
+
+	status = rpc_call_sync(clnt, msg, RPC_TASK_SOFT);
+	while (retries--) {
+		switch (status) {
+		case -EIO:
+			/* Network partition? */
+			atomic_set(&clp->cl_callback.cb_set, 0);
+		case -EBADHANDLE:
+		case -NFS4ERR_BAD_STATEID:
+			/* Race: client probably got cb_recall
+			 * before open reply granting delegation */
+			break;
+		default:
+			goto out;
+		}
+		ssleep(2);
+		status = rpc_call_sync(clnt, msg, RPC_TASK_SOFT);
+	}
+out:
+	return status;
+}
+
+#if defined(CONFIG_NFSD_V4_1)
+static int
+_nfsd41_cb_recall(struct nfs4_delegation *dp, struct rpc_message *msg)
+{
+	struct nfs4_client *clp = dp->dl_client;
+	struct rpc_clnt *clnt = clp->cl_callback.cb_client;
+	struct nfs4_cb_recall *cbr = &dp->dl_recall;
+	struct nfs41_cb_sequence seq;
+	struct nfs41_rpc_args args = {
+		.args_op = cbr,
+		.args_seq = &seq
+	};
+	struct nfs41_rpc_res res = {
+		.res_seq = &seq
+	};
+	int status;
+
+	dprintk("NFSD: _nfs41_cb_recall: dp %p\n", dp);
+
+	nfs41_cb_sequence_setup(clp, &seq);
+	msg->rpc_proc = &nfs41_cb_procedures[NFSPROC4_CLNT_CB_RECALL];
+	msg->rpc_argp = &args;
+	msg->rpc_resp = &res;
+
+	status = rpc_call_sync(clnt, msg, RPC_TASK_SOFT);
+	nfs41_cb_sequence_done(clp, &seq);
+
+	/* Network partition? */
+	if (status == -EIO)
+		atomic_set(&clp->cl_callback.cb_set, 0);
+
+	return status;
+}
+#endif /* defined(CONFIG_NFSD_V4_1) */
+
 /*
  * called with dp->dl_count inc'ed.
  * nfs4_lock_state() may or may not have been called.
@@ -617,39 +707,36 @@ nfsd4_cb_recall(struct nfs4_delegation *dp)
 	struct nfs4_client *clp = dp->dl_client;
 	struct rpc_clnt *clnt = clp->cl_callback.cb_client;
 	struct nfs4_cb_recall *cbr = &dp->dl_recall;
-	struct rpc_message msg = {
-		.rpc_proc = &nfs4_cb_procedures[NFSPROC4_CLNT_CB_RECALL],
-		.rpc_argp = cbr,
-	};
-	int retries = 1;
+	struct rpc_message msg;
 	int status = 0;
+
+	dprintk("NFSD: nfs4_cb_recall: dp %p\n", dp);
 
 	cbr->cbr_trunc = 0; /* XXX need to implement truncate optimization */
 	cbr->cbr_dp = dp;
 
-	status = rpc_call_sync(clnt, &msg, RPC_TASK_SOFT);
-	while (retries--) {
-		switch (status) {
-			case -EIO:
-				/* Network partition? */
-				atomic_set(&clp->cl_callback.cb_set, 0);
-			case -EBADHANDLE:
-			case -NFS4ERR_BAD_STATEID:
-				/* Race: client probably got cb_recall
-				 * before open reply granting delegation */
-				break;
-			default:
-				goto out_put_cred;
-		}
-		ssleep(2);
-		status = rpc_call_sync(clnt, &msg, RPC_TASK_SOFT);
+	memset(&msg, 0, sizeof(msg));
+
+#if defined(CONFIG_NFSD_V4_1)
+	if (clp->cl_callback.cb_minorversion == 1) {
+		status = _nfsd41_cb_recall(dp, &msg);
+		goto out_put_cred;
 	}
+#endif /* defined(CONFIG_NFSD_V4_1) */
+
+	status = _nfsd4_cb_recall(dp, &msg);
+
 out_put_cred:
 	/*
 	 * Success or failure, now we're either waiting for lease expiration
 	 * or deleg_return.
 	 */
+	dprintk("NFSD: nfs4_cb_recall: dp %p dl_flock %p dl_count %d\n",
+		dp, dp->dl_flock, atomic_read(&dp->dl_count));
 	put_nfs4_client(clp);
+	rpc_release_client(clnt);
+	nfs4_lock_state();
 	nfs4_put_delegation(dp);
+	nfs4_unlock_state();
 	return;
 }
