@@ -176,7 +176,6 @@ panlayout_iodone(struct panlayout_io_state *state)
  */
 int
 panlayout_commit(struct pnfs_layout_type *pnfslay,
-		 struct list_head *pages,
 		 int sync,
 		 struct nfs_write_data *data)
 {
