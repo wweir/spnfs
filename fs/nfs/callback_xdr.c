@@ -167,23 +167,13 @@ static __be32 decode_compound_hdr_arg(struct xdr_stream *xdr, struct cb_compound
 	if (unlikely(p == NULL))
 		return htonl(NFS4ERR_RESOURCE);
 	hdr->minorversion = ntohl(*p++);
-	/* Check minor version is zero. */
-	if (hdr->minorversion == 0) {
+	/* Check minor version is zero or one. */
+	if (hdr->minorversion <= 1) {
 		p = read_buf(xdr, 8);
 		if (unlikely(p == NULL))
 			return htonl(NFS4ERR_RESOURCE);
 		hdr->callback_ident = ntohl(*p++);
-	}
-#if defined(CONFIG_NFS_V4_1)
-	else if (hdr->minorversion == 1) {
-		/* FIXME: draft-13! */
-		p = read_buf(xdr, 4);
-		if (unlikely(p == NULL))
-			return htonl(NFS4ERR_RESOURCE);
-		hdr->callback_ident = 0;
-	}
-#endif /* CONFIG_NFS_V4_1 */
-	else {
+	} else {
 		printk(KERN_WARNING "%s: NFSv4 server callback with "
 			"illegal minor version %u!\n",
 			__func__, hdr->minorversion);
