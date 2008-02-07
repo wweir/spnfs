@@ -94,7 +94,7 @@ enum nfs_cb_opnum4 {
 #if defined(CONFIG_NFSD_V4_1)
 #define NFS41_enc_cb_null_sz		0
 #define NFS41_dec_cb_null_sz		0
-#define cb_compound41_enc_hdr_sz	3
+#define cb_compound41_enc_hdr_sz	4
 #define cb_compound41_dec_hdr_sz	(3 + (NFS4_MAXTAGLEN >> 2))
 #define sessionid_sz			(NFS4_MAX_SESSIONID_LEN >> 2)
 #define cb_sequence41_enc_sz		(sessionid_sz + 4 +             \
@@ -327,9 +327,10 @@ encode_cb_compound41_hdr(struct xdr_stream *xdr,
 {
 	u32 *p;
 
-	RESERVE_SPACE(12);
+	RESERVE_SPACE(16);
 	WRITE32(0);             /* tag length is always 0 */
 	WRITE32(1);             /* minorversion */
+	WRITE32(0);             /* callback_ident not used in 4.1 */
 	WRITE32(hdr->nops);
 	return 0;
 }
