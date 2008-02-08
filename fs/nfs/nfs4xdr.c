@@ -255,11 +255,11 @@ static int nr_sequence_quads;
 				2 + 1 + 1 + 2 + 1 + \
 				(NFS4_OPAQUE_LIMIT >> 2) + 1 + \
 				(NFS4_OPAQUE_LIMIT >> 2) + 1)
-#define encode_create_session_maxsz	(op_encode_hdr_maxsz + 2 + 4 + \
-					6 + 6 + /* fore and back chan */ \
-					3 + 4 + 2 + 4 /* auth sys */)
-#define decode_create_session_maxsz	(op_decode_hdr_maxsz + 4 + 3 + \
-					3 + 7 + 7)
+#define encode_create_session_maxsz	(op_encode_hdr_maxsz + 2 + 2 + \
+					 7 + 7 + 4 + 4 + 16)
+#define decode_create_session_maxsz	(op_decode_hdr_maxsz +	\
+					 2 + 6 + 2 + 6 + 2 +	\
+					 XDR_QUADLEN(NFS4_MAX_SESSIONID_LEN))
 #define encode_destroy_session_maxsz    (op_encode_hdr_maxsz + 4)
 #define decode_destroy_session_maxsz    (op_decode_hdr_maxsz)
 #define encode_sequence_maxsz	(op_encode_hdr_maxsz + \
