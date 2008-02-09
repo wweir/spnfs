@@ -191,11 +191,9 @@ struct pnfs_device {
 };
 
 struct pnfs_devicelist {
-	unsigned int        layout_type;
-	unsigned int        num_devs;
-	unsigned int        eof;
-	unsigned int        devs_len;
-	struct pnfs_device  devs[NFS4_PNFS_DEV_MAXNUM];
+	unsigned int		eof;
+	unsigned int		num_devs;
+	struct pnfs_deviceid	dev_id[NFS4_PNFS_DEV_MAXNUM];
 };
 
 /* pNFS client callback functions.
