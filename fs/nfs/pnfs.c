@@ -59,7 +59,7 @@
 extern int nfs_fsync(struct file *file, struct dentry *dentry, int datasync);
 extern int nfs4_pnfs_getdevicelist(struct nfs_fh *fh, struct nfs_server *server,
 				   struct pnfs_devicelist *devlist);
-extern int nfs4_pnfs_getdeviceinfo(struct inode *inode, u32 dev_id,
+extern int nfs4_pnfs_getdeviceinfo(struct inode *inode, pnfs_deviceid *dev_id,
 				   struct pnfs_device *res);
 extern void nfs_initiate_commit(struct nfs_write_data *data,
 				struct rpc_clnt *clnt, int how);
@@ -1602,7 +1602,9 @@ pnfs_getdevicelist(struct super_block *sb, struct nfs_fh *fh,
 /* Retrieve the device information for a device.
  */
 int
-pnfs_getdeviceinfo(struct inode *inode, u32 dev_id, struct pnfs_device *dev)
+pnfs_getdeviceinfo(struct inode *inode,
+		   pnfs_deviceid *dev_id,
+		   struct pnfs_device *dev)
 {
 	int rc;
 
