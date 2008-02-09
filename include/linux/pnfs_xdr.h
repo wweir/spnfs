@@ -18,6 +18,11 @@
 
 #define PNFS_LAYOUT_MAXSIZE 4096
 #define PNFS_MAX_NUM_LAYOUT_TYPES 2
+#define NFS4_PNFS_DEVICEID4_SIZE 16
+
+struct pnfs_deviceid {
+	char data[NFS4_PNFS_DEVICEID4_SIZE];
+};
 
 struct nfs4_pnfs_layout {
 	__u32 len;
@@ -122,7 +127,8 @@ struct nfs4_pnfs_getdevicelist_res {
 struct nfs4_pnfs_getdeviceinfo_arg {
 	const struct nfs_fh *fh;
 	u32 layoutclass;
-	u32 dev_id;
+	struct pnfs_deviceid 		*dev_id;
+	u32 				dev_notify_types;
 	struct nfs41_sequence_args	seq_args;
 };
 
