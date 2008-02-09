@@ -1585,29 +1585,6 @@ pnfs_commit(struct nfs_write_data *data, int sync)
 	return result;
 }
 
-int
-pnfs_getdevicelist(struct super_block *sb, struct nfs_fh *fh,
-		   struct pnfs_devicelist *devlist)
-{
-	struct nfs_server *server = NFS_SB(sb);
-
-	return nfs4_pnfs_getdevicelist(fh, server, devlist);
-}
-
-/* Retrieve the device information for a device.
- */
-int
-pnfs_getdeviceinfo(struct inode *inode,
-		   struct pnfs_deviceid *dev_id,
-		   struct pnfs_device *dev)
-{
-	int rc;
-
-	rc = nfs4_pnfs_getdeviceinfo(inode, dev_id, dev);
-
-	return rc;
-}
-
 /* Called on completion of layoutcommit */
 void
 pnfs_layoutcommit_done(
@@ -1818,8 +1795,8 @@ void pnfs_free_request_data(struct nfs_page *req)
 /* Callback operations for layout drivers.
  */
 struct pnfs_client_operations pnfs_ops = {
-	.nfs_getdevicelist = pnfs_getdevicelist,
-	.nfs_getdeviceinfo = pnfs_getdeviceinfo,
+	.nfs_getdevicelist = nfs4_pnfs_getdevicelist,
+	.nfs_getdeviceinfo = nfs4_pnfs_getdeviceinfo,
 	.nfs_readlist_complete = pnfs_read_done,
 	.nfs_writelist_complete = pnfs_writeback_done,
 	.nfs_commit_complete = pnfs_commit_done,
