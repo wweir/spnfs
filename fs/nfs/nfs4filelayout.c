@@ -112,11 +112,8 @@ filelayout_initialize_mountpoint(struct super_block *sb, struct nfs_fh *fh)
 	if (status)
 		goto cleanup_mt;
 
-	/*
-	 * Decode opaque devicelist and add to list of available
-	 * devices (data servers
-	 */
-	status = decode_and_add_devicelist(fl_mt, dlist);
+	/* Retrieve and add all available devices */
+	status = process_deviceid_list(fl_mt, fh, dlist);
 	if (status)
 		goto cleanup_mt;
 
