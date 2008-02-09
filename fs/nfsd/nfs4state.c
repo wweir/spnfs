@@ -4739,6 +4739,7 @@ nfs4_pnfs_cb_get_state(struct super_block *sb, struct pnfs_get_state *arg)
 				arg->stid.si_generation,
 				arg->ino);
 
+	nfs4_lock_state();
 	stp = find_stateid(&arg->stid, flags);
 	if (!stp) {
 		ino = iget(sb, arg->ino);
@@ -4762,6 +4763,7 @@ nfs4_pnfs_cb_get_state(struct super_block *sb, struct pnfs_get_state *arg)
 		arg->clid = stp->st_stateowner->so_client->cl_clientid;
 	}
 out:
+	nfs4_unlock_state();
 	return status;
 }
 
