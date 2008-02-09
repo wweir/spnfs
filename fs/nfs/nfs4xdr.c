@@ -269,12 +269,12 @@ static int nfs4_stat_to_errno(int);
 				XDR_QUADLEN(NFS4_MAX_SESSIONID_LEN) + 5)
 #endif /* CONFIG_NFS_V4_1 */
 #if defined(CONFIG_PNFS)
-#define encode_getdevicelist_maxsz (op_encode_hdr_maxsz + 4 +  \
-				   (NFS4_VERIFIER_SIZE >> 2))
-#define decode_getdevicelist_maxsz (op_decode_hdr_maxsz + 6 +		\
-				    NFS4_PNFS_DEV_MAXNUM *		\
-				    (NFS4_PNFS_DEVICEID4_SIZE + 2 +	\
-				     NFS4_PNFS_DEV_MAXSIZE))
+#define encode_getdevicelist_maxsz (op_encode_hdr_maxsz + 4 + \
+				    encode_verifier_maxsz)
+#define decode_getdevicelist_maxsz (op_decode_hdr_maxsz + 2 + 1 + 1 +	\
+				    decode_verifier_maxsz +		\
+				    XDR_QUADLEN(NFS4_PNFS_DEV_MAXNUM *	\
+						NFS4_PNFS_DEVICEID4_SIZE))
 #define encode_getdeviceinfo_maxsz (op_encode_hdr_maxsz + 4 + \
 				    XDR_QUADLEN(NFS4_PNFS_DEVICEID4_SIZE))
 #define decode_getdeviceinfo_maxsz (op_decode_hdr_maxsz + 4 + \
@@ -1809,9 +1809,9 @@ static int encode_getdevicelist(struct xdr_stream *xdr,
 
 	RESERVE_SPACE(20);
 	WRITE32(OP_GETDEVICELIST);
-	WRITE32(args->layoutclass);             /* layout type */
-	WRITE32(NFS4_PNFS_DEV_MAXNUM * NFS4_PNFS_DEV_MAXSIZE); /* maxcount */
-	WRITE64(0ULL);                          /* cookie */
+	WRITE32(args->layoutclass);
+	WRITE32(NFS4_PNFS_DEV_MAXNUM);
+	WRITE64(0ULL);				/* cookie */
 	encode_nfs4_verifier(xdr, &dummy);
 
 	return 0;
@@ -5443,14 +5443,13 @@ static int decode_sequence(struct xdr_stream *xdr,
 #ifdef CONFIG_PNFS
 /*
  * Decode getdevicelist results for pNFS.
- * TODO: Need to match this xdr with the server.
+ * TODO: Need to handle case when EOF != true;
  */
 static int decode_getdevicelist(struct xdr_stream *xdr,
 				struct pnfs_devicelist *res)
 {
-	uint32_t *p;
-	int status, i, cnt;
-	uint32_t len = 0, total_len = 0;
+	__be32 *p;
+	int status, i;
 	struct nfs_writeverf verftemp;
 
 	status = decode_op_hdr(xdr, OP_GETDEVICELIST);
@@ -5468,36 +5467,17 @@ static int decode_getdevicelist(struct xdr_stream *xdr,
 	READ_BUF(4);
 	READ32(res->num_devs);
 
-	for (i = 0, cnt = 0;
-	     i < res->num_devs && cnt < NFS4_PNFS_DEV_MAXNUM;
-	     i++) {
+	dprintk("%s: num_dev %d \n", __func__, res->num_devs);
+
+	if (res->num_devs > NFS4_PNFS_DEV_MAXNUM)
+		return -NFS4ERR_REP_TOO_BIG;
+
+	for (i = 0; i < res->num_devs; i++) {
 		READ_BUF(NFS4_PNFS_DEVICEID4_SIZE);
-		COPYMEM(res->devs[cnt].dev_id.data, NFS4_PNFS_DEVICEID4_SIZE);
-
-		READ_BUF(4);
-		READ32(res->layout_type);
-
-		READ_BUF(4);
-		READ32(len);
-		dprintk("%s: num_dev %d i %d cnt %d len %d\n",
-			__func__, res->num_devs, i, cnt, len);
-
-		READ_BUF(len);
-
-		/* DH-TODO: Can I decode this inline?  Is the xdr_stream
-		 * memory valid after the completion of this function?
-		 */
-		/* decode_opaque_inline(xdr, &len, &r_addr); */
-		COPYMEM(&res->devs[cnt].dev_addr_buf, len);
-		res->devs[cnt].dev_addr_len = len;
-
-		total_len += len;
-		cnt++;
+		COPYMEM(res->dev_id[i].data, NFS4_PNFS_DEVICEID4_SIZE);
 	}
 	READ_BUF(4);
 	READ32(res->eof);
-
-	res->devs_len = total_len;
 	return 0;
 }
 
