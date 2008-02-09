@@ -643,9 +643,10 @@ decode_and_add_devicelist(struct filelayout_mount_type *mt,
  * of available devices, and return it.
  */
 static struct nfs4_pnfs_dev_item *
-get_device_info(struct inode *inode, struct pnfs_deviceid *dev_id)
+get_device_info(struct filelayout_mount_type *mt,
+		struct nfs_fh *fh,
+		struct pnfs_deviceid *dev_id)
 {
-	struct filelayout_mount_type *mt = FILE_MT(inode);
 	struct pnfs_device *pdev = NULL;
 	int rc;
 
@@ -656,7 +657,7 @@ get_device_info(struct inode *inode, struct pnfs_deviceid *dev_id)
 
 	memcpy(&pdev->dev_id, dev_id, NFS4_PNFS_DEVICEID4_SIZE);
 
-	rc = pnfs_callback_ops->nfs_getdeviceinfo(inode, dev_id, pdev);
+	rc = pnfs_callback_ops->nfs_getdeviceinfo(mt->fl_sb, fh, pdev);
 	dprintk("%s getdevice info returns %d\n", __func__, rc);
 	if (rc) {
 		kfree(pdev);
@@ -670,9 +671,10 @@ get_device_info(struct inode *inode, struct pnfs_deviceid *dev_id)
 }
 
 struct nfs4_pnfs_dev_item *
-nfs4_pnfs_device_item_get(struct inode *inode, struct pnfs_deviceid *dev_id)
+nfs4_pnfs_device_item_get(struct filelayout_mount_type *mt,
+			  struct nfs_fh *fh,
+			  struct pnfs_deviceid *dev_id)
 {
-	struct filelayout_mount_type *mt = FILE_MT(inode);
 	struct nfs4_pnfs_dev_item *dev;
 
 	read_lock(&mt->hlist->dev_lock);
@@ -680,7 +682,7 @@ nfs4_pnfs_device_item_get(struct inode *inode, struct pnfs_deviceid *dev_id)
 	read_unlock(&mt->hlist->dev_lock);
 
 	if (dev == NULL)
-		dev = get_device_info(inode, dev_id);
+		dev = get_device_info(mt, fh, dev_id);
 	return dev;
 }
 
@@ -704,7 +706,8 @@ nfs4_pnfs_dserver_get(struct inode *inode,
 
 	layout = LSEG_LD_DATA(&flo->pnfs_lseg);
 
-	di = nfs4_pnfs_device_item_get(inode, &layout->dev_id);
+	di = nfs4_pnfs_device_item_get(FILE_MT(inode), NFS_FH(inode),
+				       &layout->dev_id);
 	if (di == NULL)
 		return 1;
 
