@@ -5229,7 +5229,7 @@ int nfs4_pnfs_getdevicelist(struct nfs_fh *fh,
 }
 
 int nfs4_pnfs_getdeviceinfo(struct inode *inode,
-			    u32 dev_id,
+			    struct pnfs_deviceid *dev_id,
 			    struct pnfs_device *dev)
 {
 	struct nfs_server *server = NFS_SERVER(inode);

@@ -608,7 +608,7 @@ filelayout_set_layout(struct pnfs_layout_type *layoutid,
 
 	dprintk("%s: set_layout_map Begin\n", __func__);
 
-	READ32(fl->dev_id);
+	COPYMEM(&fl->dev_id, NFS4_PNFS_DEVICEID4_SIZE);
 	READ32(nfl_util);
 	if (nfl_util & NFL4_UFLG_COMMIT_THRU_MDS)
 		fl->commit_through_mds = 1;
@@ -621,8 +621,8 @@ filelayout_set_layout(struct pnfs_layout_type *layoutid,
 	READ32(fl->first_stripe_index);
 	READ32(fl->num_fh);
 
-	dprintk("DEBUG: %s: dev_id %u nfl_util 0x%X num_fh %u\n", __func__,
-				fl->dev_id, nfl_util, fl->num_fh);
+	dprintk("%s: nfl_util 0x%X num_fh %u dev_id %s\n",
+		__func__, nfl_util, fl->num_fh, deviceid_fmt(&fl->dev_id));
 
 	for (i = 0; i < fl->num_fh; i++) {
 		/* fh */
