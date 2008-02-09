@@ -202,9 +202,9 @@ struct pnfs_devicelist {
  * E.g., getdeviceinfo, I/O callbacks, etc
  */
 struct pnfs_client_operations {
-	int (*nfs_getdevicelist) (struct super_block *sb, struct nfs_fh *fh, struct pnfs_devicelist *devlist);
-	int (*nfs_getdeviceinfo) (struct inode *inode,
-				  struct pnfs_deviceid *dev_id,
+	int (*nfs_getdevicelist) (struct super_block *sb, struct nfs_fh *fh,
+				  struct pnfs_devicelist *devlist);
+	int (*nfs_getdeviceinfo) (struct super_block *sb, struct nfs_fh *fh,
 				  struct pnfs_device *dev);
 
 	/* Post read callback. */
