@@ -90,21 +90,51 @@ print_stripe_devs(struct nfs4_pnfs_dev_item *dev)
 	}
 }
 
+/* Debugging function assuming a 64bit major/minor split of the deviceid */
+char *
+deviceid_fmt(const struct pnfs_deviceid *dev_id)
+{
+	static char buf[17];
+	uint32_t *p = (uint32_t *)dev_id->data;
+	uint64_t major, minor;
+
+	READ64(major);
+	READ64(minor);
+
+	sprintf(buf, "%08llu %08llu", major, minor);
+	return buf;
+}
+
+unsigned long
+_deviceid_hash(const struct pnfs_deviceid *dev_id)
+{
+	unsigned char *cptr = (unsigned char *)dev_id->data;
+	unsigned int nbytes = NFS4_PNFS_DEVICEID4_SIZE;
+	u64 x = 0;
+
+	while (nbytes--) {
+		x *= 37;
+		x += *cptr++;
+	}
+	return x & NFS4_PNFS_DEV_HASH_MASK;
+}
+
 /* Assumes lock is held */
 static inline struct nfs4_pnfs_dev_item *
-_device_lookup(struct nfs4_pnfs_dev_hlist *hlist, u32 dev_id)
+_device_lookup(struct nfs4_pnfs_dev_hlist *hlist,
+	       const struct pnfs_deviceid *dev_id)
 {
 	unsigned long      hash;
 	struct hlist_node *np;
 
-	dprintk("_device_lookup: dev_id=%u\n", dev_id);
+	dprintk("_device_lookup: dev_id=%s\n", deviceid_fmt(dev_id));
 
-	hash = hash_long(dev_id, NFS4_PNFS_DEV_HASH_BITS);
+	hash = _deviceid_hash(dev_id);
 
 	hlist_for_each(np, &hlist->dev_list[hash]) {
 		struct nfs4_pnfs_dev_item *dev;
 		dev = hlist_entry(np, struct nfs4_pnfs_dev_item, hash_node);
-		if (dev->dev_id == dev_id)
+		if (!memcmp(&dev->dev_id, dev_id, NFS4_PNFS_DEVICEID4_SIZE))
 			return dev;
 	}
 	return NULL;
@@ -140,10 +170,11 @@ _device_add(struct nfs4_pnfs_dev_hlist *hlist, struct nfs4_pnfs_dev_item *dev)
 {
 	unsigned long      hash;
 
-	dprintk("_device_add: dev_id=%u stripe_devs:\n", dev->dev_id);
+	dprintk("_device_add: dev_id=%s\nstripe_devs:\n",
+		deviceid_fmt(&dev->dev_id));
 	print_stripe_devs(dev);
 
-	hash = hash_long(dev->dev_id, NFS4_PNFS_DEV_HASH_BITS);
+	hash = _deviceid_hash(&dev->dev_id);
 	hlist_add_head(&dev->hash_node, &hlist->dev_list[hash]);
 }
 
@@ -288,7 +319,8 @@ device_destroy(struct nfs4_pnfs_dev_item *dev,
 	if (!dev)
 		return;
 
-	dprintk("device_destroy: did=%u dev_list: \n", dev->dev_id);
+	dprintk("device_destroy: dev_id=%s\ndev_list:\n",
+		deviceid_fmt(&dev->dev_id));
 	print_stripe_devs(dev);
 
 	write_lock(&hlist->dev_lock);
@@ -319,7 +351,7 @@ nfs4_pnfs_devlist_init(struct nfs4_pnfs_dev_hlist *hlist)
 
 	hlist->dev_lock = __RW_LOCK_UNLOCKED("pnfs_devlist_lock");
 
-	for (i = 0; i < NFS4_PNFS_DEV_HASH; i++) {
+	for (i = 0; i < NFS4_PNFS_DEV_HASH_SIZE; i++) {
 		INIT_HLIST_HEAD(&hlist->dev_list[i]);
 		INIT_HLIST_HEAD(&hlist->dev_dslist[i]);
 	}
@@ -339,7 +371,7 @@ nfs4_pnfs_devlist_destroy(struct nfs4_pnfs_dev_hlist *hlist)
 		return;
 
 	/* No lock held, as synchronization should occur at upper levels */
-	for (i = 0; i < NFS4_PNFS_DEV_HASH; i++) {
+	for (i = 0; i < NFS4_PNFS_DEV_HASH_SIZE; i++) {
 		struct hlist_node *np, *next;
 
 		hlist_for_each_safe(np, next, &hlist->dev_list[i]) {
@@ -367,7 +399,7 @@ nfs4_pnfs_device_add(struct filelayout_mount_type *mt,
 
 	/* Write lock, do lookup again, and then add device */
 	write_lock(&hlist->dev_lock);
-	tmp_dev = _device_lookup(hlist, dev->dev_id);
+	tmp_dev = _device_lookup(hlist, &dev->dev_id);
 	if (tmp_dev == NULL)
 		_device_add(hlist, dev);
 	write_unlock(&hlist->dev_lock);
@@ -509,7 +541,7 @@ decode_device(struct filelayout_mount_type *mt, struct pnfs_device *dev)
 	INIT_HLIST_NODE(&file_dev->hash_node);
 
 	/* Device id */
-	file_dev->dev_id = dev->dev_id;
+	memcpy(&file_dev->dev_id, &dev->dev_id, NFS4_PNFS_DEVICEID4_SIZE);
 
 	fdev = &file_dev->stripe_devs[0];
 	for (i = 0; i < len; i++) {
@@ -611,7 +643,7 @@ decode_and_add_devicelist(struct filelayout_mount_type *mt,
  * of available devices, and return it.
  */
 static struct nfs4_pnfs_dev_item *
-get_device_info(struct inode *inode, u32 dev_id)
+get_device_info(struct inode *inode, struct pnfs_deviceid *dev_id)
 {
 	struct filelayout_mount_type *mt = FILE_MT(inode);
 	struct pnfs_device *pdev = NULL;
@@ -622,7 +654,7 @@ get_device_info(struct inode *inode, u32 dev_id)
 	if (pdev == NULL)
 		return NULL;
 
-	pdev->dev_id = dev_id;
+	memcpy(&pdev->dev_id, dev_id, NFS4_PNFS_DEVICEID4_SIZE);
 
 	rc = pnfs_callback_ops->nfs_getdeviceinfo(inode, dev_id, pdev);
 	dprintk("%s getdevice info returns %d\n", __func__, rc);
@@ -638,7 +670,7 @@ get_device_info(struct inode *inode, u32 dev_id)
 }
 
 struct nfs4_pnfs_dev_item *
-nfs4_pnfs_device_item_get(struct inode *inode, u32 dev_id)
+nfs4_pnfs_device_item_get(struct inode *inode, struct pnfs_deviceid *dev_id)
 {
 	struct filelayout_mount_type *mt = FILE_MT(inode);
 	struct nfs4_pnfs_dev_item *dev;
@@ -672,7 +704,7 @@ nfs4_pnfs_dserver_get(struct inode *inode,
 
 	layout = LSEG_LD_DATA(&flo->pnfs_lseg);
 
-	di = nfs4_pnfs_device_item_get(inode, layout->dev_id);
+	di = nfs4_pnfs_device_item_get(inode, &layout->dev_id);
 	if (di == NULL)
 		return 1;
 
@@ -703,8 +735,9 @@ nfs4_pnfs_dserver_get(struct inode *inode,
 	else
 		dserver->fh = &layout->fh_array[stripe_idx];
 
-	dprintk("%s: dev_id=%u, idx=%u, offset=%Lu, count=%Zu\n",
-		__func__, layout->dev_id, stripe_idx, offset, count);
+	dprintk("%s: dev_id=%s idx=%u, offset=%Lu, count=%Zu\n",
+		__func__, deviceid_fmt(&layout->dev_id),
+		stripe_idx, offset, count);
 
 	return 0;
 }
