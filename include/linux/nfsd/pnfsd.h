@@ -42,7 +42,7 @@
 
 /* pNFS Metadata to Data server state communication*/
 struct pnfs_get_state {
-	u32			devid;    /* request */
+	u32			dsid;    /* request */
 	unsigned long		ino;      /* request */
 	stateid_t		stid;     /* request;response */
 	clientid_t		clid;     /* response */
