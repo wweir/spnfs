@@ -21,7 +21,8 @@
 extern int nfs4_pnfs_getdevicelist(struct nfs_fh *fh,
 				   struct nfs_server *server,
 				   struct pnfs_devicelist *devlist);
-extern int nfs4_pnfs_getdeviceinfo(struct inode *inode, u32 dev_id,
+extern int nfs4_pnfs_getdeviceinfo(struct inode *inode,
+				   struct pnfs_deviceid *dev_id,
 				   struct pnfs_device *res);
 
 /* pnfs.c */
