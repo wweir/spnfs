@@ -112,6 +112,9 @@ int nfs4_pnfs_dserver_get(struct inode *inode,
 			  size_t count,
 			  struct nfs4_pnfs_dserver *dserver);
 int decode_and_add_devicelist(struct filelayout_mount_type *mt, struct pnfs_devicelist *devlist);
+int process_deviceid_list(struct filelayout_mount_type *mt,
+			  struct nfs_fh *fh,
+			  struct pnfs_devicelist *devlist);
 
 #define READ32(x)         (x) = ntohl(*p++)
 #define READ64(x)         do {			\
