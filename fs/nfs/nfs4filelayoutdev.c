@@ -64,6 +64,10 @@ extern int _nfs4_proc_exchange_id(struct nfs_client *, struct rpc_cred *);
 
 extern struct pnfs_client_operations *pnfs_callback_ops;
 
+struct nfs4_pnfs_dev_item *nfs4_pnfs_device_item_get(struct filelayout_mount_type *mt,
+						      struct nfs_fh *fh,
+						      pnfs_deviceid *dev_id);
+
 void
 print_ds_list(struct nfs4_pnfs_dev *fdev)
 {
@@ -614,28 +618,29 @@ decode_and_add_device(struct filelayout_mount_type *mt, struct pnfs_device *dev)
 	return file_dev;
 }
 
-/* Decode the opaque device list in 'devlist'
- * and add it to the list of available devices for this
+/* For each deviceid, if not already in the cache,
+ * call getdeviceinfo and add the devices associated with
+ * the deviceid to the list of available devices for this
  * mount point.
  * Must at some point be followed up with device_destroy.
  */
 int
-decode_and_add_devicelist(struct filelayout_mount_type *mt, struct pnfs_devicelist *devlist)
+process_deviceid_list(struct filelayout_mount_type *mt,
+		      struct nfs_fh *fh,
+		      struct pnfs_devicelist *devlist)
 {
-	int i, cnt;
+	int i;
 
-	dprintk("%s invoked.  num_devs=%d\n", __FUNCTION__, devlist->num_devs);
+	dprintk("%s num_devs=%d\n", __func__, devlist->num_devs);
 
-	for (i = 0, cnt = 0;
-	     i < devlist->num_devs && cnt < NFS4_PNFS_DEV_MAXNUM;
-	     i++) {
-		if (!decode_and_add_device(mt, &devlist->devs[cnt])) {
-			dprintk("%s error count=%d\n", __FUNCTION__, cnt);
+	for (i = 0; i < devlist->num_devs; i++) {
+		if (!nfs4_pnfs_device_item_get(mt, fh, &devlist->dev_id[i])) {
+			printk(KERN_WARNING "%s Error retrieving device %d\n",
+			       __func__, i);
 			return 1;
 		}
-		cnt++;
 	}
-	dprintk("%s success\n", __FUNCTION__);
+	dprintk("%s success\n", __func__);
 	return 0;
 }
 
