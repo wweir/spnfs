@@ -57,10 +57,10 @@
 #define MIN_POOL_LC		(4)
 
 extern int nfs_fsync(struct file *file, struct dentry *dentry, int datasync);
-extern int nfs4_pnfs_getdevicelist(struct nfs_fh *fh, struct nfs_server *server,
+extern int nfs4_pnfs_getdevicelist(struct super_block *sb, struct nfs_fh *fh,
 				   struct pnfs_devicelist *devlist);
-extern int nfs4_pnfs_getdeviceinfo(struct inode *inode, pnfs_deviceid *dev_id,
-				   struct pnfs_device *res);
+extern int nfs4_pnfs_getdeviceinfo(struct super_block *sb, struct nfs_fh *fh,
+				   struct pnfs_device *dev);
 extern void nfs_initiate_commit(struct nfs_write_data *data,
 				struct rpc_clnt *clnt, int how);
 extern int nfs_flush_one(struct inode *inode, struct list_head *head,
@@ -1584,29 +1584,6 @@ pnfs_commit(struct nfs_write_data *data, int sync)
 	return result;
 }
 
-int
-pnfs_getdevicelist(struct super_block *sb, struct nfs_fh *fh,
-		   struct pnfs_devicelist *devlist)
-{
-	struct nfs_server *server = NFS_SB(sb);
-
-	return nfs4_pnfs_getdevicelist(fh, server, devlist);
-}
-
-/* Retrieve the device information for a device.
- */
-int
-pnfs_getdeviceinfo(struct inode *inode,
-		   pnfs_deviceid *dev_id,
-		   struct pnfs_device *dev)
-{
-	int rc;
-
-	rc = nfs4_pnfs_getdeviceinfo(inode, dev_id, dev);
-
-	return rc;
-}
-
 /* Called on completion of layoutcommit */
 void
 pnfs_layoutcommit_done(
@@ -1810,8 +1787,8 @@ void pnfs_free_request_data(struct nfs_page *req)
 /* Callback operations for layout drivers.
  */
 struct pnfs_client_operations pnfs_ops = {
-	.nfs_getdevicelist = pnfs_getdevicelist,
-	.nfs_getdeviceinfo = pnfs_getdeviceinfo,
+	.nfs_getdevicelist = nfs4_pnfs_getdevicelist,
+	.nfs_getdeviceinfo = nfs4_pnfs_getdeviceinfo,
 	.nfs_readlist_complete = pnfs_read_done,
 	.nfs_writelist_complete = pnfs_writeback_done,
 	.nfs_commit_complete = pnfs_commit_done,
