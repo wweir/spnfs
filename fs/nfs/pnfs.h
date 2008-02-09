@@ -18,12 +18,10 @@
 
 #ifdef CONFIG_PNFS
 /* nfs4proc.c */
-extern int nfs4_pnfs_getdevicelist(struct nfs_fh *fh,
-				   struct nfs_server *server,
+extern int nfs4_pnfs_getdevicelist(struct super_block *sb, struct nfs_fh *fh,
 				   struct pnfs_devicelist *devlist);
-extern int nfs4_pnfs_getdeviceinfo(struct inode *inode,
-				   struct pnfs_deviceid *dev_id,
-				   struct pnfs_device *res);
+extern int nfs4_pnfs_getdeviceinfo(struct super_block *sb, struct nfs_fh *fh,
+				   struct pnfs_device *dev);
 
 /* pnfs.c */
 int pnfs_update_layout(struct inode *ino, struct nfs_open_context *ctx,
