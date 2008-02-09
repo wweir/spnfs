@@ -5210,12 +5210,13 @@ static int _nfs4_pnfs_getdevicelist(struct nfs_fh *fh,
 	return status;
 }
 
-int nfs4_pnfs_getdevicelist(struct nfs_fh *fh,
-			    struct nfs_server *server,
+int nfs4_pnfs_getdevicelist(struct super_block *sb,
+			    struct nfs_fh *fh,
 			    struct pnfs_devicelist *devlist)
 {
 	struct nfs4_exception exception = { };
 	int err;
+	struct nfs_server *server = NFS_SB(sb);
 	do {
 		err = nfs4_handle_exception(server,
 				_nfs4_pnfs_getdevicelist(fh, server, devlist),
@@ -5228,14 +5229,14 @@ int nfs4_pnfs_getdevicelist(struct nfs_fh *fh,
 	return err;
 }
 
-int nfs4_pnfs_getdeviceinfo(struct inode *inode,
-			    struct pnfs_deviceid *dev_id,
+int nfs4_pnfs_getdeviceinfo(struct super_block *sb,
+			    struct nfs_fh *fh,
 			    struct pnfs_device *dev)
 {
-	struct nfs_server *server = NFS_SERVER(inode);
+	struct nfs_server *server = NFS_SB(sb);
 	struct nfs4_pnfs_getdeviceinfo_arg args = {
-		.fh = NFS_FH(inode),
-		.dev_id = dev_id,
+		.fh = fh,
+		.dev_id = &dev->dev_id,
 		.layoutclass = server->pnfs_curr_ld->id,
 	};
 	struct nfs4_pnfs_getdeviceinfo_res res = {
