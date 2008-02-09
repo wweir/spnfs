@@ -181,7 +181,7 @@ struct layoutdriver_policy_operations {
 };
 
 struct pnfs_device {
-	int           dev_id;
+	struct pnfs_deviceid dev_id;
 	unsigned int  dev_count;
 	unsigned int  dev_addr_len;
 	char          dev_addr_buf[NFS4_PNFS_DEV_MAXSIZE];
@@ -202,7 +202,9 @@ struct pnfs_devicelist {
  */
 struct pnfs_client_operations {
 	int (*nfs_getdevicelist) (struct super_block *sb, struct nfs_fh *fh, struct pnfs_devicelist *devlist);
-	int (*nfs_getdeviceinfo) (struct inode *inode, u32 dev_id, struct pnfs_device *dev);
+	int (*nfs_getdeviceinfo) (struct inode *inode,
+				  struct pnfs_deviceid *dev_id,
+				  struct pnfs_device *dev);
 
 	/* Post read callback. */
 	void (*nfs_readlist_complete) (struct nfs_read_data *nfs_data);

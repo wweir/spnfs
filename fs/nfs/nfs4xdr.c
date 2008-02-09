@@ -271,10 +271,13 @@ static int nfs4_stat_to_errno(int);
 #if defined(CONFIG_PNFS)
 #define encode_getdevicelist_maxsz (op_encode_hdr_maxsz + 4 +  \
 				   (NFS4_VERIFIER_SIZE >> 2))
-#define decode_getdevicelist_maxsz (op_decode_hdr_maxsz + 5 + 2 +      \
-				   NFS4_PNFS_DEV_MAXNUM*NFS4_PNFS_DEV_MAXSIZE)
-#define encode_getdeviceinfo_maxsz (op_encode_hdr_maxsz + 2)
-#define decode_getdeviceinfo_maxsz (op_decode_hdr_maxsz + 3 + \
+#define decode_getdevicelist_maxsz (op_decode_hdr_maxsz + 6 +		\
+				    NFS4_PNFS_DEV_MAXNUM *		\
+				    (NFS4_PNFS_DEVICEID4_SIZE + 2 +	\
+				     NFS4_PNFS_DEV_MAXSIZE))
+#define encode_getdeviceinfo_maxsz (op_encode_hdr_maxsz + 2 + \
+				    NFS4_PNFS_DEVICEID4_SIZE)
+#define decode_getdeviceinfo_maxsz (op_decode_hdr_maxsz + 2 + \
 				   NFS4_PNFS_DEV_MAXSIZE)
 #define encode_pnfs_layoutget_sz (op_encode_hdr_maxsz + 13)
 #define decode_pnfs_layoutget_maxsz	(op_decode_hdr_maxsz + 8 + \
@@ -1825,9 +1828,11 @@ static int encode_getdeviceinfo(struct xdr_stream *xdr,
 				const struct nfs4_pnfs_getdeviceinfo_arg *args)
 {
 	uint32_t *p;
-	RESERVE_SPACE(16);
+
+	RESERVE_SPACE(12 + NFS4_PNFS_DEVICEID4_SIZE);
+
 	WRITE32(OP_GETDEVICEINFO);
-	WRITE32(args->dev_id);
+	WRITEMEM(args->dev_id->data, NFS4_PNFS_DEVICEID4_SIZE);
 	WRITE32(args->layoutclass);
 	WRITE32(NFS4_PNFS_DEV_MAXSIZE);
 	return 0;
@@ -5471,17 +5476,16 @@ static int decode_getdevicelist(struct xdr_stream *xdr,
 	for (i = 0, cnt = 0;
 	     i < res->num_devs && cnt < NFS4_PNFS_DEV_MAXNUM;
 	     i++) {
-		READ_BUF(4);
-		READ32(res->devs[cnt].dev_id);	/* device id */
+		READ_BUF(NFS4_PNFS_DEVICEID4_SIZE);
+		COPYMEM(res->devs[cnt].dev_id.data, NFS4_PNFS_DEVICEID4_SIZE);
 
 		READ_BUF(4);
 		READ32(res->layout_type);
 
 		READ_BUF(4);
 		READ32(len);
-		dprintk("%s: num_dev %d i %d cnt %d id %d len %d\n",
-			__func__, res->num_devs, i, cnt,
-			res->devs[cnt].dev_id, len);
+		dprintk("%s: num_dev %d i %d cnt %d len %d\n",
+			__func__, res->num_devs, i, cnt, len);
 
 		READ_BUF(len);
 
@@ -5506,7 +5510,7 @@ static int decode_getdevicelist(struct xdr_stream *xdr,
  * Decode GETDEVICEINFO reply
  */
 static int decode_getdeviceinfo(struct xdr_stream *xdr,
-struct pnfs_device *res)
+				struct pnfs_device *res)
 {
 	uint32_t *p;
 	uint32_t len, type;
