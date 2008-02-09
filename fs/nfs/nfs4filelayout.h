@@ -89,6 +89,7 @@ struct nfs4_filelayout_segment {
 	u32 commit_through_mds;
 	u64 stripe_unit;
 	u32 first_stripe_index;
+	u64 pattern_offset;
 	pnfs_deviceid dev_id;
 	unsigned int num_fh;
 	struct nfs_fh fh_array[NFS4_PNFS_MAX_STRIPE_CNT];
