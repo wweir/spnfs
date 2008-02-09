@@ -18,7 +18,8 @@
 #include <linux/pnfs_xdr.h>
 
 #define NFS4_PNFS_DEV_HASH_BITS 5
-#define NFS4_PNFS_DEV_HASH (1 << NFS4_PNFS_DEV_HASH_BITS)
+#define NFS4_PNFS_DEV_HASH_SIZE (1 << NFS4_PNFS_DEV_HASH_BITS)
+#define NFS4_PNFS_DEV_HASH_MASK (NFS4_PNFS_DEV_HASH_SIZE - 1)
 
 #define NFS4_PNFS_MAX_STRIPE_CNT 16
 #define NFS4_PNFS_MAX_MULTI_DS   2
@@ -48,19 +49,19 @@ struct nfs4_pnfs_dev {
 /* stripe_count is length of dev_list, bounded by NFS4_PNFS_MAX_STRIPE_CNT */
 struct nfs4_pnfs_dev_item {
 	struct hlist_node	hash_node;	/* nfs4_pnfs_dev_hlist dev_list */
-	u32 			dev_id;
+	struct pnfs_deviceid	dev_id;
 	u32 			stripe_count;
 	struct nfs4_pnfs_dev	*stripe_devs;
 };
 
 struct nfs4_pnfs_dev_hlist {
 	rwlock_t		dev_lock;
-	struct hlist_head	dev_list[NFS4_PNFS_DEV_HASH];
-	struct hlist_head	dev_dslist[NFS4_PNFS_DEV_HASH];
+	struct hlist_head	dev_list[NFS4_PNFS_DEV_HASH_SIZE];
+	struct hlist_head	dev_dslist[NFS4_PNFS_DEV_HASH_SIZE];
 };
 
 struct nfs4_pnfs_devaddr {
-	u32 dev_id;
+	struct pnfs_deviceid dev_id;
 	u32 ip;
 	u16 port;
 };
@@ -81,7 +82,7 @@ struct nfs4_filelayout_segment {
 	u32 commit_through_mds;
 	u64 stripe_unit;
 	u32 first_stripe_index;
-	u32 dev_id;
+	struct pnfs_deviceid dev_id;
 	unsigned int num_fh;
 	struct nfs_fh fh_array[NFS4_PNFS_MAX_STRIPE_CNT];
 };
@@ -100,6 +101,7 @@ struct filelayout_mount_type {
 
 extern struct pnfs_client_operations *pnfs_callback_ops;
 
+char *deviceid_fmt(const struct pnfs_deviceid *dev_id);
 int  nfs4_pnfs_devlist_init(struct nfs4_pnfs_dev_hlist *hlist);
 void nfs4_pnfs_devlist_destroy(struct nfs4_pnfs_dev_hlist *hlist);
 
@@ -111,7 +113,7 @@ int nfs4_pnfs_dserver_get(struct inode *inode,
 int decode_and_add_devicelist(struct filelayout_mount_type *mt, struct pnfs_devicelist *devlist);
 
 struct nfs4_pnfs_dev_item *
-nfs4_pnfs_device_item_get(struct inode *inode, u32 dev_id);
+nfs4_pnfs_device_item_get(struct inode *inode, struct pnfs_deviceid *dev_id);
 
 
 #define READ32(x)         (x) = ntohl(*p++)
