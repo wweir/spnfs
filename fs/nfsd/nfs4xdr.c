@@ -1265,7 +1265,7 @@ nfsd4_decode_getdevinfo(struct nfsd4_compoundargs *argp,
 	DECODE_TAIL;
 }
 
-/* LAYOUTGET: minorversion1-01.txt
+/* LAYOUTGET: minorversion1-19.txt
 u32     int32                   signal_layout_available;
 u32     pnfs_layouttype4        layout_type;
 u32     pnfs_layoutiomode4      iomode;
@@ -1280,19 +1280,21 @@ nfsd4_decode_layoutget(struct nfsd4_compoundargs *argp,
 {
 	DECODE_HEAD;
 
-	READ_BUF(40);
+	READ_BUF(44 + sizeof(stateid_opaque_t));
 	READ32(lgp->lg_signal);
 	READ32(lgp->lg_seg.layout_type);
 	READ32(lgp->lg_seg.iomode);
 	READ64(lgp->lg_seg.offset);
 	READ64(lgp->lg_seg.length);
 	READ64(lgp->lg_minlength);
+	READ32(lgp->lg_generation);
+	COPYMEM(&lgp->lg_opaque, sizeof(stateid_opaque_t));
 	READ32(lgp->lg_maxcount);
 
 	DECODE_TAIL;
 }
 
-/* LAYOUTCOMMIT: minorversion1-01.txt
+/* LAYOUTCOMMIT: minorversion1-19.txt
 
      struct pnfs_layoutupdate4 {
             pnfs_layouttype4        type;
@@ -1316,10 +1318,12 @@ nfsd4_decode_layoutcommit(struct nfsd4_compoundargs *argp,
 	DECODE_HEAD;
 	u32 timechange;
 
-	READ_BUF(24);
+	READ_BUF(28 + sizeof(stateid_opaque_t));
 	READ64(lcp->lc_seg.offset);
 	READ64(lcp->lc_seg.length);
 	READ32(lcp->lc_reclaim);
+	READ32(lcp->lc_generation);
+	COPYMEM(&lcp->lc_opaque, sizeof(stateid_opaque_t));
 	READ32(lcp->lc_newoffset);
 	if (lcp->lc_newoffset) {
 		READ_BUF(8);
@@ -1335,16 +1339,6 @@ nfsd4_decode_layoutcommit(struct nfsd4_compoundargs *argp,
 	} else {
 		lcp->lc_mtime.seconds = 0;
 		lcp->lc_mtime.nseconds = 0;
-	}
-	READ_BUF(4);
-	READ32(timechange);
-	if (timechange) {
-		READ_BUF(12);
-		READ64(lcp->lc_atime.seconds);
-		READ32(lcp->lc_atime.nseconds);
-	} else {
-		lcp->lc_atime.seconds = 0;
-		lcp->lc_atime.nseconds = 0;
 	}
 	READ_BUF(8);
 	READ32(lcp->lc_seg.layout_type);
@@ -1374,9 +1368,11 @@ nfsd4_decode_layoutreturn(struct nfsd4_compoundargs *argp,
 	READ32(lrp->lr_seg.iomode);
 	READ32(lrp->lr_return_type);
 	if (lrp->lr_return_type == RETURN_FILE) {
-		READ_BUF(16);
+		READ_BUF(20 + sizeof(stateid_opaque_t));
 		READ64(lrp->lr_seg.offset);
 		READ64(lrp->lr_seg.length);
+		READ32(lrp->lr_generation);
+		COPYMEM(&lrp->lr_opaque, sizeof(stateid_opaque_t));
 	}
 
 	DECODE_TAIL;
@@ -3443,7 +3439,7 @@ nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp,
 	return nfs_ok;
 }
 
-/* LAYOUTGET: minorversion1-13.txt
+/* LAYOUTGET: minorversion1-19.txt
 u32            bool                    logr_return_on_close;
 u64            offset4                 offset;
 u64            length4                 length;
@@ -3472,7 +3468,7 @@ nfsd4_encode_layoutget(struct nfsd4_compoundres *resp,
 		maxcount = lgp->lg_maxcount;
 
 	/* Check for space on xdr stream */
-	leadcount = 28;
+	leadcount = 32 + sizeof(stateid_opaque_t);
 	RESERVE_SPACE(leadcount);
 	/* encode layout metadata after file system encodes layout */
 	p += XDR_QUADLEN(leadcount);
@@ -3522,6 +3518,8 @@ nfsd4_encode_layoutget(struct nfsd4_compoundres *resp,
 	/* Rewind to beginning and encode attrs */
 	p = p_start;
 	WRITE32(args.return_on_close);
+	WRITE32(lgp->lg_generation);
+	WRITEMEM(&lgp->lg_opaque, sizeof(stateid_opaque_t));
 	WRITE64(args.seg.offset);
 	WRITE64(args.seg.length);
 	WRITE32(args.seg.iomode);
@@ -3537,7 +3535,7 @@ nfsd4_encode_layoutget(struct nfsd4_compoundres *resp,
 	return nfs_ok;
 }
 
-/* LAYOUTGET: minorversion1-01.txt
+/* LAYOUTCOMMIT: minorversion1-19.txt
      struct LAYOUTCOMMIT4resok {
             newsize4                 newsize;
      };
@@ -3558,6 +3556,20 @@ nfsd4_encode_layoutcommit(struct nfsd4_compoundres *resp, int nfserr,
 			WRITE64(lcp->lc_newsize);
 			ADJUST_ARGS();
 		}
+	}
+}
+
+static void
+nfsd4_encode_layoutreturn(struct nfsd4_compoundres *resp, int nfserr,
+			  struct nfsd4_pnfs_layoutreturn *lrp)
+{
+	ENCODE_HEAD;
+
+	if (!nfserr) {
+		RESERVE_SPACE(8 + sizeof(stateid_t));
+		WRITE32(1);    /* got stateid */
+		WRITE32(lrp->lr_generation);
+		WRITEMEM(&lrp->lr_opaque, sizeof(stateid_opaque_t));
 	}
 }
 #endif /* CONFIG_PNFSD */
@@ -3684,6 +3696,7 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 		nfsd4_encode_layoutcommit(resp, op->status, &op->u.pnfs_layoutcommit);
 		break;
 	case OP_LAYOUTRETURN:
+		nfsd4_encode_layoutreturn(resp, op->status, &op->u.pnfs_layoutreturn);
 		break;
 #endif /* CONFIG_PNFSD */
 #if defined(CONFIG_NFSD_V4_1)
