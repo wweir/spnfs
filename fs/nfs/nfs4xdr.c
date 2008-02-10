@@ -279,14 +279,20 @@ static int nfs4_stat_to_errno(int);
 				    NFS4_PNFS_DEVICEID4_SIZE)
 #define decode_getdeviceinfo_maxsz (op_decode_hdr_maxsz + 2 + \
 				   NFS4_PNFS_DEV_MAXSIZE)
-#define encode_pnfs_layoutget_sz (op_encode_hdr_maxsz + 13)
+#define encode_pnfs_layoutget_sz (op_encode_hdr_maxsz + 10 + \
+				  encode_stateid_maxsz)
 #define decode_pnfs_layoutget_maxsz	(op_decode_hdr_maxsz + 8 + \
-					 PNFS_LAYOUT_MAXSIZE)
-#define encode_pnfs_layoutcommit_sz	(18 + PNFS_LAYOUT_MAXSIZE + \
-					op_encode_hdr_maxsz)
+					 decode_stateid_maxsz + \
+					 XDR_QUADLEN(PNFS_LAYOUT_MAXSIZE))
+#define encode_pnfs_layoutcommit_sz	(18 +				\
+					 XDR_QUADLEN(PNFS_LAYOUT_MAXSIZE) + \
+					 op_encode_hdr_maxsz +		\
+					 encode_stateid_maxsz)
 #define decode_pnfs_layoutcommit_maxsz	(3 + op_decode_hdr_maxsz)
-#define encode_pnfs_layoutreturn_sz	(8 + op_encode_hdr_maxsz)
-#define decode_pnfs_layoutreturn_maxsz	(op_decode_hdr_maxsz)
+#define encode_pnfs_layoutreturn_sz	(8 + op_encode_hdr_maxsz + \
+					 encode_stateid_maxsz)
+#define decode_pnfs_layoutreturn_maxsz	(op_decode_hdr_maxsz + \
+					 1 + decode_stateid_maxsz)
 #endif /* CONFIG_PNFS */
 
 #define NFS40_enc_compound_sz	(1024)  /* XXX: large enough? */
@@ -1103,29 +1109,21 @@ static int encode_pnfs_layoutcommit(struct xdr_stream *xdr,
 		args->lseg.length, args->lseg.offset, args->lastbytewritten,
 		args->layout_type);
 
-	RESERVE_SPACE(40);
+	RESERVE_SPACE(40 + NFS4_STATEID_SIZE);
 	WRITE32(OP_LAYOUTCOMMIT);
 	WRITE64(args->lseg.offset);
 	WRITE64(args->lseg.length);
 	WRITE32(0);     /* reclaim */
+	WRITEMEM(args->stateid.data, NFS4_STATEID_SIZE);
 	WRITE32(1);     /* newoffset = TRUE */
 	WRITE64(args->lastbytewritten);
-	WRITE32(args->time_modify_changed);
+	WRITE32(args->time_modify_changed != 0);
 	if (args->time_modify_changed) {
 		RESERVE_SPACE(12);
 		WRITE32(0);
 		WRITE32(args->time_modify.tv_sec);
 		WRITE32(args->time_modify.tv_nsec);
 	}
-	RESERVE_SPACE(4);
-	WRITE32(args->time_access_changed);
-	if (args->time_access_changed) {
-		RESERVE_SPACE(12);
-		WRITE32(0);
-		WRITE32(args->time_access.tv_sec);
-		WRITE32(args->time_access.tv_nsec);
-	}
-
 	RESERVE_SPACE(8 + args->new_layout_size);
 	WRITE32(args->layout_type);
 	WRITE32(args->new_layout_size);
@@ -1846,7 +1844,7 @@ static int encode_pnfs_layoutget(struct xdr_stream *xdr,
 {
 	uint32_t *p;
 
-	RESERVE_SPACE(44);
+	RESERVE_SPACE(44 + NFS4_STATEID_SIZE);
 	WRITE32(OP_LAYOUTGET);
 	WRITE32(0);     /* Signal layout available */
 	WRITE32(args->type);
@@ -1854,6 +1852,7 @@ static int encode_pnfs_layoutget(struct xdr_stream *xdr,
 	WRITE64(args->lseg.offset);
 	WRITE64(args->lseg.length);
 	WRITE64(args->minlength);
+	WRITEMEM(&args->stateid.data, NFS4_STATEID_SIZE);
 	WRITE32(args->maxcount);
 
 	dprintk("%s: 1st type:0x%x iomode:%d off:%lu len:%lu mc:%d\n",
@@ -1880,9 +1879,10 @@ static int encode_pnfs_layoutreturn(struct xdr_stream *xdr,
 	WRITE32(args->lseg.iomode);
 	WRITE32(args->return_type);
 	if (args->return_type == RETURN_FILE) {
-		RESERVE_SPACE(16);
+		RESERVE_SPACE(16 + NFS4_STATEID_SIZE);
 		WRITE64(args->lseg.offset);
 		WRITE64(args->lseg.length);
+		WRITEMEM(&args->stateid.data, NFS4_STATEID_SIZE);
 	}
 	return 0;
 }
@@ -5544,8 +5544,9 @@ static int decode_pnfs_layoutget(struct xdr_stream *xdr, struct rpc_rqst *req,
 	status = decode_op_hdr(xdr, OP_LAYOUTGET);
 	if (status)
 		return status;
-	READ_BUF(32);
+	READ_BUF(32 + NFS4_STATEID_SIZE);
 	READ32(res->return_on_close);
+	COPYMEM(res->stateid.data, NFS4_STATEID_SIZE);
 	READ64(res->lseg.offset);
 	READ64(res->lseg.length);
 	READ32(res->lseg.iomode);
@@ -5570,9 +5571,20 @@ static int decode_pnfs_layoutget(struct xdr_stream *xdr, struct rpc_rqst *req,
 /*
  * Decode LAYOUTRETURN reply
  */
-static int decode_pnfs_layoutreturn(struct xdr_stream *xdr)
+static int decode_pnfs_layoutreturn(struct xdr_stream *xdr, uint32_t *p, struct nfs4_pnfs_layoutreturn_res *res)
 {
-	return decode_op_hdr(xdr, OP_LAYOUTRETURN);
+	int status;
+
+	status = decode_op_hdr(xdr, OP_LAYOUTRETURN);
+	if (status)
+		return status;
+	READ_BUF(4);
+	READ32(res->lrs_present);
+	if (res->lrs_present) {
+		READ_BUF(NFS4_STATEID_SIZE);
+		COPYMEM(res->stateid.data, NFS4_STATEID_SIZE);
+	}
+	return 0;
 }
 
  #endif /* CONFIG_PNFS */
@@ -7518,7 +7530,7 @@ static int nfs41_xdr_dec_pnfs_layoutreturn(struct rpc_rqst *rqstp, uint32_t *p,
 	status = decode_putfh(&xdr);
 	if (status)
 		goto out;
-	status = decode_pnfs_layoutreturn(&xdr);
+	status = decode_pnfs_layoutreturn(&xdr, p, res);
 out:
 	return status;
 }
