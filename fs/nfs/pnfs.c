@@ -860,9 +860,12 @@ pnfs_update_layout(struct inode *ino,
 	}
 
 	res.layout.buf = NULL;
+	memcpy(&layout_new->stateid.data, &arg.stateid.data, NFS4_STATEID_SIZE);
 	spin_unlock(&nfsi->lo_lock);
 	result = get_layout(ino, ctx, &arg, &res);
 	spin_lock(&nfsi->lo_lock);
+	/* FIXME: check for reordering using the returned sequence id */
+	memcpy(&res.stateid.data, &layout_new->stateid.data, NFS4_STATEID_SIZE);
 
 	/* we got a reference on nfsi->current_layout hence it must never
 	 * change, even while nfsi->lo_lock was not held.
@@ -1713,7 +1716,6 @@ pnfs_layoutcommit_setup(struct pnfs_layoutcommit_data *data, int sync)
 
 	/* TODO: Need to determine the correct values */
 	data->args.time_modify_changed = 0;
-	data->args.time_access_changed = 0;
 
 	/* Set values from inode so it can be reset
 	 */
