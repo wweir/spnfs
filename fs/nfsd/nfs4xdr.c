@@ -3566,7 +3566,7 @@ nfsd4_encode_layoutreturn(struct nfsd4_compoundres *resp, int nfserr,
 	ENCODE_HEAD;
 
 	if (!nfserr) {
-		RESERVE_SPACE(8 + sizeof(stateid_t));
+		RESERVE_SPACE(4 + sizeof(stateid_t));
 		WRITE32(1);    /* got stateid */
 		WRITE32(lrp->lr_generation);
 		WRITEMEM(&lrp->lr_opaque, sizeof(stateid_opaque_t));
