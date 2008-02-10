@@ -290,7 +290,8 @@ static int nfs4_stat_to_errno(int);
 					 encode_stateid_maxsz)
 #define decode_pnfs_layoutcommit_maxsz	(3 + op_decode_hdr_maxsz)
 #define encode_pnfs_layoutreturn_sz	(8 + op_encode_hdr_maxsz + \
-					 encode_stateid_maxsz)
+					 encode_stateid_maxsz + \
+					 1 /* FIXME: opaque lrf_body always empty at the moment */)
 #define decode_pnfs_layoutreturn_maxsz	(op_decode_hdr_maxsz + \
 					 1 + decode_stateid_maxsz)
 #endif /* CONFIG_PNFS */
@@ -1880,10 +1881,11 @@ static int encode_pnfs_layoutreturn(struct xdr_stream *xdr,
 	WRITE32(args->lseg.iomode);
 	WRITE32(args->return_type);
 	if (args->return_type == RETURN_FILE) {
-		RESERVE_SPACE(16 + NFS4_STATEID_SIZE);
+		RESERVE_SPACE(20 + NFS4_STATEID_SIZE);
 		WRITE64(args->lseg.offset);
 		WRITE64(args->lseg.length);
 		WRITEMEM(&args->stateid.data, NFS4_STATEID_SIZE);
+		WRITE32(0); /* FIXME: opaque lrf_body always empty at the moment */
 	}
 	return 0;
 }
