@@ -1392,11 +1392,16 @@ nfsd4_decode_layoutreturn(struct nfsd4_compoundargs *argp,
 	READ32(lrp->lr_seg.iomode);
 	READ32(lrp->lr_return_type);
 	if (lrp->lr_return_type == RETURN_FILE) {
-		READ_BUF(20 + sizeof(stateid_opaque_t));
+		READ_BUF(24 + sizeof(stateid_opaque_t));
 		READ64(lrp->lr_seg.offset);
 		READ64(lrp->lr_seg.length);
 		READ32(lrp->lr_sid.si_generation);
 		COPYMEM(&lrp->lr_sid.si_opaque, sizeof(stateid_opaque_t));
+		READ32(lrp->lrf_body_len);
+		if (lrp->lrf_body_len > 0) {
+			READ_BUF(lrp->lrf_body_len);
+			READMEM(lrp->lrf_body, lrp->lrf_body_len);
+		}
 	}
 
 	DECODE_TAIL;
