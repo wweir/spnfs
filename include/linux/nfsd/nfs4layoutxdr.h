@@ -80,6 +80,7 @@ struct pnfs_filelayout_layout {
 	u32                             lg_stripe_type; /* response */
 	u32                             lg_commit_through_mds; /* response */
 	u64                             lg_stripe_unit; /* response */
+	u64                             lg_pattern_offset; /* response */
 	u32                             lg_first_stripe_index;	/* response */
 	deviceid_t			device_id;		/* response */
 	u32                             lg_fh_length;		/* response */
