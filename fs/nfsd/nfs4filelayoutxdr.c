@@ -200,6 +200,10 @@ filelayout_encode_layout(struct pnfs_xdr_info *resp, void *layout)
 	WRITE32(flp->lg_first_stripe_index);
 	len += 4;
 
+	/* encode striping pattern start */
+	WRITE64(flp->lg_pattern_offset);
+	len += 8;
+
 	/* Ensure file system added at least one file handle */
 	if (flp->lg_fh_length <= 0) {
 		printk("%s: File Layout has no file handles!!\n", __FUNCTION__);
