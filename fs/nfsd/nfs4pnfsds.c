@@ -290,9 +290,12 @@ nfsv4_ds_get_state(struct svc_fh *cfh, stateid_t *stidp)
 		return dsp;
 	memcpy(&gs.stid, stidp, sizeof(stateid_t));
 	sb = ino->i_sb;
-	if (sb && sb->s_export_op->get_state)
+	if (sb && sb->s_export_op->get_state) {
+		nfs4_unlock_state();
 		status = sb->s_export_op->get_state(ino, &cfh->fh_handle, &gs);
 		dprintk("pNFSD: %s from MDS status %d\n", __func__, status);
+		nfs4_lock_state();
+	}
 	if (status)
 		return NULL;
 	/* create new pnfs_ds_stateid */
