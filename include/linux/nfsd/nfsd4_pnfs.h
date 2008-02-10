@@ -66,6 +66,7 @@ struct nfsd4_pnfs_layoutget {
 	u64			lg_minlength;	/* request */
 	u32			lg_maxcount;	/* request */
 	struct svc_fh		*lg_fhp;	/* response */
+	stateid_t		lg_sid;		/* request/response */
 };
 
 struct nfsd4_pnfs_layoutcommit {
@@ -74,7 +75,7 @@ struct nfsd4_pnfs_layoutcommit {
 	u32			lc_newoffset;	/* request */
 	u64			lc_last_wr;	/* request */
 	struct nfstime4		lc_mtime;	/* request */
-	struct nfstime4		lc_atime;	/* request */
+	stateid_t		lc_sid;		/* request */
 	u32			lc_up_len;	/* layout length */
 	void			*lc_up_layout;	/* decoded by callback */
 	u32			lc_size_chg;	/* boolean for response */
@@ -91,6 +92,7 @@ struct nfsd4_pnfs_layoutreturn {
 	struct nfsd4_layout_seg	lr_seg;		/* request */
 	u32			lr_reclaim;	/* request */
 	u32			lr_flags;
+	stateid_t		lr_sid;		/* request/resopnse */
 };
 
 struct nfsd4_pnfs_cb_layout {
