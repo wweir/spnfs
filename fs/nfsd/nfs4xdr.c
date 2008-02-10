@@ -3561,11 +3561,18 @@ static void
 nfsd4_encode_layoutreturn(struct nfsd4_compoundres *resp, int nfserr,
 			  struct nfsd4_pnfs_layoutreturn *lrp)
 {
+	int lrs_present;
 	ENCODE_HEAD;
 
-	if (!nfserr) {
-		RESERVE_SPACE(4 + sizeof(stateid_t));
-		WRITE32(1);    /* got stateid */
+	if (nfserr)
+		return;
+
+	RESERVE_SPACE(4);
+	lrs_present = (lrp->lrs_present != 0);
+	WRITE32(lrs_present);    /* got stateid? */
+	ADJUST_ARGS();
+	if (lrs_present) {
+		RESERVE_SPACE(sizeof(stateid_t));
 		WRITE32(lrp->lr_sid.si_generation);
 		WRITEMEM(&lrp->lr_sid.si_opaque, sizeof(stateid_opaque_t));
 		ADJUST_ARGS();
