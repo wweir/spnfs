@@ -41,6 +41,7 @@ struct nfs4_pnfs_layoutget_arg {
 	__u64 minlength;
 	__u32 maxcount;
 	struct nfs_open_context *ctx;
+	nfs4_stateid stateid;
 	struct inode *inode;
 	struct nfs41_sequence_args	seq_args;
 };
@@ -49,6 +50,7 @@ struct nfs4_pnfs_layoutget_res {
 	__u32 return_on_close;
 	struct nfs4_pnfs_layout_segment lseg;
 	__u32 type;
+	nfs4_stateid stateid;
 	struct nfs4_pnfs_layout layout;
 	struct nfs41_sequence_res	seq_res;
 };
@@ -59,11 +61,10 @@ struct nfs4_pnfs_layoutget {
 };
 
 struct pnfs_layoutcommit_arg {
+	nfs4_stateid stateid;
 	__u64 lastbytewritten;
 	__u32 time_modify_changed;
 	struct timespec time_modify;
-	__u32 time_access_changed;
-	struct timespec time_access;
 	const u32 *bitmask;
 	struct nfs_fh *fh;
 
@@ -98,12 +99,15 @@ struct nfs4_pnfs_layoutreturn_arg {
 	__u32	layout_type;
 	__u32	return_type;
 	struct nfs4_pnfs_layout_segment lseg;
+	nfs4_stateid stateid;
 	struct inode *inode;
 	struct nfs41_sequence_args	seq_args;
 };
 
 struct nfs4_pnfs_layoutreturn_res {
 	struct nfs41_sequence_res	seq_res;
+	u32 lrs_present;
+	nfs4_stateid stateid;
 };
 
 struct nfs4_pnfs_layoutreturn {

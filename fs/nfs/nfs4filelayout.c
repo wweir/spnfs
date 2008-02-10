@@ -619,6 +619,7 @@ filelayout_set_layout(struct pnfs_layout_type *layoutid,
 	fl->stripe_unit = nfl_util & ~NFL4_UFLG_MASK;
 
 	READ32(fl->first_stripe_index);
+	READ64(fl->pattern_offset);
 	READ32(fl->num_fh);
 
 	dprintk("%s: nfl_util 0x%X num_fh %u dev_id %s\n",
