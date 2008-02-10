@@ -293,7 +293,7 @@ static int nr_sequence_quads;
 #define encode_pnfs_layoutreturn_sz	(8 + op_encode_hdr_maxsz + \
 					 encode_stateid_maxsz)
 #define decode_pnfs_layoutreturn_maxsz	(op_decode_hdr_maxsz + \
-					 decode_stateid_maxsz)
+					 1 + decode_stateid_maxsz)
 #endif /* CONFIG_PNFS */
 
 #define NFS40_enc_compound_sz	(1024)  /* XXX: large enough? */
@@ -5587,10 +5587,12 @@ static int decode_pnfs_layoutreturn(struct xdr_stream *xdr, uint32_t *p, struct 
 	status = decode_op_hdr(xdr, OP_LAYOUTRETURN);
 	if (status)
 		return status;
-	READ_BUF(4 + NFS4_STATEID_SIZE);
+	READ_BUF(4);
 	READ32(res->lrs_present);
-	if (res->lrs_present)
+	if (res->lrs_present) {
+		READ_BUF(NFS4_STATEID_SIZE);
 		COPYMEM(res->stateid.data, NFS4_STATEID_SIZE);
+	}
 	return 0;
 }
 
