@@ -3570,6 +3570,7 @@ nfsd4_encode_layoutreturn(struct nfsd4_compoundres *resp, int nfserr,
 		WRITE32(1);    /* got stateid */
 		WRITE32(lrp->lr_generation);
 		WRITEMEM(&lrp->lr_opaque, sizeof(stateid_opaque_t));
+		ADJUST_ARGS();
 	}
 }
 #endif /* CONFIG_PNFSD */
