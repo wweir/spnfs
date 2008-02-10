@@ -94,6 +94,7 @@ struct nfsd4_pnfs_layoutreturn {
 	u32			lr_reclaim;	/* request */
 	u32			lr_flags;
 	stateid_t		lr_sid;		/* request/resopnse */
+	u32			lrs_present;	/* response */
 };
 
 struct nfsd4_pnfs_cb_layout {
