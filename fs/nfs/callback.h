@@ -81,6 +81,7 @@ struct cb_pnfs_layoutrecallargs {
 	uint32_t		cbl_recall_type;
 	uint32_t		cbl_layout_type;
 	uint32_t		cbl_layoutchanged;
+	nfs4_stateid		cbl_stateid;
 };
 #endif /* CONFIG_PNFS */
 
