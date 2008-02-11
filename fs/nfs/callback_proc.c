@@ -205,9 +205,8 @@ static int pnfs_recall_layout(void *data)
 		printk(KERN_INFO
 		       "%s: ignoring pnfs_return_layout_rpc status=%d\n",
 		       __func__, status);
-	iput(inode);
-
 out:
+	iput(inode);
 	module_put_and_exit(0);
 	dprintk("%s: exit status %d\n", __func__, 0);
 	return 0;
