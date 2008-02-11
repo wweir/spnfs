@@ -263,6 +263,9 @@ static unsigned decode_pnfs_layoutrecall_args(struct svc_rqst *rqstp,
 		p = read_buf(xdr, 2 * sizeof(uint64_t));
 		READ64(args->cbl_seg.offset);
 		READ64(args->cbl_seg.length);
+		status = decode_stateid(xdr, &args->cbl_stateid);
+		if (unlikely(status != 0))
+			goto out;
 	} else if (args->cbl_recall_type == RECALL_FSID) {
 		p = read_buf(xdr, 2 * sizeof(uint64_t));
 		READ64(args->cbl_fsid.major);
