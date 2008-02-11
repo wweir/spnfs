@@ -311,11 +311,8 @@ static int
 encode_cb_layout(struct xdr_stream *xdr, struct nfs4_layoutrecall *clr)
 {
 	u32 *p;
-	int len = clr->cb.cbl_recall_type == RECALL_FILE ?
-		  clr->clr_file->fi_fhlen : 0;
 
-	RESERVE_SPACE(40 + len);
-
+	RESERVE_SPACE(20);
 	WRITE32(OP_CB_LAYOUT);
 	WRITE32(clr->cb.cbl_seg.layout_type);
 	WRITE32(clr->cb.cbl_seg.iomode);
@@ -323,6 +320,8 @@ encode_cb_layout(struct xdr_stream *xdr, struct nfs4_layoutrecall *clr)
 	WRITE32(clr->cb.cbl_recall_type);
 	if (unlikely(clr->cb.cbl_recall_type == RECALL_FSID)) {
 		struct nfs4_fsid fsid = clr->cb.cbl_fsid;
+
+		RESERVE_SPACE(16);
 		WRITE64(fsid.major);
 		WRITE64(fsid.minor);
 		dprintk("%s: type %x iomode %d changed %d recall_type %d "
@@ -331,10 +330,14 @@ encode_cb_layout(struct xdr_stream *xdr, struct nfs4_layoutrecall *clr)
 			clr->cb.cbl_seg.iomode, clr->cb.cbl_layoutchanged,
 			clr->cb.cbl_recall_type, fsid.major, fsid.minor);
 	} else if (clr->cb.cbl_recall_type == RECALL_FILE) {
+		int len = clr->clr_file->fi_fhlen;
+
+		RESERVE_SPACE(20 + sizeof(stateid_t) + len);
 		WRITE32(len);
 		WRITEMEM(clr->clr_file->fi_fhval, len);
 		WRITE64(clr->cb.cbl_seg.offset);
 		WRITE64(clr->cb.cbl_seg.length);
+		WRITEMEM(&clr->cb.cbl_sid, sizeof(stateid_t));
 		dprintk("%s: type %x iomode %d changed %d recall_type %d "
 			"offset %lld length %lld\n",
 			__func__, clr->cb.cbl_seg.layout_type,
