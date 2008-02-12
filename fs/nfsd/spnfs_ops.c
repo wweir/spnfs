@@ -180,21 +180,37 @@ spnfs_getdeviceiter(struct super_block *sb, struct pnfs_deviter_arg *iter)
 	return status;
 }
 
-/*
- * Fill in an nfs4_1_file_layout_ds_addr4 structure with the device info
- * that was gathered from userspace
- */
-static int
-filldeviceinfo(struct spnfs_device *dev, struct pnfs_filelayout_device *fldev)
+int
+spnfs_getdeviceinfo(struct super_block *sb, struct pnfs_devinfo_arg *info)
 {
+	struct spnfs *spnfs = global_spnfs;
+	struct spnfs_msg im;
+	union spnfs_msg_res res;
+	struct spnfs_device *dev;
+	struct pnfs_filelayout_device *fldev = NULL;
 	struct pnfs_filelayout_multipath *mp = NULL;
 	struct pnfs_filelayout_devaddr *fldap = NULL;
-	int status = 0;
-	int i, len;
+	int status = 0, i, len;
 
-	if (fldev == NULL)
-		return -EIO;
+	im.im_type = SPNFS_TYPE_GETDEVICEINFO;
+	im.im_args.getdeviceinfo_args.devid = info->devid;
 
+	/* call function to queue the msg for upcall */
+	status = spnfs_upcall(spnfs, &im, &res);
+	if (status != 0) {
+		dprintk("%s spnfs upcall failure: %d\n", __FUNCTION__, status);
+		status = -EIO;
+		goto getdeviceinfo_out;
+	}
+	status = res.getdeviceinfo_res.status;
+	dev = &res.getdeviceinfo_res.devinfo;
+
+	/* Fill in the device data, i.e., nfs4_1_file_layout_ds_addr4 */
+	fldev = kmalloc(sizeof(struct pnfs_filelayout_device), GFP_KERNEL);
+	if (fldev == NULL) {
+		status = -ENOMEM;
+		goto getdeviceinfo_out;
+	}
 	fldev->fl_stripeindices_list = NULL;
 	fldev->fl_device_list = NULL;
 
@@ -210,7 +226,7 @@ filldeviceinfo(struct spnfs_device *dev, struct pnfs_filelayout_device *fldev)
 			GFP_KERNEL);
 	if (fldev->fl_stripeindices_list == NULL) {
 		status = -ENOMEM;
-		goto cleanup;
+		goto getdeviceinfo_out;
 	}
 	for (i = 0; i < fldev->fl_stripeindices_length; i++)
 		fldev->fl_stripeindices_list[i] = i + 1;
@@ -226,7 +242,7 @@ filldeviceinfo(struct spnfs_device *dev, struct pnfs_filelayout_device *fldev)
 			GFP_KERNEL);
 	if (fldev->fl_device_list == NULL) {
 		status = -ENOMEM;
-		goto cleanup;
+		goto getdeviceinfo_out;
 	}
 	for (i = 0; i < fldev->fl_device_length; i++) {
 		mp = &fldev->fl_device_list[i];
@@ -236,7 +252,7 @@ filldeviceinfo(struct spnfs_device *dev, struct pnfs_filelayout_device *fldev)
 				GFP_KERNEL);
 		if (mp->fl_multipath_list == NULL) {
 			status = -ENOMEM;
-			goto cleanup;
+			goto getdeviceinfo_out;
 		}
 		fldap = mp->fl_multipath_list;
 
@@ -247,7 +263,7 @@ filldeviceinfo(struct spnfs_device *dev, struct pnfs_filelayout_device *fldev)
 		fldap->r_netid.data = kmalloc(len, GFP_KERNEL);
 		if (fldap->r_netid.data == NULL) {
 			status = -ENOMEM;
-			goto cleanup;
+			goto getdeviceinfo_out;
 		}
 		memcpy(fldap->r_netid.data, dev->dslist[i].netid, len);
 		fldap->r_netid.len = len;
@@ -260,63 +276,31 @@ filldeviceinfo(struct spnfs_device *dev, struct pnfs_filelayout_device *fldev)
 		fldap->r_addr.data = kmalloc(len, GFP_KERNEL);
 		if (fldap->r_addr.data == NULL) {
 			status = -ENOMEM;
-			goto cleanup;
+			goto getdeviceinfo_out;
 		}
 		memcpy(fldap->r_addr.data, dev->dslist[i].addr, len);
 		fldap->r_addr.len = len;
 	}
 
-cleanup:
-	kfree(fldev->fl_stripeindices_list);
-	if (fldev->fl_device_list) {
-		for (i = 0; i < fldev->fl_device_length; i++) {
-			fldap = fldev->fl_device_list[i].fl_multipath_list;
-			kfree(fldap->r_netid.data);
-			kfree(fldap->r_addr.data);
-			kfree(fldap);
-		}
-		kfree(fldev->fl_device_list);
-	}
-
-	return status;
-}
-
-int
-spnfs_getdeviceinfo(struct super_block *sb, struct pnfs_devinfo_arg *info)
-{
-	struct spnfs *spnfs = global_spnfs;
-	struct spnfs_msg im;
-	union spnfs_msg_res res;
-	struct pnfs_filelayout_device *fldev = NULL;
-	int status;
-
-	im.im_type = SPNFS_TYPE_GETDEVICEINFO;
-	im.im_args.getdeviceinfo_args.devid = info->devid;
-
-	/* call function to queue the msg for upcall */
-	status = spnfs_upcall(spnfs, &im, &res);
-	if (status != 0) {
-		dprintk("%s spnfs upcall failure: %d\n", __FUNCTION__, status);
-		status = -EIO;
-		goto getdeviceinfo_out;
-	}
-	status = res.getdeviceinfo_res.status;
-
-	/* fill in the device data, i.e., nfs4_1_file_layout_ds_addr4 */
-	fldev = kmalloc(sizeof(struct pnfs_filelayout_device), GFP_KERNEL);
-	if (fldev == NULL) {
-		status = -ENOMEM;
-		goto getdeviceinfo_out;
-	}
-	status = filldeviceinfo(&res.getdeviceinfo_res.devinfo, fldev);
-	if (status != 0)
-		goto getdeviceinfo_out;
-
 	/* encode the device data */
 	status = info->func(&info->xdr, fldev);
 
 getdeviceinfo_out:
-	kfree(fldev);
+	if (fldev) {
+		kfree(fldev->fl_stripeindices_list);
+		if (fldev->fl_device_list) {
+			for (i = 0; i < fldev->fl_device_length; i++) {
+				fldap =
+				    fldev->fl_device_list[i].fl_multipath_list;
+				kfree(fldap->r_netid.data);
+				kfree(fldap->r_addr.data);
+				kfree(fldap);
+			}
+			kfree(fldev->fl_device_list);
+		}
+		kfree(fldev);
+	}
+
 	return status;
 }
 
