@@ -443,12 +443,12 @@ static int nfs41_validate_seq_args(struct nfs4_session *session,
 					cache_this, task);
 }
 
-static int nfs4_setup_sequence(struct nfs_client *clp,
-				struct nfs4_session *session,
-				struct nfs41_sequence_args *args,
-				struct nfs41_sequence_res *res,
-				int cache_reply,
-				struct rpc_task *task)
+int nfs4_setup_sequence(struct nfs_client *clp,
+			struct nfs4_session *session,
+			struct nfs41_sequence_args *args,
+			struct nfs41_sequence_res *res,
+			int cache_reply,
+			struct rpc_task *task)
 {
 	int ret;
 
