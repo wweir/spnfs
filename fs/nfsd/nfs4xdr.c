@@ -3392,6 +3392,7 @@ nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp,
 	struct pnfs_devinfo_arg args;
 	struct super_block *sb;
 	int maxcount = 0;
+	int has_bitmap;
 	u32 *p_in = resp->p;
 
 	ENCODE_HEAD;
@@ -3461,9 +3462,11 @@ nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp,
 	ADJUST_ARGS();
 
 	/* Encode supported device notifications */
-	RESERVE_SPACE(8);
-	WRITE32(1);
-	WRITE32(args.notify_types);
+	has_bitmap = (args.notify_types != 0);
+	RESERVE_SPACE(4 + (has_bitmap * 4));
+	WRITE32(has_bitmap);
+	if (has_bitmap)
+		WRITE32(args.notify_types);
 	ADJUST_ARGS();
 
 out:
