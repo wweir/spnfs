@@ -1628,9 +1628,20 @@ pnfs_layoutcommit_rpc_done(struct rpc_task *task, void *calldata)
 			       task->tk_status);
 }
 
+static int pnfs_layoutcommit_validate(struct rpc_task *task, void *data)
+{
+	struct pnfs_layoutcommit_data *ldata =
+		(struct pnfs_layoutcommit_data *)data;
+	struct nfs_server *server = NFS_SERVER(ldata->inode);
+
+	return nfs4_setup_sequence(server->nfs_client, server->session,
+		&ldata->args.seq_args, &ldata->res.seq_res, 1, task);
+}
+
 static const struct rpc_call_ops pnfs_layoutcommit_ops = {
 	.rpc_call_done = pnfs_layoutcommit_rpc_done,
 	.rpc_release = pnfs_layoutcommit_release,
+	.rpc_call_validate_args = pnfs_layoutcommit_validate,
 };
 
 /* Execute a layoutcommit to the server */
