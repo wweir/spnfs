@@ -1823,14 +1823,17 @@ static int encode_getdevicelist(struct xdr_stream *xdr, const struct nfs4_pnfs_g
 static int encode_getdeviceinfo(struct xdr_stream *xdr,
 				const struct nfs4_pnfs_getdeviceinfo_arg *args)
 {
+	int has_bitmap = (args->dev_notify_types != 0);
 	__be32 *p;
-	RESERVE_SPACE(20 + NFS4_PNFS_DEVICEID4_SIZE);
+
+	RESERVE_SPACE(16 + NFS4_PNFS_DEVICEID4_SIZE + (has_bitmap * 4));
 	WRITE32(OP_GETDEVICEINFO);
 	WRITEMEM(args->dev_id->data, NFS4_PNFS_DEVICEID4_SIZE);
 	WRITE32(args->layoutclass);
 	WRITE32(NFS4_PNFS_DEV_MAXSIZE);
-	WRITE32(1); 				/* single bitmap */
-	WRITE32(args->dev_notify_types);
+	WRITE32(has_bitmap); 		/* bitmap array length 0 or 1 */
+	if (has_bitmap)
+		WRITE32(args->dev_notify_types);
 	return 0;
 }
 
