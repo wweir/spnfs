@@ -205,6 +205,9 @@ extern struct nfs4_state_recovery_ops *nfs4_network_partition_recovery_ops[];
 extern int nfs41_call_validate_seq_args(struct nfs_server *server,
 	struct nfs4_session *session, void *args, void *res, int cache_this,
 	struct rpc_task *task);
+extern int nfs4_setup_sequence(struct nfs_client *clp,
+	struct nfs4_session *session, struct nfs41_sequence_args *args,
+	struct nfs41_sequence_res *res, int cache_reply, struct rpc_task *task);
 extern void nfs4_put_session(struct nfs4_session **session);
 extern struct nfs4_session *nfs4_alloc_session(void);
 extern int nfs4_proc_destroy_session(struct nfs4_session *, struct rpc_clnt *);
