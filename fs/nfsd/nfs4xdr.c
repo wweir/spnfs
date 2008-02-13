@@ -3443,12 +3443,23 @@ toosmall:
 }
 
 /* LAYOUTGET: minorversion1-19.txt
+       struct LAYOUTGET4resok {
 u32            bool                    logr_return_on_close;
-u64            offset4                 offset;
-u64            length4                 length;
-u32            pnfs_layoutiomode4      iomode;
-u32            pnfs_layouttype4        type;
-u32  + len     opaque                  layout<>;
+opaque[16]     stateid4                logr_stateid;
+u32 + array    layout4                 logr_layout<>;
+       };
+
+       struct layout4 {
+u64            offset4                 lo_offset;
+u64            length4                 lo_length;
+u32            layoutiomode4           lo_iomode;
+               layout_content4         lo_content;
+       };
+
+       struct layout_content4 {
+u32            layouttype4             loc_type;
+u32 + len      opaque                  loc_body<>;
+       };
 */
 static __be32
 nfsd4_encode_layoutget(struct nfsd4_compoundres *resp,
@@ -3471,7 +3482,7 @@ nfsd4_encode_layoutget(struct nfsd4_compoundres *resp,
 		maxcount = lgp->lg_maxcount;
 
 	/* Check for space on xdr stream */
-	leadcount = 32 + sizeof(stateid_opaque_t);
+	leadcount = 36 + sizeof(stateid_opaque_t);
 	RESERVE_SPACE(leadcount);
 	/* encode layout metadata after file system encodes layout */
 	p += XDR_QUADLEN(leadcount);
@@ -3523,6 +3534,8 @@ nfsd4_encode_layoutget(struct nfsd4_compoundres *resp,
 	WRITE32(args.return_on_close);
 	WRITE32(lgp->lg_sid.si_generation);
 	WRITEMEM(&lgp->lg_sid.si_opaque, sizeof(stateid_opaque_t));
+	/* FIXME: response logr_layout array count, always one for now */
+	WRITE32(1);
 	WRITE64(args.seg.offset);
 	WRITE64(args.seg.length);
 	WRITE32(args.seg.iomode);
