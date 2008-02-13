@@ -5537,13 +5537,24 @@ static int decode_pnfs_layoutget(struct xdr_stream *xdr, struct rpc_rqst *req,
 {
 	uint32_t *p;
 	int status;
+	u32 layout_count;
 
 	status = decode_op_hdr(xdr, OP_LAYOUTGET);
 	if (status)
 		return status;
-	READ_BUF(32 + NFS4_STATEID_SIZE);
+	READ_BUF(8 + NFS4_STATEID_SIZE);
 	READ32(res->return_on_close);
 	COPYMEM(res->stateid.data, NFS4_STATEID_SIZE);
+	READ32(layout_count);
+	if (!layout_count) {
+		dprintk("%s: server responded with empty layout array\n", __func__);
+		return -EINVAL;
+	}
+	/* FIXME: the whole layotu array should be passed up to the pnfs client */
+	if (layout_count > 1)
+		dprintk("%s: server responded with %d layouts, dropping tail\n",
+			__func__, layout_count);
+	READ_BUF(28 * layout_count);
 	READ64(res->lseg.offset);
 	READ64(res->lseg.length);
 	READ32(res->lseg.iomode);
