@@ -1553,6 +1553,91 @@ int pnfs_try_to_read_data(struct nfs_read_data *data,
 	}
 }
 
+/*
+ * This gives the layout driver an opportunity to read in page "around"
+ * the data to be written.  It returns 0 on success, otherwise an error code
+ * which will either be passed up to user, or ignored if
+ * some previous part of write succeeded.
+ * Note the range [pos, pos+len-1] is entirely within the page.
+ */
+/* flags = AOP_FLAG_UNINTERRUPTIBLE or 0 - ??? need this ??? */
+int pnfs_write_begin(struct file *filp, struct page *page,
+		     loff_t pos, unsigned len,
+		     unsigned flags, void **fsdata)
+{
+	struct inode *inode = filp->f_dentry->d_inode;
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	struct pnfs_layout_type *lo;
+	int status = 0;
+	struct nfs4_pnfs_layout_segment range = {IOMODE_RW, (u64)pos, (u64)len};
+	struct pnfs_layout_segment *lseg;
+	struct pnfs_fsdata *pnfs_fsdata = NULL;
+
+	lo = get_lock_current_layout(NFS_I(inode));
+	if (!lo) {
+		/* XXX We could try to get layout here */
+		*fsdata = NULL;
+		return 0;
+	}
+	if (!nfss->pnfs_curr_ld->ld_io_ops ||
+	    !nfss->pnfs_curr_ld->ld_io_ops->write_begin) {
+		/* If layout driver doesn't define, just do nothing */
+		goto out;
+	}
+	lseg = pnfs_has_layout(lo, &range, 1);
+	if (!lseg)
+		goto out;
+	status = nfss->pnfs_curr_ld->ld_io_ops->write_begin(lseg, page,
+							    pos, len,
+							    &pnfs_fsdata);
+	if (status && pnfs_fsdata) {
+		pnfs_free_fsdata(pnfs_fsdata);
+		pnfs_fsdata = NULL;
+	}
+	put_lseg(lseg);
+	if (pnfs_fsdata && !pnfs_fsdata->ld_io_ops)
+		pnfs_fsdata->ld_io_ops = nfss->pnfs_curr_ld->ld_io_ops;
+ out:
+	put_unlock_current_layout(NFS_I(inode), lo);
+	*fsdata = pnfs_fsdata;
+	return status;
+}
+
+/* Given an nfs request, determine if it should be flushed before proceeding.
+ * It should default to returning False, returning True only if there is a
+ * specific reason to flush.
+ */
+int pnfs_do_flush(struct nfs_page *req, void *fsdata)
+{
+	struct inode *inode = req->wb_context->path.dentry->d_inode;
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	struct pnfs_layout_type *lo;
+	struct pnfs_layout_segment *lseg;
+	u64 pos = (u64)(req->wb_index << PAGE_CACHE_SHIFT) + req->wb_offset;
+	u64 count = (u64)req->wb_bytes;
+	struct nfs4_pnfs_layout_segment range = {IOMODE_RW, pos, count};
+	int status = 0;
+
+	if (!pnfs_enabled_sb(nfss))
+		return 0;
+	lo = get_lock_current_layout(NFS_I(inode));
+	if (!lo)
+		return 0;
+	if (!nfss->pnfs_curr_ld->ld_io_ops ||
+	    !nfss->pnfs_curr_ld->ld_policy_ops->do_flush) {
+		status = 0;
+		goto out;
+	}
+	lseg = pnfs_has_layout(lo, &range, 1);
+	/* Note lseg may be NULL */
+	status = nfss->pnfs_curr_ld->ld_policy_ops->do_flush(lseg, req,
+						(struct pnfs_fsdata *)fsdata);
+	put_lseg(lseg);
+ out:
+	put_unlock_current_layout(NFS_I(inode), lo);
+	return status;
+}
+
 int pnfs_try_to_write_data(struct nfs_write_data *data,
 				const struct rpc_call_ops *call_ops, int how)
 {
@@ -1873,6 +1958,14 @@ void pnfs_free_request_data(struct nfs_page *req)
 	lo = (struct layoutdriver_io_operations *)req->wb_ops;
 	if (lo->free_request_data)
 		lo->free_request_data(req);
+}
+
+void pnfs_free_fsdata(void *fsdata)
+{
+	struct pnfs_fsdata *data = (struct pnfs_fsdata *)fsdata;
+
+	if (data && data->ld_io_ops->free_fsdata)
+		data->ld_io_ops->free_fsdata(data);
 }
 
 /* Callback operations for layout drivers.
