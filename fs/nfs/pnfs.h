@@ -29,6 +29,9 @@ int pnfs_use_ds_io(struct list_head *, struct inode *, int);
 
 int pnfs_use_write(struct inode *inode, ssize_t count);
 int pnfs_try_to_write_data(struct nfs_write_data *, const struct rpc_call_ops *, int);
+int pnfs_write_begin(struct file *filp, struct page *page, loff_t pos,
+		     unsigned len, unsigned flags, void **fsdata);
+int pnfs_do_flush(struct nfs_page *req, void *fsdata);
 int pnfs_try_to_read_data(struct nfs_read_data *data, const struct rpc_call_ops *call_ops);
 int pnfs_initialize(void);
 void pnfs_uninitialize(void);
@@ -46,7 +49,14 @@ void pnfs_pageio_init_write(struct nfs_pageio_descriptor *, struct inode *);
 void pnfs_update_layout_commit(struct inode *, struct list_head *, pgoff_t, unsigned int);
 int pnfs_flush_one(struct inode *, struct list_head *, unsigned int, size_t, int);
 void pnfs_free_request_data(struct nfs_page *req);
+void pnfs_free_fsdata(void *fsdata);
 ssize_t pnfs_file_write(struct file *, const char __user *, size_t, loff_t *);
+
+#else /* CONFIG_PNFS */
+static inline int pnfs_do_flush(struct nfs_page *req, void *fsdata)
+{
+	return 0;
+}
 
 #endif /* CONFIG_PNFS */
 
