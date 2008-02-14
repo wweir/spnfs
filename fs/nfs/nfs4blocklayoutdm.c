@@ -30,21 +30,93 @@
  * possibility of such damages.
  */
 
+#include <linux/genhd.h> /* gendisk - used in a dprintk*/
+
 #include "nfs4blocklayout.h"
 
 #define NFSDBG_FACILITY         NFSDBG_BLOCKLAYOUT
 
-/* Stub */
-int nfs4_blk_mdev_release(struct block_mount_id *b_mt_id)
+static int dev_create(const char *name, dev_t *dev)
 {
-	dprintk("%s Releasing %s\n", __FUNCTION__, b_mt_id->bm_mdevname);
-	return 0;
+	struct dm_ioctl ctrl;
+	int rv;
+
+	memset(&ctrl, 0, sizeof(ctrl));
+	strncpy(ctrl.name, name, DM_NAME_LEN-1);
+	rv = dm_dev_create(&ctrl); /* XXX - need to pull data out of ctrl */
+	dprintk("Tried to create %s, got %i\n", name, rv);
+	if (!rv) {
+		*dev = huge_decode_dev(ctrl.dev);
+		dprintk("dev = (%i, %i)\n", MAJOR(*dev), MINOR(*dev));
+	}
+	return rv;
 }
 
-/* Stub */
+static int dev_remove(const char *name)
+{
+	struct dm_ioctl ctrl;
+	memset(&ctrl, 0, sizeof(ctrl));
+	strncpy(ctrl.name, name, DM_NAME_LEN-1);
+	return dm_dev_remove(&ctrl);
+}
+
+/*
+ * Release meta device
+ */
+int nfs4_blk_mdev_release(struct block_mount_id *b_mt_id)
+{
+	int rv;
+
+	dprintk("%s Releasing %s\n", __FUNCTION__, b_mt_id->bm_mdevname);
+	/* XXX Check return? */
+	rv = nfs4_blkdev_put(b_mt_id->bm_mdev);
+	dprintk("%s nfs4_blkdev_put returns %d\n", __FUNCTION__, rv);
+
+	rv = dev_remove(b_mt_id->bm_mdevname);
+	dprintk("%s Returns %d\n", __FUNCTION__, rv);
+	return rv;
+}
+
+/*
+ *  Create meta device. Keep it open to use for I/O.
+ */
 int nfs4_blk_init_mdev(struct block_mount_id *b_mt_id)
 {
-	return 0;
+	struct block_device *bd;
+	dev_t meta_dev;
+	int rv;
+
+	dprintk("%s for %s\n", __FUNCTION__, b_mt_id->bm_mdevname);
+
+	rv = dev_create(b_mt_id->bm_mdevname, &meta_dev);
+	if (rv)
+		return rv;
+
+	rv = -EIO;
+	bd = nfs4_blkdev_get(meta_dev);
+	if (!bd)
+		goto out;
+
+	if (bd_claim(bd, b_mt_id->bm_sb)) {
+		dprintk("%s: failed to claim device %d:%d\n",
+					__FUNCTION__,
+					MAJOR(meta_dev),
+					MINOR(meta_dev));
+		blkdev_put(bd);
+		goto out;
+	}
+	rv = 0;
+
+	write_lock(&b_mt_id->bm_lock);
+	b_mt_id->bm_mdev = bd;
+	write_unlock(&b_mt_id->bm_lock);
+	dprintk("%s Created device %s named %s with bd_block_size %u\n",
+				__FUNCTION__,
+				bd->bd_disk->disk_name,
+				b_mt_id->bm_mdevname,
+				bd->bd_block_size);
+out:
+	return rv;
 }
 
 /* Stub */
