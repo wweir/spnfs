@@ -350,6 +350,12 @@ put_unlock_current_layout(struct nfs_inode *nfsi,
 	BUG_ON(lo->refcount <= 0);
 
 	if (--lo->refcount == 0 && list_empty(&lo->segs)) {
+		/* FRED - this use of refcounting is strange and in my
+		 * opinion should be changed.  The count is basically
+		 * kept at zero, and freed when the list is empty, as
+		 * opposed to the normal usage of being kept positive,
+		 * and freed when hits zero.
+		 */
 		struct layoutdriver_io_operations *io_ops =
 			PNFS_LD_IO_OPS(lo);
 
