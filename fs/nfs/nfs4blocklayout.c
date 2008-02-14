@@ -32,9 +32,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-#include <linux/nfs_fs.h>
-#include <linux/pnfs_xdr.h> /* Needed by nfs4_pnfs.h */
-#include <linux/nfs4_pnfs.h>
+#include "nfs4blocklayout.h"
 
 #define NFSDBG_FACILITY         NFSDBG_BLOCKLAYOUT
 
@@ -135,17 +133,116 @@ bl_cleanup_layoutcommit(struct pnfs_layout_type *layoutid,
 	dprintk("%s enter\n", __FUNCTION__);
 }
 
+/* Right now this is called without lock held.
+ * XXX Does it make more sense to call with lock held?
+ */
+static void free_blk_mountid(struct block_mount_id *b_mt_id)
+{
+	if (b_mt_id) {
+		write_lock(&b_mt_id->bm_lock);
+		if (b_mt_id->bm_mdev) {
+			dprintk("%s Removing DM device: %s %d:%d\n",
+				__FUNCTION__,
+				b_mt_id->bm_mdevname,
+				MAJOR(b_mt_id->bm_mdev->bd_dev),
+				MINOR(b_mt_id->bm_mdev->bd_dev));
+			/* XXX Check status ?? */
+			nfs4_blk_mdev_release(b_mt_id);
+		}
+		write_unlock(&b_mt_id->bm_lock);
+		kfree(b_mt_id->bm_mdevname);
+		kfree(b_mt_id);
+	}
+}
+
+/*
+ * Retrieve the list of available devices for the mountpoint.
+ */
 static struct pnfs_mount_type *
 bl_initialize_mountpoint(struct super_block *sb, struct nfs_fh *fh)
 {
+	struct block_mount_id *b_mt_id = NULL;
+	struct pnfs_mount_type *mtype = NULL;
+	struct pnfs_devicelist *dlist = NULL;
+	struct nfs_server *server = NFS_SB(sb);
+	LIST_HEAD(scsi_disklist);
+	int status;
+
 	dprintk("%s enter\n", __FUNCTION__);
-	return NULL;
+
+	b_mt_id = kzalloc(sizeof(struct block_mount_id), GFP_KERNEL);
+	if (!b_mt_id)
+		goto out_error;
+	/* Initialize nfs4 block layout mount id */
+	b_mt_id->bm_sb = sb; /* back pointer to retrieve nfs_server struct */
+	rwlock_init(&b_mt_id->bm_lock);
+	/* 16 for 2 uint64_t, 2 for 2 ":" and 1 for the end zero */
+	b_mt_id->bm_mdevname = kzalloc(strlen(server->nfs_client->cl_hostname)
+				       + 16 + 2 + 1, GFP_KERNEL);
+	if (!b_mt_id->bm_mdevname)
+		goto out_error;
+	sprintf(b_mt_id->bm_mdevname, "%s:%Lu:%Lu",
+		server->nfs_client->cl_hostname,
+		server->fsid.major, server->fsid.minor);
+	dprintk("%s b_mt_id->bm_mdevname %s\n",
+	       __FUNCTION__, b_mt_id->bm_mdevname);
+
+	mtype = kzalloc(sizeof(struct pnfs_mount_type), GFP_KERNEL);
+	if (!mtype)
+		goto out_error;
+	mtype->mountid = (void *)b_mt_id;
+
+	/* Construct a list of all visible scsi disks that have not been
+	 * claimed.
+	 */
+	status =  nfs4_blk_create_scsi_disk_list(sb, &scsi_disklist);
+	if (status < 0)
+		goto out_error;
+
+	/* Retrieve device list from server. This returns the list in a
+	 * per-layout type opaque buffer.
+	 */
+	dlist = kmalloc(sizeof(struct pnfs_devicelist), GFP_KERNEL);
+	if (!dlist)
+		goto out_error;
+	status = pnfs_callback_ops->nfs_getdevicelist(sb, fh, dlist);
+	if (status)
+		goto out_error;
+
+	/* Decode opaque devicelist, create a flat volume topology,
+	 * matching VOLUME_SIMPLE disk signatures to disks in the
+	 * visible scsi disk list. Construct an LVM meta device
+	 * from the flat volume topology.
+	 */
+	status = nfs4_blk_process_devicelist(b_mt_id, dlist, &scsi_disklist);
+	if (status)
+		goto out_error;
+	dprintk("%s SUCCESS\n", __FUNCTION__);
+
+ out_return:
+	kfree(dlist);
+	nfs4_blk_destroy_disk_list(&scsi_disklist);
+	return mtype;
+
+ out_error:
+	free_blk_mountid(b_mt_id);
+	kfree(mtype);
+	mtype = NULL;
+	goto out_return;
 }
 
 static int
 bl_uninitialize_mountpoint(struct pnfs_mount_type *mtype)
 {
+	struct block_mount_id *b_mt_id = NULL;
+
 	dprintk("%s enter\n", __FUNCTION__);
+	if (!mtype)
+		return 0;
+	b_mt_id = (struct block_mount_id *)mtype->mountid;
+	free_blk_mountid(b_mt_id);
+	kfree(mtype);
+	dprintk("%s RETURNS\n", __FUNCTION__);
 	return 0;
 }
 
