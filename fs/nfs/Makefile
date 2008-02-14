@@ -21,3 +21,5 @@ nfs-$(CONFIG_SYSCTL) += sysctl.o
 
 obj-m += nfslayoutdriver.o
 nfslayoutdriver-objs := nfs4filelayout.o nfs4filelayoutdev.o
+obj-m += blocklayoutdriver.o
+blocklayoutdriver-objs := nfs4blocklayout.o
