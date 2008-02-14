@@ -118,7 +118,8 @@ enum exstate4 {
 	READ_WRITE_DATA	= 0, /* valid for reading and writing. */
 	READ_DATA	= 1, /* valid for reading; it may not be written.*/
 	INVALID_DATA	= 2, /* location is valid;  data is invalid */
-	NONE_DATA	= 3  /* location is invalid - it's a hole */
+	NONE_DATA	= 3,  /* location is invalid - it's a hole */
+	NEEDS_INIT	= 4  /* INVAL in the process of being upgraded to RW */
 };
 
 struct pnfs_block_extent {
@@ -127,6 +128,7 @@ struct pnfs_block_extent {
 	sector_t	be_length;    /* the size of the extent */
 	sector_t	be_v_offset;  /* the starting offset in the volume */
 	enum exstate4	be_state;     /* the state of this extent */
+	uint32_t	be_bitmap;    /* state tracking for NEEDS_INIT */
 	struct kref	be_refcnt;
 };
 
@@ -137,6 +139,9 @@ struct pnfs_block_layout {
 	uint32_t		bl_n_ext;
 	struct list_head	bl_extents;
 };
+
+#define BLK_ID(lt)	((struct block_mount_id *)(PNFS_MOUNTID(lt)->mountid))
+#define BLK_LO(lseg)	((struct pnfs_block_layout *)lseg->ld_data)
 
 uint32_t *blk_overflow(uint32_t *p, uint32_t *end, size_t nbytes);
 
