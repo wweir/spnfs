@@ -848,6 +848,22 @@ cleanup:
 	return ret;
 }
 
+/* CAREFUL - what happens if copied < count??? */
+static int
+bl_write_end(struct inode *inode, struct page *page, loff_t pos,
+	     unsigned count, unsigned copied, struct pnfs_fsdata *fsdata)
+{
+	dprintk("%s enter, %u@%Ld\n", __FUNCTION__, count, pos);
+	print_page(page);
+	if (fsdata) {
+		int *statusp = (int *)fsdata;
+		dprintk("%s status=%i\n", __FUNCTION__, *statusp);
+		if (*statusp)
+			SetPageUptodate(page);
+	}
+	return 0;
+}
+
 static void
 bl_new_request(struct pnfs_layout_segment *lseg, struct nfs_page *req,
 	       u64 pos, u64 count, struct pnfs_fsdata *fsdata)
@@ -894,15 +910,17 @@ bl_pg_test(struct nfs_pageio_descriptor *pgio, struct nfs_page *prev,
 	return 1;
 }
 
+/* This checks if old req will likely use same io method as soon
+ * to be created request, and returns False if they are the same.
+ */
 static int
 bl_do_flush(struct pnfs_layout_segment *lseg, struct nfs_page *req,
 	    struct pnfs_fsdata *fsdata)
 {
+	int will_try_pnfs;
 	dprintk("%s enter\n", __FUNCTION__);
-	/* This checks if old req will likely use same io method as soon
-	 * to be created request, and returns False if they are the same.
-	 */
-	return (!lseg != !test_bit(PG_USE_PNFS, &req->wb_flags));
+	will_try_pnfs = fsdata ? (fsdata == bl_use_pnfs) : (lseg != NULL);
+	return (will_try_pnfs != test_bit(PG_USE_PNFS, &req->wb_flags));
 }
 
 static struct layoutdriver_io_operations blocklayout_io_operations = {
@@ -910,6 +928,7 @@ static struct layoutdriver_io_operations blocklayout_io_operations = {
 	.read_pagelist			= bl_read_pagelist,
 	.write_pagelist			= bl_write_pagelist,
 	.write_begin			= bl_write_begin,
+	.write_end			= bl_write_end,
 	.new_request			= bl_new_request,
 	.alloc_layout			= bl_alloc_layout,
 	.free_layout			= bl_free_layout,
