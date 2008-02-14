@@ -866,6 +866,20 @@ void nfs_initiate_write(struct nfs_write_data *data,
 	nfs_execute_write(data);
 }
 
+/* If a nfs_flush_* function fails, it should remove reqs from @head and
+ * call this on each, which will prepare them to be retried on next
+ * writeback using standard nfs.
+ */
+static void nfs_retry_request(struct nfs_page *req)
+{
+#ifdef CONFIG_PNFS
+	clear_bit(PG_USE_PNFS, &req->wb_flags);
+#endif
+	nfs_redirty_request(req);
+	nfs_end_page_writeback(req->wb_page);
+	nfs_clear_page_tag_locked(req);
+}
+
 /*
  * Generate multiple small requests to write out a single
  * contiguous dirty area on one page.
@@ -925,9 +939,7 @@ out_bad:
 		list_del(&data->pages);
 		nfs_writedata_release(data);
 	}
-	nfs_redirty_request(req);
-	nfs_end_page_writeback(req->wb_page);
-	nfs_clear_page_tag_locked(req);
+	nfs_retry_request(req);
 	return -ENOMEM;
 }
 
@@ -973,9 +985,7 @@ int nfs_flush_one(struct inode *inode, struct list_head *head,
 	while (!list_empty(head)) {
 		req = nfs_list_entry(head->next);
 		nfs_list_remove_request(req);
-		nfs_redirty_request(req);
-		nfs_end_page_writeback(req->wb_page);
-		nfs_clear_page_tag_locked(req);
+		nfs_retry_request(req);
 	}
 	return -ENOMEM;
 }
