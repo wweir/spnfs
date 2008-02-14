@@ -115,7 +115,7 @@ static int nr_sequence_quads;
 #define decode_savefh_maxsz     (op_decode_hdr_maxsz)
 #define encode_restorefh_maxsz  (op_encode_hdr_maxsz)
 #define decode_restorefh_maxsz  (op_decode_hdr_maxsz)
-#define encode_fsinfo_maxsz	(op_encode_hdr_maxsz + 2)
+#define encode_fsinfo_maxsz	(op_encode_hdr_maxsz + 3)
 #define decode_fsinfo_maxsz	(op_decode_hdr_maxsz + 11)
 #define encode_renew_maxsz	(op_encode_hdr_maxsz + 3)
 #define decode_renew_maxsz	(op_decode_hdr_maxsz)
