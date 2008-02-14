@@ -344,6 +344,8 @@ static int nfs_write_begin(struct file *file, struct address_space *mapping,
 	int ret;
 	pgoff_t index;
 	struct page *page;
+
+	dprintk("%s enter", __FUNCTION__);
 	index = pos >> PAGE_CACHE_SHIFT;
 
 	page = __grab_cache_page(mapping, index);
