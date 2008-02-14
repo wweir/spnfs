@@ -114,6 +114,30 @@ struct pnfs_blk_sig {
 	struct pnfs_blk_sig_comp	si_comps[MAX_SIG_COMP];
 };
 
+enum exstate4 {
+	READ_WRITE_DATA	= 0, /* valid for reading and writing. */
+	READ_DATA	= 1, /* valid for reading; it may not be written.*/
+	INVALID_DATA	= 2, /* location is valid;  data is invalid */
+	NONE_DATA	= 3  /* location is invalid - it's a hole */
+};
+
+struct pnfs_block_extent {
+	struct list_head be_node;
+	sector_t	be_f_offset;  /* the starting offset in the file */
+	sector_t	be_length;    /* the size of the extent */
+	sector_t	be_v_offset;  /* the starting offset in the volume */
+	enum exstate4	be_state;     /* the state of this extent */
+	struct kref	be_refcnt;
+};
+
+/* XXX Need to rethink this */
+struct pnfs_block_layout {
+	uint32_t		bl_rootid;      /* logical volume device id */
+	spinlock_t		bl_ext_lock;    /* protects bl_extents */
+	uint32_t		bl_n_ext;
+	struct list_head	bl_extents;
+};
+
 uint32_t *blk_overflow(uint32_t *p, uint32_t *end, size_t nbytes);
 
 #define BLK_READBUF(p, e, nbytes)  do { \
@@ -139,11 +163,23 @@ uint32_t *blk_overflow(uint32_t *p, uint32_t *end, size_t nbytes);
 	memcpy((x), p, nbytes);                 \
 	p += XDR_QUADLEN(nbytes);               \
 } while (0)
+#define READSECTOR(x)     do { \
+	READ64(tmp); \
+	if (tmp & 0x1ff) { \
+		printk(KERN_WARNING \
+		       "%s Value not 512-byte aligned at line %d\n", \
+		       __FUNCTION__, __LINE__);			     \
+		goto out_err; \
+	} \
+	(x) = tmp >> 9; \
+} while (0)
 
 struct block_device *nfs4_blkdev_get(dev_t dev);
 int nfs4_blkdev_put(struct block_device *bdev);
 int nfs4_blk_process_devicelist(struct block_mount_id *,
 				struct pnfs_devicelist *, struct list_head *);
+int nfs4_blk_process_layoutget(struct pnfs_block_layout *bl,
+			       struct nfs4_pnfs_layoutget_res *lgr);
 int nfs4_blk_create_scsi_disk_list(struct super_block *, struct list_head *);
 void nfs4_blk_destroy_disk_list(struct list_head *);
 int nfs4_blk_mdev_release(struct block_mount_id *);

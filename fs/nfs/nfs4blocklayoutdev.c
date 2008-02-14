@@ -556,3 +556,56 @@ nfs4_blk_process_devicelist(struct block_mount_id *b_mt_id,
 	}
 	return nfs4_blk_decode_device(b_mt_id, &dl->devs[0], sdlist);
 }
+
+int
+nfs4_blk_process_layoutget(struct pnfs_block_layout *bl,
+			   struct nfs4_pnfs_layoutget_res *lgr)
+{
+	uint32_t *p = (uint32_t *)lgr->layout.buf;
+	uint32_t *end = (uint32_t *)((char *)lgr->layout.buf + lgr->layout.len);
+	int i, status = -EIO;
+	uint32_t count;
+
+	BLK_READBUF(p, end, 8);
+	READ32(bl->bl_rootid);
+	READ32(count);
+
+	dprintk("%s enter, rootid %i number of extents %i\n", __FUNCTION__,
+			bl->bl_rootid, count);
+	/* Each extent is 28 bytes */
+	BLK_READBUF(p, end, 28 * count);
+
+	for (i = 0; i < count; i++) {
+		struct pnfs_block_extent  *be;
+		uint64_t tmp; /* Used by READSECTOR */
+
+		be = kmalloc(sizeof(*be), GFP_KERNEL);
+		if (!be) {
+			status = -ENOMEM;
+			goto out_err;
+		}
+		INIT_LIST_HEAD(&be->be_node);
+		kref_init(&be->be_refcnt);
+		/* The next three values are read in as bytes,
+		 * but stored as 512-byte sector lengths
+		 */
+		READSECTOR(be->be_f_offset);
+		READSECTOR(be->be_length);
+		READSECTOR(be->be_v_offset);
+		READ32(be->be_state);
+
+		spin_lock(&bl->bl_ext_lock);
+		list_add_tail(&be->be_node, &bl->bl_extents);
+		bl->bl_n_ext++;
+		spin_unlock(&bl->bl_ext_lock);
+	}
+	if (p != end) {
+		dprintk("%s Undecoded cruft at end of opaque\n", __FUNCTION__);
+		status = -EIO;
+		goto out_err;
+	}
+	status = 0;
+ out_err:
+	dprintk("%s returns %i\n", __FUNCTION__, status);
+	return status;
+}
