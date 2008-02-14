@@ -139,6 +139,8 @@ uint32_t *blk_overflow(uint32_t *p, uint32_t *end, size_t nbytes);
 	p += XDR_QUADLEN(nbytes);               \
 } while (0)
 
+struct block_device *nfs4_blkdev_get(dev_t dev);
+int nfs4_blkdev_put(struct block_device *bdev);
 int nfs4_blk_process_devicelist(struct block_mount_id *,
 				struct pnfs_devicelist *, struct list_head *);
 int nfs4_blk_create_scsi_disk_list(struct super_block *, struct list_head *);
