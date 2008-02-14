@@ -17,6 +17,7 @@
 #include <linux/nfs_page.h>
 
 #define NFS4_PNFS_DEV_MAXNUM 16
+/* This is way too small for block driver */
 #define NFS4_PNFS_DEV_MAXSIZE 128
 
 /* Per-layout driver specific registration structure */
