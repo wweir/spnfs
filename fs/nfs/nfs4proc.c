@@ -3039,6 +3039,10 @@ static int pnfs4_read_done(struct rpc_task *task, struct nfs_read_data *data)
 		return -EAGAIN;
 	}
 
+	/* FRED - if we fell back to nfs, do we need to call
+	 * nfs_invalidate_atime(data->inode) ?
+	 */
+
 	/* Only renew lease if this was a read call to MDS */
 	if (task->tk_status > 0 && !data->ds_nfs_client)
 		renew_lease(mds_svr, data->timestamp);
