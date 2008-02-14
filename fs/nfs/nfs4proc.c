@@ -3039,6 +3039,10 @@ static int pnfs4_read_done(struct rpc_task *task, struct nfs_read_data *data)
 		return -EAGAIN;
 	}
 
+	/* FRED - if we fell back to nfs, do we need to call
+	 * nfs_invalidate_atime(data->inode) ?
+	 */
+
 	/* Only renew lease if this was a read call to MDS */
 	if (task->tk_status > 0 && !data->ds_nfs_client)
 		renew_lease(mds_svr, data->timestamp);
@@ -3083,15 +3087,10 @@ static int pnfs4_write_done(struct rpc_task *task, struct nfs_write_data *data)
 	 * MDS write: renew lease
 	 * DS write: update lastbyte written
 	 */
-	if (task->tk_status > 0) {
-		if (!data->ds_nfs_client) {
-			nfs_post_op_update_inode_force_wcc(data->inode,
-							data->res.fattr);
-			renew_lease(mds_svr, data->timestamp);
-		} else
-			pnfs_update_last_write(NFS_I(data->inode),
-					       data->args.offset,
-					       data->res.count);
+	if (task->tk_status > 0 && !data->ds_nfs_client) {
+		nfs_post_op_update_inode_force_wcc(data->inode,
+						   data->res.fattr);
+		renew_lease(mds_svr, data->timestamp);
 	}
 	return 0;
 }
@@ -3125,13 +3124,10 @@ static int pnfs4_commit_done(struct rpc_task *task, struct nfs_write_data *data)
 		return -EAGAIN;
 	}
 
-	if (task->tk_status >= 0) {
+	if (task->tk_status >= 0 && !data->ds_nfs_client) {
 		/* Update inode if commit to MDS */
 		if (!data->ds_nfs_client)
 			nfs_refresh_inode(data->inode, data->res.fattr);
-
-		/* Mark for LAYOUTCOMMIT */
-		pnfs_need_layoutcommit(NFS_I(data->inode), data->args.context);
 	}
 	dprintk("<-- %s\n", __func__);
 	return 0;
