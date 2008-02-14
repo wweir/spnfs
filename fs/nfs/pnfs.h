@@ -31,6 +31,8 @@ int pnfs_use_write(struct inode *inode, ssize_t count);
 int pnfs_try_to_write_data(struct nfs_write_data *, const struct rpc_call_ops *, int);
 int pnfs_write_begin(struct file *filp, struct page *page, loff_t pos,
 		     unsigned len, unsigned flags, void **fsdata);
+int pnfs_write_end(struct file *filp, struct page *page,
+		   loff_t pos, unsigned len, unsigned copied, void *fsdata);
 int pnfs_do_flush(struct nfs_page *req, void *fsdata);
 int pnfs_try_to_read_data(struct nfs_read_data *data, const struct rpc_call_ops *call_ops);
 int pnfs_initialize(void);
