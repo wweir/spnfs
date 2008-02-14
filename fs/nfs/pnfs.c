@@ -1603,6 +1603,38 @@ int pnfs_write_begin(struct file *filp, struct page *page,
 	return status;
 }
 
+/* Return 0 on succes, negative on failure */
+/* CAREFUL - what happens if copied < len??? */
+int pnfs_write_end(struct file *filp, struct page *page,
+		   loff_t pos, unsigned len, unsigned copied, void *fsdata)
+{
+	struct inode *inode = filp->f_dentry->d_inode;
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	struct pnfs_layout_type *lo;
+	int status = 0;
+	struct nfs4_pnfs_layout_segment range = {IOMODE_RW, (u64)pos, (u64)len};
+	struct pnfs_layout_segment *lseg;
+
+	lo = get_lock_current_layout(NFS_I(inode));
+	if (!lo)
+		return 0;
+	if (!nfss->pnfs_curr_ld->ld_io_ops ||
+	    !nfss->pnfs_curr_ld->ld_io_ops->write_begin) {
+		/* If layout driver doesn't define, just do nothing */
+		goto out;
+	}
+	lseg = pnfs_has_layout(lo, &range, 1);
+	if (!lseg)
+		goto out;
+	status = nfss->pnfs_curr_ld->ld_io_ops->write_end(inode, page,
+						pos, len, copied,
+						(struct pnfs_fsdata *)fsdata);
+	put_lseg(lseg);
+ out:
+	put_unlock_current_layout(NFS_I(inode), lo);
+	return status;
+}
+
 /* Given an nfs request, determine if it should be flushed before proceeding.
  * It should default to returning False, returning True only if there is a
  * specific reason to flush.
