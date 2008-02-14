@@ -1412,6 +1412,11 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 	if (pnfs_get_type(inode) != LAYOUT_NFSV4_FILES)
 		wdata->pnfsflags |= PNFS_NO_RPC;
 	wdata->lseg = lseg;
+	/* FRED - this should return just 0 (to indicate done for now)
+	 * or 1 (to indicate try normal nfs).  It can indicate bytes
+	 * written in wdata->res.count.  It can indicate error status in
+	 * wdata->task.tk_status.
+	 */
 	status = nfss->pnfs_curr_ld->ld_io_ops->write_pagelist(
 							nfsi->current_layout,
 							args->pages,
@@ -1422,13 +1427,15 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 							how,
 							wdata);
 
-	if (status)
+	if (status) {
 		put_lseg(lseg);
-	if (status > 0) {
-		dprintk("%s: LD write_pagelist returned status %d > 0\n", __FUNCTION__, status);
-		pnfs_update_last_write(nfsi, args->offset, status);
+		wdata->pnfsflags &= ~PNFS_NO_RPC;
+	}
+	if (status == 0 && wdata->res.count > 0) {
+		dprintk("%s: LD write_pagelist returned count %d > 0\n",
+			__FUNCTION__, wdata->res.count);
+		pnfs_update_last_write(nfsi, args->offset, wdata->res.count);
 		pnfs_need_layoutcommit(nfsi, wdata->args.context);
-		status = 0;
 	}
 
 out:
@@ -1495,6 +1502,11 @@ pnfs_readpages(struct nfs_read_data *rdata)
 	if (pnfs_get_type(inode) != LAYOUT_NFSV4_FILES)
 		rdata->pnfsflags |= PNFS_NO_RPC;
 	rdata->lseg = lseg;
+	/* FRED - this should return just 0 (to indicate done for now)
+	 * or 1 (to indicate try normal nfs).  It can indicate bytes
+	 * read in rdata->res.count.  It can indicate error status in
+	 * rdata->task.tk_status.
+	 */
 	status = nfss->pnfs_curr_ld->ld_io_ops->read_pagelist(
 							nfsi->current_layout,
 							args->pages,
@@ -1503,12 +1515,13 @@ pnfs_readpages(struct nfs_read_data *rdata)
 							(loff_t)args->offset,
 							args->count,
 							rdata);
-	if (status)
+	if (status) {
 		put_lseg(lseg);
-	if (status > 0) {
-		dprintk("%s: LD read_pagelist returned status %d > 0\n", __FUNCTION__, status);
-		status = 0;
+		rdata->pnfsflags &= ~PNFS_NO_RPC;
 	}
+	if (status == 0 && rdata->res.count > 0)
+		dprintk("%s: LD read_pagelist returned count %d > 0\n",
+			__FUNCTION__, status);
 
  out:
 	dprintk("%s: End Status %d\n", __FUNCTION__, status);
