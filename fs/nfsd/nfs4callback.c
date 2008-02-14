@@ -813,6 +813,8 @@ nfsd4_cb_recall(struct nfs4_delegation *dp)
 	cbr->cbr_trunc = 0; /* XXX need to implement truncate optimization */
 	cbr->cbr_dp = dp;
 
+	memset(&msg, 0, sizeof(msg));
+
 #if defined(CONFIG_NFSD_V4_1)
 	if (clp->cl_callback.cb_minorversion == 1) {
 		status = _nfsd41_cb_recall(dp, &msg);
