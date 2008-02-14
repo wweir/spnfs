@@ -586,6 +586,7 @@ nfs4_blk_process_layoutget(struct pnfs_block_layout *bl,
 		}
 		INIT_LIST_HEAD(&be->be_node);
 		kref_init(&be->be_refcnt);
+		be->be_bitmap = 0;
 		/* The next three values are read in as bytes,
 		 * but stored as 512-byte sector lengths
 		 */
