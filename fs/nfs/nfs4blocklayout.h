@@ -123,13 +123,20 @@ enum exstate4 {
 };
 
 struct pnfs_block_extent {
-	struct list_head be_node;
+	struct list_head be_node;     /* link into lseg list */
+	struct list_head be_lc_node;  /* link into layoutcommit list */
 	sector_t	be_f_offset;  /* the starting offset in the file */
 	sector_t	be_length;    /* the size of the extent */
 	sector_t	be_v_offset;  /* the starting offset in the volume */
 	enum exstate4	be_state;     /* the state of this extent */
 	uint32_t	be_bitmap;    /* state tracking for NEEDS_INIT */
 	struct kref	be_refcnt;
+};
+
+struct pnfs_block_layout_top {
+	struct list_head	blt_commit_list; /* extents for layoutcommit */
+	int			blt_count;       /* number of entries in list */
+	spinlock_t		blt_lock;        /* protects blt_commit_list */
 };
 
 /* XXX Need to rethink this */
@@ -142,6 +149,7 @@ struct pnfs_block_layout {
 
 #define BLK_ID(lt)	((struct block_mount_id *)(PNFS_MOUNTID(lt)->mountid))
 #define BLK_LO(lseg)	((struct pnfs_block_layout *)lseg->ld_data)
+#define BLK_LOT(lseg)	((struct pnfs_block_layout_top *)lseg->layout->ld_data)
 
 uint32_t *blk_overflow(uint32_t *p, uint32_t *end, size_t nbytes);
 
@@ -159,6 +167,11 @@ uint32_t *blk_overflow(uint32_t *p, uint32_t *end, size_t nbytes);
 #define TOTAL(x) ((x)*(x))
 #define SETARRAY(a, i, n) (a + i*n)
 
+#define WRITE32(n)               *p++ = htonl(n)
+#define WRITE64(n)               do {				\
+	*p++ = htonl((uint32_t)((n) >> 32));				\
+	*p++ = htonl((uint32_t)(n));					\
+} while (0)
 #define READ32(x)         (x) = ntohl(*p++)
 #define READ64(x)         do {                  \
 	(x) = (uint64_t)ntohl(*p++) << 32;           \
