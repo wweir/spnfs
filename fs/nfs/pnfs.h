@@ -48,6 +48,8 @@ void pnfs_pageio_init_read(struct nfs_pageio_descriptor *, struct inode *, struc
 void pnfs_pageio_init_write(struct nfs_pageio_descriptor *, struct inode *);
 void pnfs_update_layout_commit(struct inode *, struct list_head *, pgoff_t, unsigned int);
 int pnfs_flush_one(struct inode *, struct list_head *, unsigned int, size_t, int);
+void pnfs_modify_new_request(struct inode *inode, struct nfs_page *req,
+			     void *fsdata);
 void pnfs_free_request_data(struct nfs_page *req);
 void pnfs_free_fsdata(void *fsdata);
 ssize_t pnfs_file_write(struct file *, const char __user *, size_t, loff_t *);

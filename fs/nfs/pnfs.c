@@ -1949,6 +1949,32 @@ out_unlock:
 	goto out;
 }
 
+void pnfs_modify_new_request(struct inode *inode, struct nfs_page *req,
+			     void *fsdata)
+{
+	struct pnfs_layout_type *lo;
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	struct pnfs_layout_segment *lseg = NULL;
+	u64 pos, count;
+
+	if (!pnfs_enabled_sb(nfss) || !nfss->pnfs_curr_ld->ld_io_ops ||
+	    !nfss->pnfs_curr_ld->ld_io_ops->new_request)
+		return;
+
+	pos = (u64)(req->wb_index << PAGE_CACHE_SHIFT) + req->wb_offset;
+	count = (u64)req->wb_bytes;
+	lo = get_lock_current_layout(NFS_I(inode));
+	if (lo) {
+		struct nfs4_pnfs_layout_segment range = {IOMODE_RW, pos, count};
+		lseg = pnfs_has_layout(lo, &range, 1);
+	}
+	nfss->pnfs_curr_ld->ld_io_ops->new_request(lseg, req, pos, count,
+					(struct pnfs_fsdata *)fsdata);
+	put_lseg(lseg);
+	if (lo)
+		put_unlock_current_layout(NFS_I(inode), lo);
+}
+
 void pnfs_free_request_data(struct nfs_page *req)
 {
 	struct layoutdriver_io_operations *lo;
