@@ -243,6 +243,11 @@ split_inval_extent(struct pnfs_layout_segment *lseg,
 	}
 	rv->be_state = NEEDS_INIT;
 	rv->be_bitmap = (1 << (len >> (PAGE_CACHE_SHIFT - 9))) - 1;
+	spin_lock(&BLK_LOT(lseg)->blt_lock);
+	list_add_tail(&rv->be_lc_node, &BLK_LOT(lseg)->blt_commit_list);
+	BLK_LOT(lseg)->blt_count++;
+	spin_unlock(&BLK_LOT(lseg)->blt_lock);
+	kref_get(&be->be_refcnt);
  out:
 	spin_unlock(&bl->bl_ext_lock);
 	if (rv)
@@ -570,7 +575,22 @@ release_extents(struct pnfs_block_layout *bl)
 static void
 bl_free_layout(struct pnfs_layout_type *lt)
 {
+	struct pnfs_block_extent *be;
+	struct pnfs_block_layout_top *priv;
+
 	dprintk("%s enter\n", __FUNCTION__);
+	if (!lt)
+		return;
+	priv = (struct pnfs_block_layout_top *) lt->ld_data;
+	spin_lock(&priv->blt_lock);
+	while (!list_empty(&priv->blt_commit_list)) {
+		be = list_first_entry(&priv->blt_commit_list,
+				      struct pnfs_block_extent,
+				      be_lc_node);
+		list_del(&be->be_lc_node);
+		put_extent(be);
+	}
+	spin_unlock(&priv->blt_lock);
 	kfree(lt);
 	return;
 }
@@ -580,9 +600,15 @@ static struct pnfs_layout_type *
 bl_alloc_layout(struct pnfs_mount_type *mtype, struct inode *inode)
 {
 	struct pnfs_layout_type		*lt;
+	struct pnfs_block_layout_top	*priv;
 
 	dprintk("%s enter\n", __FUNCTION__);
-	lt = kzalloc(sizeof(*lt) + 0, GFP_KERNEL);
+	lt = kzalloc(sizeof(*lt) + sizeof(*priv), GFP_KERNEL);
+	if (!lt)
+		return NULL;
+	priv = (struct pnfs_block_layout_top *) lt->ld_data;
+	spin_lock_init(&priv->blt_lock);
+	INIT_LIST_HEAD(&priv->blt_commit_list);
 	return lt;
 }
 
@@ -627,9 +653,14 @@ bl_alloc_lseg(struct pnfs_layout_type *layoutid,
 
 static int
 bl_setup_layoutcommit(struct pnfs_layout_type *lo,
-		struct pnfs_layoutcommit_arg *arg)
+		      struct pnfs_layoutcommit_arg *arg,
+		      struct list_head *local_list)
 {
 	struct nfs_server *nfss = PNFS_NFS_SERVER(lo);
+	struct pnfs_block_layout_top *priv;
+	struct pnfs_block_extent *be;
+	int count;
+	__be32 *p, *buf;
 
 	dprintk("%s enter\n", __FUNCTION__);
 	/* Need to ensure commit is block-size aligned */
@@ -639,15 +670,61 @@ bl_setup_layoutcommit(struct pnfs_layout_type *lo,
 		arg->lseg.length += mask;
 		arg->lseg.length &= ~mask;
 	}
+	if (!lo)
+		return -EIO;
+	priv = (struct pnfs_block_layout_top *) lo->ld_data;
+
+	/* Find NEEDS INIT pieces in range
+	 * (STUB - just use them all - really need a private field so we
+	 * can pass data to cleanup */
+	spin_lock(&priv->blt_lock);
+	list_splice_init(&priv->blt_commit_list, local_list);
+	count = priv->blt_count;
+	priv->blt_count = 0;
+	spin_unlock(&priv->blt_lock);
+	buf = kmalloc((7 * count + 2) * sizeof(__be32), GFP_KERNEL);
+	if (!buf) {
+		/* Need to put extents back.  Note not caring about order */
+		spin_lock(&priv->blt_lock);
+		list_splice_init(local_list, &priv->blt_commit_list);
+		priv->blt_count += count;
+		spin_unlock(&priv->blt_lock);
+		return -ENOMEM;
+	}
+	/* Parse into XDR */
+	p = buf;
+	WRITE32(count);
+	list_for_each_entry(be, local_list, be_lc_node) {
+		WRITE64(be->be_f_offset << 9);
+		WRITE64(be->be_length << 9);
+		WRITE64(be->be_v_offset << 9);
+		WRITE32(READ_WRITE_DATA);
+	}
+	WRITE32(0);
+	/* Set args */
+	arg->new_layout = buf;
+	arg->new_layout_size = (7 * count + 2) * 4;
 	return 0;
 }
 
 static void
 bl_cleanup_layoutcommit(struct pnfs_layout_type *layoutid,
-		struct pnfs_layoutcommit_arg *arg,
-		struct pnfs_layoutcommit_res *res)
+			struct pnfs_layoutcommit_arg *arg,
+			struct pnfs_layoutcommit_res *res,
+			struct list_head *local_list)
 {
+	struct pnfs_block_extent *be;
+
 	dprintk("%s enter\n", __FUNCTION__);
+	/* Free buffer */
+	kfree(arg->new_layout);
+	/* If Succes, change NEEDS_INIT into RW, else to INVAL */
+	/* STUB - there seems to be no way to get status - assume passed */
+	/* Merge back together - how get list lock? */
+	list_for_each_entry(be, local_list, be_lc_node) {
+		/* huge STUB - but works given current limits */
+		be->be_state = READ_WRITE_DATA;
+	}
 }
 
 /* Right now this is called without lock held.
