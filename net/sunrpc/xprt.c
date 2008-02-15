@@ -974,6 +974,27 @@ void xprt_set_timeout(struct rpc_timeout *to, unsigned int retr, unsigned long i
 	to->to_exponential = 0;
 }
 
+/*
+ * The autoclose function for the back channel
+ *
+ * The callback channel should never close the channel,
+ * let the forechannel do that.
+ */
+static void bc_autoclose(struct work_struct *work)
+{
+	return;
+}
+
+
+/*
+ * The autodisconnect routine for the back channel. We never disconnect
+ */
+static void
+bc_init_autodisconnect(unsigned long data)
+{
+	return;
+}
+
 /**
  * xprt_create_transport - create an RPC transport
  * @args: rpc transport creation arguments
@@ -1010,15 +1031,24 @@ found:
 
 	INIT_LIST_HEAD(&xprt->free);
 	INIT_LIST_HEAD(&xprt->recv);
-	INIT_WORK(&xprt->task_cleanup, xprt_autoclose);
+
+	if (args->svsk)
+		INIT_WORK(&xprt->task_cleanup, bc_autoclose);
+	else
+		INIT_WORK(&xprt->task_cleanup, xprt_autoclose);
+
 	init_timer(&xprt->timer);
-	xprt->timer.function = xprt_init_autodisconnect;
+	if (args->svsk)
+		xprt->timer.function = bc_init_autodisconnect;
+	else
+		xprt->timer.function = xprt_init_autodisconnect;
 	xprt->timer.data = (unsigned long) xprt;
 	xprt->last_used = jiffies;
 	xprt->cwnd = RPC_INITCWND;
 	xprt->bind_index = 0;
 
-	rpc_init_wait_queue(&xprt->binding, "xprt_binding");
+	if (!args->svsk)
+		rpc_init_wait_queue(&xprt->binding, "xprt_binding");
 	rpc_init_wait_queue(&xprt->pending, "xprt_pending");
 	rpc_init_wait_queue(&xprt->sending, "xprt_sending");
 	rpc_init_wait_queue(&xprt->resend, "xprt_resend");
@@ -1032,6 +1062,13 @@ found:
 
 	dprintk("RPC:       created transport %p with %u slots\n", xprt,
 			xprt->max_reqs);
+
+	if (args->svsk)
+		/*
+		 * Since we don't want connections for the backchannel, we set
+		 * the xprt status to connected
+		 */
+		xprt_set_connected(xprt);
 
 	return xprt;
 }
