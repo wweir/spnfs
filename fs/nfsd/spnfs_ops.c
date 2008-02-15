@@ -47,11 +47,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <linux/nfs4.h>
 #include <linux/exportfs.h>
 #include <linux/nfsd4_spnfs.h>
+#include <linux/nfsd/debug.h>
 #include <linux/nfsd/state.h>
 #include <linux/nfsd/nfsd4_pnfs.h>
 #include <linux/nfsd/nfs4layoutxdr.h>
 
-#define	NFSDDBG_FACILITY		NFSDDBG_PROC
+#define	NFSDDBG_FACILITY		NFSDDBG_PNFS
 
 /*
  * The functions that are called from elsewhere in the kernel
@@ -99,12 +100,14 @@ spnfs_layoutget(struct inode *inode, struct pnfs_layoutget_arg *lgp)
 		status = -ENOMEM;
 		goto layoutget_cleanup;
 	}
-	flp->device_id = res.layoutget_res.dev_id;
+	/* XXX FIX: figure out what to do about fsid */
+	flp->device_id.pnfs_devid = res.layoutget_res.devid;
 	flp->lg_layout_type = 1; /* XXX */
 	flp->lg_stripe_type = res.layoutget_res.stripe_type;
 	flp->lg_commit_through_mds = 0;
 	flp->lg_stripe_unit =  res.layoutget_res.stripe_size;
 	flp->lg_first_stripe_index = 0;
+	flp->lg_pattern_offset = 0;
 	flp->lg_fh_length = res.layoutget_res.stripe_count;
 
 	flp->lg_fh_list = kmalloc(flp->lg_fh_length * sizeof(struct knfsd_fh),
@@ -193,7 +196,8 @@ spnfs_getdeviceinfo(struct super_block *sb, struct pnfs_devinfo_arg *info)
 	int status = 0, i, len;
 
 	im.im_type = SPNFS_TYPE_GETDEVICEINFO;
-	im.im_args.getdeviceinfo_args.devid = info->devid;
+	/* XXX FIX: figure out what to do about fsid */
+	im.im_args.getdeviceinfo_args.devid = info->devid.pnfs_devid;
 
 	/* call function to queue the msg for upcall */
 	status = spnfs_upcall(spnfs, &im, &res);
@@ -203,6 +207,9 @@ spnfs_getdeviceinfo(struct super_block *sb, struct pnfs_devinfo_arg *info)
 		goto getdeviceinfo_out;
 	}
 	status = res.getdeviceinfo_res.status;
+	if (status != 0)
+		goto getdeviceinfo_out;
+
 	dev = &res.getdeviceinfo_res.devinfo;
 
 	/* Fill in the device data, i.e., nfs4_1_file_layout_ds_addr4 */
@@ -281,6 +288,9 @@ spnfs_getdeviceinfo(struct super_block *sb, struct pnfs_devinfo_arg *info)
 		memcpy(fldap->r_addr.data, dev->dslist[i].addr, len);
 		fldap->r_addr.len = len;
 	}
+
+	/* XXX FIX: this should go through the userspace daemon */
+	info->notify_types = 0;
 
 	/* encode the device data */
 	status = info->func(&info->xdr, fldev);
