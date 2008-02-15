@@ -689,7 +689,7 @@ filelayout_clone_write_data(struct nfs_write_data *old)
 	new->args.count  = 0;
 	new->res.count   = 0;
 	new->res.fattr   = old->res.fattr;
-	new->res.verf    = old->res.verf;
+	new->res.verf    = &new->verf;
 	new->args.context = old->args.context;
 	new->call_ops = old->call_ops;
 	new->how = old->how;
