@@ -106,6 +106,7 @@ struct rpc_create_args {
 	u32			version;
 	rpc_authflavor_t	authflavor;
 	unsigned long		flags;
+	struct svc_sock		*bc_sock;	/* NFSv4.1 backchannel */
 };
 
 /* Values for "flags" field */
