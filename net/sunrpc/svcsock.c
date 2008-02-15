@@ -1288,14 +1288,17 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 #if defined(CONFIG_NFSD_V4_1)
 		if (calldir) {
 			/* REPLY */
-			req = xprt_lookup_rqst(svsk->sk_xprt, xid);
+			if (svsk->sk_xprt)
+				req = xprt_lookup_rqst(svsk->sk_xprt, xid);
 			if (req) {
 				memcpy(&req->rq_private_buf, &req->rq_rcv_buf,
 					sizeof(struct xdr_buf));
 				vec[0] = req->rq_private_buf.head[0];
 			} else
 				printk(KERN_NOTICE
-					"Got reply with unknown xid!\n");
+					"%s: Got unrecognized reply: calldir 0x%x "
+					"sk_xprt %p xid %08x\n", __func__,
+					ntohl(calldir), svsk->sk_xprt, xid);
 		}
 
 		if (!calldir || !req)
