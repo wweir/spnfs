@@ -28,6 +28,7 @@ struct svc_sock {
 	/* private TCP part */
 	int			sk_reclen;	/* length of record */
 	int			sk_tcplen;	/* current read length */
+	struct rpc_xprt	       *sk_bc_xprt;	/* NFSv4.1 backchannel xprt */
 };
 
 /*
