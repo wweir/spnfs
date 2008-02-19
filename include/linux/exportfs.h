@@ -61,10 +61,11 @@ typedef int (*pnfs_encodedev_t)(struct pnfs_xdr_info *xdr, void *device);
 
 /* Arguments for get_device_info */
 struct pnfs_devinfo_arg {
-	u32 type;
-	deviceid_t devid;
-	struct pnfs_xdr_info xdr;
-	pnfs_encodedev_t func;
+	u32 type;			/* request */
+	deviceid_t devid;		/* request */
+	u32 notify_types;		/* request/response */
+	struct pnfs_xdr_info xdr;	/* request/response */
+	pnfs_encodedev_t func;		/* request */
 };
 
 /* Used by get_device_iter to retrieve all available devices.
