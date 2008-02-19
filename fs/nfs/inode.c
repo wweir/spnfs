@@ -1202,6 +1202,7 @@ static inline void nfs4_init_once(struct nfs_inode *nfsi)
 #endif
 #ifdef CONFIG_PNFS
 	init_waitqueue_head(&nfsi->lo_waitq);
+	spin_lock_init(&nfsi->lo_lock);
 #endif /* CONFIG_PNFS */
 }
 
