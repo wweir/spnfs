@@ -297,6 +297,48 @@ pnfs_unregister_layoutdriver(struct pnfs_layoutdriver_type *ld_type)
 }
 
 /*
+ * pNFS client layout cache
+ */
+#if defined(CONFIG_SMP)
+#define BUG_ON_UNLOCKED_LO(lo) \
+	BUG_ON(!spin_is_locked(&PNFS_NFS_INODE(lo)->lo_lock))
+#else /* CONFIG_SMP */
+#define BUG_ON_UNLOCKED_LO(lo) do {} while (0)
+#endif /* CONFIG_SMP */
+
+/*
+ * get and lock nfs->current_layout
+ */
+static inline struct pnfs_layout_type *
+get_lock_current_layout(struct nfs_inode *nfsi)
+{
+	struct pnfs_layout_type *lo;
+
+	spin_lock(&nfsi->lo_lock);
+	lo = nfsi->current_layout;
+	if (lo)
+		lo->refcount++;
+	else
+		spin_unlock(&nfsi->lo_lock);
+
+	return lo;
+}
+
+/*
+ * put and unlock nfs->current_layout
+ */
+static inline void
+put_unlock_current_layout(struct nfs_inode *nfsi,
+			    struct pnfs_layout_type *lo)
+{
+	BUG_ON_UNLOCKED_LO(lo);
+	BUG_ON(lo->refcount <= 0);
+
+	--lo->refcount;
+	spin_unlock(&nfsi->lo_lock);
+}
+
+/*
 * Get layout from server.
 *    for now, assume that whole file layouts are requested.
 *    arg->offset: 0
@@ -336,18 +378,21 @@ get_layout(struct inode *ino,
 int
 pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range)
 {
+	struct pnfs_layout_type *lo;
 	struct nfs_inode *nfsi = NFS_I(ino);
 	struct nfs_server *server = NFS_SERVER(ino);
 	struct nfs4_pnfs_layoutreturn_arg arg;
 	int status;
 
-	dprintk("%s:Begin layout %p\n", __func__, nfsi->current_layout);
+	lo = get_lock_current_layout(nfsi);
+	dprintk("%s:Begin layout %p\n", __func__, lo);
 
-	if (nfsi->current_layout == NULL)
+	if (lo == NULL)
 		return 0;
 
 	server->pnfs_curr_ld->ld_io_ops->free_layout(
 		&nfsi->current_layout, &arg.lseg);
+	put_unlock_current_layout(nfsi, lo);
 
 	arg.reclaim = 0;
 	arg.layout_type = server->pnfs_curr_ld->id;
@@ -434,6 +479,7 @@ alloc_init_layout(struct inode *ino, struct layoutdriver_io_operations *io_ops)
 		return NULL;
 	}
 
+	lo->refcount = 1;
 	lo->roc_iomode = 0;
 	lo->inode = ino;
 	return lo;
@@ -448,11 +494,15 @@ static int pnfs_wait_schedule(void *word)
 }
 
 /*
- * get, possibly allocate current_layout
+ * get, possibly allocate, and lock current_layout
+ *
+ * Note: If successful, nfsi->lo_lock is taken and the caller
+ * must put and unlock current_layout by using put_unlock_current_layout()
+ * when the returned layout is released.
  */
 static struct pnfs_layout_type *
-get_alloc_layout(struct inode *ino,
-		 struct layoutdriver_io_operations *io_ops)
+get_lock_alloc_layout(struct inode *ino,
+		      struct layoutdriver_io_operations *io_ops)
 {
 	struct nfs_inode *nfsi = NFS_I(ino);
 	struct pnfs_layout_type *lo;
@@ -460,7 +510,7 @@ get_alloc_layout(struct inode *ino,
 
 	dprintk("%s Begin\n", __FUNCTION__);
 
-	while ((lo = nfsi->current_layout) == NULL) {
+	while ((lo = get_lock_current_layout(nfsi)) == NULL) {
 		/* Compete against other threads on who's doing the allocation,
 		 * wait until bit is cleared if we lost this race.
 		 */
@@ -473,22 +523,22 @@ get_alloc_layout(struct inode *ino,
 		}
 
 		/* Was current_layout already allocated while we slept?
-		 * If not, allocate it.
+		 * If so, retry get_lock'ing it. Otherwise, allocate it.
 		 */
-		lo = nfsi->current_layout;
-		if (!lo)
-			lo = nfsi->current_layout =
-				alloc_init_layout(ino, io_ops);
+		if (nfsi->current_layout)
+			continue;
+
+		lo = alloc_init_layout(ino, io_ops);
+		if (lo) {
+			/* must grab the layout lock */
+			spin_lock(&nfsi->lo_lock);
+			nfsi->current_layout = lo;
+		} else
+			lo = ERR_PTR(-ENOMEM);
 
 		/* release the NFS_INO_LAYOUT_ALLOC bit and wake up waiters */
 		clear_bit_unlock(NFS_INO_LAYOUT_ALLOC, &nfsi->pnfs_layout_state);
 		wake_up_bit(&nfsi->pnfs_layout_state, NFS_INO_LAYOUT_ALLOC);
-
-		/* we're done here.
-		 * just check whether alloc_init_layout succeeded.
-		 */
-		if (!lo)
-			lo = ERR_PTR(-ENOMEM);
 		break;
 	}
 
@@ -518,7 +568,7 @@ pnfs_update_layout(struct inode *ino,
 	struct pnfs_layout_type *layout_new;
 	int result = -EIO;
 
-	layout_new = get_alloc_layout(ino, nfss->pnfs_curr_ld->ld_io_ops);
+	layout_new = get_lock_alloc_layout(ino, nfss->pnfs_curr_ld->ld_io_ops);
 	if (IS_ERR(layout_new)) {
 		result = PTR_ERR(layout_new);
 		goto ret;
@@ -624,6 +674,7 @@ out:
 
 	/* res.layout.buf kalloc'ed by the xdr decoder? */
 	kfree(res.layout.buf);
+	put_unlock_current_layout(nfsi, layout_new);
 ret:
 	dprintk("%s end (err:%d) state 0x%lx\n",
 		__func__, result, nfsi->pnfs_layout_state);
@@ -746,9 +797,11 @@ pnfs_getboundary(struct inode *inode)
 		goto out;
 
 	nfsi = NFS_I(inode);
-	lo = nfsi->current_layout;
-	if (lo)
+	lo = get_lock_current_layout(nfsi);;
+	if (lo) {
 		stripe_size = policy_ops->get_stripesize(lo);
+		put_unlock_current_layout(nfsi, lo);
+	}
 out:
 	return stripe_size;
 }
