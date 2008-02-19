@@ -57,7 +57,8 @@ struct nfsd4_pnfs_getdevinfo {
 	u32		gd_type;	/* request */
 	deviceid_t	gd_devid;	/* request */
 	u32		gd_maxcount;	/* request */
-	struct svc_fh	*gd_fhp;	/* response */
+	u32		gd_notify_types; /* request */
+	struct super_block *gd_sb;
 };
 
 struct nfsd4_pnfs_layoutget {
