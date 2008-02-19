@@ -1261,17 +1261,30 @@ nfsd4_decode_getdevlist(struct nfsd4_compoundargs *argp,
 	DECODE_TAIL;
 }
 
+/* GETDEVICEINFO: minorversion1-19.txt
+u32             pnfs_deviceid4                  device_id;
+u32             pnfs_layouttype4                layout_type;
+u32             count4                          maxcount;
+u32             bitmap4                         device_notify_types;
+*/
 static int
 nfsd4_decode_getdevinfo(struct nfsd4_compoundargs *argp,
 			struct nfsd4_pnfs_getdevinfo *gdev)
 {
+	int num;
 	DECODE_HEAD;
 
-	READ_BUF(8 + sizeof(deviceid_t));
+	READ_BUF(12 + sizeof(deviceid_t));
 	READ64(gdev->gd_devid.pnfs_fsid);
 	READ64(gdev->gd_devid.pnfs_devid);
 	READ32(gdev->gd_type);
 	READ32(gdev->gd_maxcount);
+	READ32(num);
+	if (num) {
+		READ_BUF(4);
+		READ32(gdev->gd_notify_types);
+	} else
+		gdev->gd_notify_types = 0;
 
 	DECODE_TAIL;
 }
@@ -3413,7 +3426,9 @@ nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp,
 {
 	struct pnfs_devinfo_arg args;
 	struct super_block *sb;
-	int maxcount;
+	int maxcount = 0;
+	int has_bitmap;
+	u32 *p_in = resp->p;
 
 	ENCODE_HEAD;
 
@@ -3421,7 +3436,7 @@ nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp,
 	if (nfserr)
 		return nfserr;
 
-	sb = gdev->gd_fhp->fh_dentry->d_inode->i_sb;
+	sb = gdev->gd_sb;
 
 	/* Set the file layout encoding function.  Once other layout
 	 * types are added to the kernel they can be set here
@@ -3429,25 +3444,29 @@ nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp,
 	if (gdev->gd_type == LAYOUT_NFSV4_FILES)
 		args.func = filelayout_encode_devinfo;
 
+	/* If maxcount is 0 then just update notifications */
+	if (gdev->gd_maxcount != 0) {
+		maxcount = PAGE_SIZE;
+		if (maxcount > gdev->gd_maxcount)
+			maxcount = gdev->gd_maxcount;
+
+		/* Ensure have room for type and notify field */
+		maxcount -= 12;
+		if (maxcount < 0) {
+			nfserr = -ETOOSMALL;
+			goto toosmall;
+		}
+	}
+
 	RESERVE_SPACE(4);
 	WRITE32(gdev->gd_type);
 	ADJUST_ARGS();
-
-	maxcount = PAGE_SIZE;
-	if (maxcount > gdev->gd_maxcount)
-		maxcount = gdev->gd_maxcount;
-
-	/* Ensure have room for type field */
-	maxcount -= 4;
-	if (maxcount < 0) {
-		printk(KERN_ERR "%s: buffer too small\n", __func__);
-		return  nfserr_toosmall;
-	}
 
 	/* Set layout type and id of device to encode */
 	args.type = gdev->gd_type;
 	args.devid.pnfs_fsid = gdev->gd_devid.pnfs_fsid;
 	args.devid.pnfs_devid = gdev->gd_devid.pnfs_devid;
+	args.notify_types = gdev->gd_notify_types;
 
 	/* Set xdr info so file system can encode device */
 	args.xdr.p   = resp->p;
@@ -3457,8 +3476,13 @@ nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp,
 	/* Call file system to retrieve and encode device */
 	nfserr = sb->s_export_op->get_device_info(sb, &args);
 	if (nfserr) {
+		/* Rewind to the beginning */
+		p = p_in;
+		ADJUST_ARGS();
+		if (nfserr == -ETOOSMALL)
+			goto toosmall;
 		printk(KERN_ERR "%s: export ERROR %d\n", __func__, nfserr);
-		return nfserrno(nfserr);
+		goto out;
 	}
 
 	/* The file system should never write 0 bytes without
@@ -3471,7 +3495,24 @@ nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp,
 	 */
 	p += XDR_QUADLEN(args.xdr.bytes_written);
 	ADJUST_ARGS();
-	return nfs_ok;
+
+	/* Encode supported device notifications */
+	has_bitmap = (args.notify_types != 0);
+	RESERVE_SPACE(4 + (has_bitmap * 4));
+	WRITE32(has_bitmap);
+	if (has_bitmap)
+		WRITE32(args.notify_types);
+	ADJUST_ARGS();
+
+out:
+	return nfserrno(nfserr);
+toosmall:
+	dprintk("%s: maxcount too small\n", __func__);
+	RESERVE_SPACE(4);
+	/* TODO: For now just return the min size as a page */
+	WRITE32(PAGE_SIZE);
+	ADJUST_ARGS();
+	goto out;
 }
 
 /* LAYOUTGET: minorversion1-19.txt
