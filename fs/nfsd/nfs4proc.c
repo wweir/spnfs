@@ -1196,21 +1196,23 @@ nfsd4_getdevinfo(struct svc_rqst *rqstp,
 		struct nfsd4_pnfs_getdevinfo *gdp)
 {
 	struct super_block *sb;
-	struct svc_fh *current_fh = &cstate->current_fh;
+	struct svc_export *exp = NULL;
+	u32 fsidv = 0;	/* FIXME: extract the fsid from the device ID arg */
 	int status;
 
 	dprintk("%s: type %u dev_id %llx:%llx maxcnt %u\n",
 	       __func__, gdp->gd_type, gdp->gd_devid.pnfs_fsid,
 	       gdp->gd_devid.pnfs_devid, gdp->gd_maxcount);
 
-	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
-	if (status) {
-		printk("%s: verify filehandle failed\n", __FUNCTION__);
+	status = nfserr_inval;
+	exp = rqst_exp_find(rqstp, FSID_NUM, &fsidv);
+	dprintk("%s: exp %p\n", __func__, exp);
+	if (IS_ERR(exp)) {
+		status = nfserrno(PTR_ERR(exp));
 		goto out;
 	}
-
-	status = nfserr_inval;
-	sb = current_fh->fh_dentry->d_inode->i_sb;
+	sb = exp->ex_path.dentry->d_inode->i_sb;
+	dprintk("%s: sb %p\n", __func__, sb);
 	if (!sb)
 		goto out;
 
@@ -1227,7 +1229,7 @@ nfsd4_getdevinfo(struct svc_rqst *rqstp,
 	}
 
 	/* Set up arguments so device can be retrieved at encode time */
-	gdp->gd_fhp = &cstate->current_fh;
+	gdp->gd_sb = sb;
 out:
 	return status;
 }
