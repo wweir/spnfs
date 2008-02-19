@@ -3327,7 +3327,7 @@ nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp,
 	if (nfserr)
 		return nfserr;
 
-	sb = gdev->gd_fhp->fh_dentry->d_inode->i_sb;
+	sb = gdev->gd_sb;
 
 	/* Set the file layout encoding function.  Once other layout
 	 * types are added to the kernel they can be set here
