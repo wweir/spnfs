@@ -314,8 +314,12 @@ pnfs_unregister_layoutdriver(struct pnfs_layoutdriver_type *ld_type)
 /*
  * pNFS client layout cache
  */
+#if defined(CONFIG_SMP)
 #define BUG_ON_UNLOCKED_LO(lo) \
-	BUG_ON(spin_trylock(&PNFS_NFS_INODE(lo)->lo_lock))
+	BUG_ON(!spin_is_locked(&PNFS_NFS_INODE(lo)->lo_lock))
+#else /* CONFIG_SMP */
+#define BUG_ON_UNLOCKED_LO(lo) do {} while (0)
+#endif /* CONFIG_SMP */
 
 /*
  * get and lock nfs->current_layout
