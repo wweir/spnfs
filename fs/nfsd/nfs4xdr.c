@@ -1261,20 +1261,15 @@ nfsd4_decode_getdevlist(struct nfsd4_compoundargs *argp,
 	DECODE_TAIL;
 }
 
-/* GETDEVICEINFO: minorversion1-13.txt
-u32             pnfs_deviceid4                  device_id;
-u32             pnfs_layouttype4                layout_type;
-u32             count4                          maxcount;
-
-*/
-  static int
+static int
 nfsd4_decode_getdevinfo(struct nfsd4_compoundargs *argp,
 			struct nfsd4_pnfs_getdevinfo *gdev)
 {
 	DECODE_HEAD;
 
-	READ_BUF(12);
-	READ32(gdev->gd_devid);
+	READ_BUF(8 + sizeof(deviceid_t));
+	READ64(gdev->gd_devid.pnfs_fsid);
+	READ64(gdev->gd_devid.pnfs_devid);
 	READ32(gdev->gd_type);
 	READ32(gdev->gd_maxcount);
 
@@ -3257,8 +3252,12 @@ nfsd4_encode_devlist_iterator(struct nfsd4_compoundres *resp,
 			goto out;
 
 		/* Encode device id and layout type */
-		RESERVE_SPACE(8);
-		WRITE32(iter_arg.devid);
+		RESERVE_SPACE(4 + sizeof(deviceid_t));
+		/* TODO: Need to encode an identifier that uniquely
+		 * identifies the export. (fsid)
+		 */
+		WRITE64(0LL);			/* devid major */
+		WRITE64(iter_arg.devid);	/* devid minor */
 		WRITE32(iter_arg.type);
 		ADJUST_ARGS();
 		*bytes_written += 8;
@@ -3271,18 +3270,20 @@ nfsd4_encode_devlist_iterator(struct nfsd4_compoundres *resp,
 
 		/* Set dev info arguments */
 		info_arg.type = gdevl->gd_type;
-		info_arg.devid = iter_arg.devid;
+		info_arg.devid.pnfs_fsid = 0;
+		info_arg.devid.pnfs_devid = iter_arg.devid;
 
 		/* set xdr info */
 		info_arg.xdr.p = resp->p;
 		info_arg.xdr.end = resp->end;
 		info_arg.xdr.maxcount = maxcount;
 
-		dprintk("%s: pre get_device_info type %u, mxcnt %u,devid %u\n",
+		dprintk("%s: pre gdi type %u, mxcnt %u,devid %llx:%llx\n",
 			__func__,
 			info_arg.type,
 			info_arg.xdr.maxcount,
-			info_arg.devid);
+			info_arg.devid.pnfs_fsid,
+			info_arg.devid.pnfs_devid);
 		nfserr = sb->s_export_op->get_device_info(sb, &info_arg);
 		dprintk("%s: post get_device_info err %d bytes_wr %u\n",
 			__func__,
@@ -3449,7 +3450,8 @@ nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp,
 
 	/* Set layout type and id of device to encode */
 	args.type = gdev->gd_type;
-	args.devid = gdev->gd_devid;
+	args.devid.pnfs_fsid = gdev->gd_devid.pnfs_fsid;
+	args.devid.pnfs_devid = gdev->gd_devid.pnfs_devid;
 
 	/* Set xdr info so file system can encode device */
 	args.xdr.p   = resp->p;

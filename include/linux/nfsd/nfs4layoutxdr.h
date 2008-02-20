@@ -39,22 +39,20 @@
 #if defined(CONFIG_PNFSD)
 
 /* Macros from fs/nfsd/nfs4xdr.c */
-#define ENCODE_HEAD              u32 *p
-
+#define ENCODE_HEAD              __be32 *p
 #define WRITE32(n)               *p++ = htonl(n)
 #define WRITE64(n)               do {                           \
 	*p++ = htonl((u32)((n) >> 32));                         \
 	*p++ = htonl((u32)(n));					\
 } while (0)
-#define WRITEMEM(ptr,nbytes)     do {                           \
-	*(p + XDR_QUADLEN(nbytes) - 1) = 0;                     \
-	memcpy(p, ptr, nbytes);                                 \
-	p += XDR_QUADLEN(nbytes);                               \
+#define WRITEMEM(ptr,nbytes)     do {				\
+	*(p + XDR_QUADLEN(nbytes) - 1) = 0;			\
+	memcpy(p, ptr, nbytes);					\
+	p += XDR_QUADLEN(nbytes);				\
 } while (0)
-
-#define RESERVE_SPACE(nbytes)   do {                            \
-	p = resp->p;                                            \
-	BUG_ON(p + XDR_QUADLEN(nbytes) > resp->end);            \
+#define RESERVE_SPACE(nbytes)	do {				\
+	p = resp->p;						\
+	BUG_ON(p + XDR_QUADLEN(nbytes) > resp->end);		\
 } while (0)
 #define ADJUST_ARGS()           resp->p = p
 
@@ -83,7 +81,7 @@ struct pnfs_filelayout_layout {
 	u32                             lg_commit_through_mds; /* response */
 	u64                             lg_stripe_unit; /* response */
 	u32                             lg_first_stripe_index;	/* response */
-	u32				device_id;		/* response */
+	deviceid_t			device_id;		/* response */
 	u32                             lg_fh_length;		/* response */
 	struct knfsd_fh                 *lg_fh_list;		/* response */
 };
