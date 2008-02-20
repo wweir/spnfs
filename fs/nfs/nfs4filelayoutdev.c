@@ -335,7 +335,7 @@ device_destroy(struct nfs4_pnfs_dev_item *dev,
 	for (i = 0; i < dev->stripe_count; i++) {
 		for (j = 0; j < fdev->num_ds; j++) {
 			ds = fdev->ds_list[j];
-			if (unhash_ds(ds))
+			if (ds != NULL && unhash_ds(ds))
 				hlist_add_head(&ds->ds_node, &release);
 		}
 		fdev++;
