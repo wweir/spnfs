@@ -46,7 +46,7 @@
 
 struct nfsd4_pnfs_getdevlist {
 	u32             gd_type;	/* request */
-	u32		gd_maxcount;	/* request */
+	u32		gd_maxnum;	/* request */
 	u64		gd_cookie;	/* request - response */
 	u64		gd_verf;	/* request - response */
 	struct svc_fh 	*gd_fhp;	/* response */
