@@ -1395,6 +1395,7 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 
 		if (session->flags & SESSION4_BACK_CHAN) {
 			unconf->svsk = rqstp->rq_sock;
+			unconf->cl_callback.cb_prog = session->callback_prog;
 			nfsd41_probe_callback(unconf);
 		}
 		conf = unconf;
