@@ -1199,9 +1199,9 @@ nfsd4_getdevinfo(struct svc_rqst *rqstp,
 	struct svc_fh *current_fh = &cstate->current_fh;
 	int status;
 
-	dprintk("%s: type %u dev_id %u maxcnt %u\n",
-	       __func__, gdp->gd_type, gdp->gd_devid,
-	       gdp->gd_maxcount);
+	dprintk("%s: type %u dev_id %llx:%llx maxcnt %u\n",
+	       __func__, gdp->gd_type, gdp->gd_devid.pnfs_fsid,
+	       gdp->gd_devid.pnfs_devid, gdp->gd_maxcount);
 
 	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
 	if (status) {
