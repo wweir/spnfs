@@ -385,7 +385,7 @@ struct nfs4_file {
 
 struct pnfs_ds_dev_entry {
 	struct list_head	dd_dev_entry; /* st_pnfs_ds_id entry */
-	u32			dd_devid;
+	u32			dd_dsid;
 };
 #endif /* CONFIG_PNFSD */
 
