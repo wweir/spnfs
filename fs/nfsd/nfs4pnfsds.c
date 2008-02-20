@@ -201,7 +201,7 @@ alloc_init_mds_id(struct pnfs_get_state *gsp)
 	INIT_LIST_HEAD(&mdp->di_hash);
 	INIT_LIST_HEAD(&mdp->di_mdsclid);
 	list_add(&mdp->di_hash, &mds_id_tbl);
-	mdp->di_mdsid = gsp->devid;
+	mdp->di_mdsid = gsp->dsid;
 	mdp->di_mdsboot = 0;
 	return mdp;
 }
@@ -215,7 +215,7 @@ alloc_init_ds_clientid(struct pnfs_get_state *gsp)
 
 	dprintk("pNFSD: %s\n", __func__);
 
-	mdp = find_pnfs_mds_id(gsp->devid);
+	mdp = find_pnfs_mds_id(gsp->dsid);
 	if (!mdp)
 		mdp = alloc_init_mds_id(gsp);
 	if (!mdp)
