@@ -953,8 +953,8 @@ nfsd4_getdevlist(struct svc_rqst *rqstp,
 	struct svc_fh *current_fh = &cstate->current_fh;
 	int status;
 
-	dprintk("%s: type %u maxcnt %u cookie %llu verf %llu\n",
-		__func__, gdlp->gd_type, gdlp->gd_maxcount,
+	dprintk("%s: type %u maxnum %u cookie %llu verf %llu\n",
+		__func__, gdlp->gd_type, gdlp->gd_maxnum,
 		gdlp->gd_cookie, gdlp->gd_verf);
 
 
@@ -978,8 +978,7 @@ nfsd4_getdevlist(struct svc_rqst *rqstp,
 
 	/* Do nothing if underlying file system does not support
 	 * getdevicelist */
-	if (!sb->s_export_op->get_device_iter ||
-	    !sb->s_export_op->get_device_info) {
+	if (!sb->s_export_op->get_device_iter) {
 		status = nfserr_notsupp;
 		goto out;
 	}
