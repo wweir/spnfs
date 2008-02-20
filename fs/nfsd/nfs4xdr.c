@@ -3264,7 +3264,7 @@ nfsd4_encode_getdevlist(struct nfsd4_compoundres *resp,
 	/* Ensure we have room for cookie, verifier, and devlist len,
 	 * which we will backfill in after we encode as many devices as possible
 	 */
-	lead_count = 8 + 4 + 4 + sizeof(nfs4_verifier);
+	lead_count = 8 + 4 + sizeof(nfs4_verifier);
 	RESERVE_SPACE(lead_count);
 	/* skip past these values */
 	p += XDR_QUADLEN(lead_count);
@@ -3291,6 +3291,7 @@ nfsd4_encode_getdevlist(struct nfsd4_compoundres *resp,
 	ADJUST_ARGS();
 
 	/* are we at the end of devices? */
+	RESERVE_SPACE(4);
 	WRITE32(gdevl->gd_eof);
 	ADJUST_ARGS();
 
