@@ -236,7 +236,7 @@ spnfs_getdeviceinfo(struct super_block *sb, struct pnfs_devinfo_arg *info)
 		goto getdeviceinfo_out;
 	}
 	for (i = 0; i < fldev->fl_stripeindices_length; i++)
-		fldev->fl_stripeindices_list[i] = i + 1;
+		fldev->fl_stripeindices_list[i] = i;
 
 	/*
 	 * Set the device's data server addresses  No multipath for spnfs,
