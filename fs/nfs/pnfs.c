@@ -752,11 +752,10 @@ get_lock_alloc_layout(struct inode *ino,
 		if (lo) {
 			struct nfs_client *clp = NFS_SERVER(ino)->nfs_client;
 
+			down_write(&clp->cl_sem);
 			/* must grab the layout lock */
 			spin_lock(&nfsi->lo_lock);
 			nfsi->current_layout = lo;
-
-			down_write(&clp->cl_sem);
 			list_add_tail(&nfsi->lo_inodes, &clp->cl_lo_inodes);
 			up_write(&clp->cl_sem);
 		} else
