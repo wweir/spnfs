@@ -44,9 +44,25 @@ int pnfs_try_to_commit(struct nfs_write_data *);
 void pnfs_pageio_init_read(struct nfs_pageio_descriptor *, struct inode *, struct nfs_open_context *, struct list_head *, size_t *);
 void pnfs_pageio_init_write(struct nfs_pageio_descriptor *, struct inode *);
 void pnfs_update_layout_commit(struct inode *, struct list_head *, pgoff_t, unsigned int);
-int pnfs_flush_one(struct inode *, struct list_head *, unsigned int, size_t, int);
 void pnfs_free_request_data(struct nfs_page *req);
 ssize_t pnfs_file_write(struct file *, const char __user *, size_t, loff_t *);
+
+/* do not call directly */
+int __pnfs_flush_one(struct inode *, struct list_head *, unsigned int, size_t, int);
+
+/*
+ * return 0 for success, 1 for legacy nfs fallback, negative for error
+ */
+static inline int
+pnfs_flush_one(struct inode *ino, struct list_head *head, unsigned int npages,
+	       size_t count, int how)
+{
+	struct nfs_server *nfss = NFS_SERVER(ino);
+
+	if (!nfss->pnfs_curr_ld->ld_io_ops->flush_one)
+		return 1;
+	return __pnfs_flush_one(ino, head, npages, count, how);
+}
 
 #endif /* CONFIG_PNFS */
 
