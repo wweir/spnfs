@@ -19,26 +19,40 @@
 #define NFS4_PNFS_DEV_HASH_BITS 5
 #define NFS4_PNFS_DEV_HASH (1 << NFS4_PNFS_DEV_HASH_BITS)
 
-#define NFS4_PNFS_MAX_DEVS 16
+#define NFS4_PNFS_MAX_STRIPE_CNT 16
+#define NFS4_PNFS_MAX_MULTI_DS   2
 
 enum stripetype4 {
 	STRIPE_SPARSE = 1,
 	STRIPE_DENSE = 2
 };
 
+struct nfs4_pnfs_ds {
+	struct hlist_node 	ds_node;  /* nfs4_pnfs_dev_hlist dev_dslist */
+	u32 			ds_ip_addr;
+	u32 			ds_port;
+	struct nfs_client	*ds_clp;
+	atomic_t		ds_count;
+};
+
+struct nfs4_pnfs_dev {
+	u32 			stripe_index;
+	int 			num_ds;
+	struct nfs4_pnfs_ds	*ds_list[NFS4_PNFS_MAX_MULTI_DS];
+};
+
+/* stripe_count is length of dev_list, bounded by NFS4_PNFS_MAX_STRIPE_CNT */
 struct nfs4_pnfs_dev_item {
-	struct hlist_node hash_node;
-	u32 dev_id;
-	u32 ip_addr;
-	u32 port;
-	atomic_t count;
-/*	struct nfs_client *clp; */
-	struct nfs_server *server;
+	struct hlist_node	hash_node;	/* nfs4_pnfs_dev_hlist dev_list */
+	u32 			dev_id;
+	u32 			stripe_count;
+	struct nfs4_pnfs_dev	*stripe_devs;
 };
 
 struct nfs4_pnfs_dev_hlist {
-	rwlock_t          dev_lock;
-	struct hlist_head dev_list[NFS4_PNFS_DEV_HASH];
+	rwlock_t		dev_lock;
+	struct hlist_head	dev_list[NFS4_PNFS_DEV_HASH];
+	struct hlist_head	dev_dslist[NFS4_PNFS_DEV_HASH];
 };
 
 struct nfs4_pnfs_devaddr {
@@ -54,7 +68,8 @@ struct nfs4_pnfs_devlist {
 
 struct nfs4_pnfs_dserver {
 	struct nfs_fh        *fh;
-	struct nfs4_pnfs_dev_item *dev_item;
+	struct nfs4_pnfs_dev *dev;
+	u32 dev_id;
 };
 
 struct nfs4_filelayout_devs {
@@ -75,7 +90,7 @@ struct nfs4_filelayout {
 	u64 stripe_unit;
 	unsigned int index_len;
 	unsigned int num_devs;
-	struct nfs4_filelayout_devs devs[NFS4_PNFS_MAX_DEVS];
+	struct nfs4_filelayout_devs devs[NFS4_PNFS_MAX_STRIPE_CNT];
 };
 
 struct filelayout_mount_type {
