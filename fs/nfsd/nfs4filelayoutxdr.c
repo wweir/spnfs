@@ -154,14 +154,15 @@ filelayout_encode_layout(struct pnfs_xdr_info *resp, void *layout)
 
 	resp->bytes_written = 0; /* in case there is an error */
 
-	dprintk("%s: devid %u, fsi %u, numfh %u\n",
+	dprintk("%s: device_id %llx:%llx fsi %u, numfh %u\n",
 		__func__,
-		flp->device_id,
+		flp->device_id.pnfs_fsid,
+		flp->device_id.pnfs_devid,
 		flp->lg_first_stripe_index,
 		flp->lg_fh_length);
 
 	/* Ensure room for len, devid, util, and first_stripe_index */
-	leadcount = 20;
+	leadcount = 32;
 	RESERVE_SPACE(leadcount);
 
 	/* Ensure that there is enough space assuming the largest
@@ -182,8 +183,9 @@ filelayout_encode_layout(struct pnfs_xdr_info *resp, void *layout)
 	len += 4;
 
 	/* encode device id */
-	WRITE32(flp->device_id);
-	len += 4;
+	WRITE64(flp->device_id.pnfs_fsid);
+	WRITE64(flp->device_id.pnfs_devid);
+	len += sizeof(deviceid_t);
 
 	/* set and encode flags */
 	nfl_util = flp->lg_stripe_unit;

@@ -37,6 +37,11 @@ enum fid_type {
 
 #if defined(CONFIG_PNFSD)
 
+typedef struct {
+	uint64_t	pnfs_fsid;	/* fsid */
+	uint64_t	pnfs_devid;	/* deviceid */
+} deviceid_t;
+
 /* XDR stream arguments and results.  Exported file system uses this
  * struct to encode information and return how many bytes were encoded.
  */
@@ -57,22 +62,23 @@ typedef int (*pnfs_encodedev_t)(struct pnfs_xdr_info *xdr, void *device);
 /* Arguments for get_device_info */
 struct pnfs_devinfo_arg {
 	u32 type;
-	u32 devid;
+	deviceid_t devid;
 	struct pnfs_xdr_info xdr;
 	pnfs_encodedev_t func;
 };
 
 /* Used by get_device_iter to retrieve all available devices.
  * Args:
- * gld_type - layout type
- * gld_cookie/verf - index and verifier of current list item
- * gld_devid - output device id
+ * type - layout type
+ * cookie/verf - index and verifier of current list item
+ * export_id - Minor part of deviceid_t
+ * eof - end of file?
  */
 struct pnfs_deviter_arg {
 	u32 type;	/* request */
 	u64 cookie;	/* request/response */
 	u64 verf;	/* request/response */
-	u32 devid;	/* response */
+	u64 devid;	/* response */
 	u32 eof;	/* response */
 };
 
@@ -86,8 +92,14 @@ struct nfsd4_layout_seg {
 
 /* Used by layout_get to encode layout (loc_body var in spec)
  * Args:
- * xdr - xdr stream
- * layout - pointer to layout to be encoded
+ * minlength - min number of accessible bytes given by layout
+ * func - per layout encoding function
+ * export_id - Major part of deviceid_t.  File system uses this
+ * to build the deviceid returned in the layout.
+ * fh - fs can modify the file handle for use on data servers
+ * seg - layout info requested and layout info returned
+ * xdr - xdr info
+ * return_on_close - true if layout to be returned on file close
  * TODO: use common func with dev?
  */
 typedef int (*pnfs_encodelayout_t)(struct pnfs_xdr_info *xdr, void *layout);
@@ -96,6 +108,7 @@ typedef int (*pnfs_encodelayout_t)(struct pnfs_xdr_info *xdr, void *layout);
 struct pnfs_layoutget_arg {
 	u64			minlength;	/* request */
 	pnfs_encodelayout_t 	func;		/* request */
+	u64			fsid;		/* request */
 	struct knfsd_fh		*fh;		/* request/response */
 	struct nfsd4_layout_seg	seg;		/* request/response */
 	struct pnfs_xdr_info	xdr;		/* request/response */
