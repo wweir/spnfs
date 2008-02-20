@@ -62,6 +62,38 @@ create_nfs_rpcclient(struct rpc_xprt *xprt,
 				rpc_authflavor_t authflavor,
 				int *err);
 
+void
+print_ds_list(struct nfs4_pnfs_dev *fdev)
+{
+	struct nfs4_pnfs_ds *ds;
+	int i;
+
+	ds = fdev->ds_list[0];
+	for (i = 0; i < fdev->num_ds; i++) {
+		dprintk("        ip_addr %x\n", ntohl(ds->ds_ip_addr));
+		dprintk("        port %hu\n", ntohs(ds->ds_port));
+		dprintk("        client %p\n", ds->ds_clp);
+		dprintk("        cl_exchange_flags %x\n",
+				    ds->ds_clp->cl_exchange_flags);
+		ds++;
+	}
+}
+
+void
+print_stripe_devs(struct nfs4_pnfs_dev_item *dev)
+{
+	struct nfs4_pnfs_dev *fdev;
+	int i;
+
+	fdev = &dev->stripe_devs[0];
+	for (i = 0; i < dev->stripe_count; i++) {
+		dprintk("        stripe_index %u\n", fdev->stripe_index);
+		dprintk("        num_ds %d\n", fdev->num_ds);
+		print_ds_list(fdev);
+		fdev++;
+	}
+}
+
 /* Assumes lock is held */
 static inline struct nfs4_pnfs_dev_item *
 _device_lookup(struct nfs4_pnfs_dev_hlist *hlist, u32 dev_id)
@@ -83,31 +115,72 @@ _device_lookup(struct nfs4_pnfs_dev_hlist *hlist, u32 dev_id)
 }
 
 /* Assumes lock is held */
+static inline struct nfs4_pnfs_ds *
+_data_server_lookup(struct nfs4_pnfs_dev_hlist *hlist, u32 ip_addr, u32 port)
+{
+	unsigned long      hash;
+	struct hlist_node *np;
+
+	dprintk("_data_server_lookup: ip_addr=%x port=%hu\n",
+			ntohl(ip_addr), ntohs(port));
+
+	hash = hash_long(ip_addr, NFS4_PNFS_DEV_HASH_BITS);
+
+	hlist_for_each(np, &hlist->dev_dslist[hash]) {
+		struct nfs4_pnfs_ds *ds;
+		ds = hlist_entry(np, struct nfs4_pnfs_ds, ds_node);
+		if (ds->ds_ip_addr == ip_addr &&
+		    ds->ds_port == port) {
+			return ds;
+		}
+	}
+	return NULL;
+}
+
+
+/* Assumes lock is held */
 static inline void
 _device_add(struct nfs4_pnfs_dev_hlist *hlist, struct nfs4_pnfs_dev_item *dev)
 {
 	unsigned long      hash;
 
-	dprintk("_device_add: dev_id=%u, ip=%x, port=%hu\n", dev->dev_id,
-		ntohl(dev->ip_addr), ntohs(dev->port));
+	dprintk("_device_add: dev_id=%u stripe_devs:\n", dev->dev_id);
+	print_stripe_devs(dev);
 
 	hash = hash_long(dev->dev_id, NFS4_PNFS_DEV_HASH_BITS);
 	hlist_add_head(&dev->hash_node, &hlist->dev_list[hash]);
 }
 
-/* Create an rpc to the data server defined in 'dev' */
-static int
-device_create(struct rpc_clnt *mds_rpc, struct nfs4_pnfs_dev_item *dev)
+/* Assumes lock is held */
+static inline void
+_data_server_add(struct nfs4_pnfs_dev_hlist *hlist, struct nfs4_pnfs_ds *ds)
 {
+	unsigned long      hash;
+
+	dprintk("_data_server_add: ip_addr=%x port=%hu\n",
+			ntohl(ds->ds_ip_addr), ntohs(ds->ds_port));
+
+	hash = hash_long(ds->ds_ip_addr, NFS4_PNFS_DEV_HASH_BITS);
+	hlist_add_head(&ds->ds_node, &hlist->dev_dslist[hash]);
+}
+
+/* Create an rpc to the data server defined in 'dev_list' */
+static int
+device_create(struct rpc_clnt *mds_rpc, struct nfs4_pnfs_dev *dev)
+{
+	struct nfs4_pnfs_ds *ds;
 	struct sockaddr_in	sin;
 	int err = 0;
 
-	sin.sin_family = AF_INET;
-	sin.sin_addr.s_addr = dev->ip_addr;
-	sin.sin_port = dev->port;
+	/* just use the first ds in ds list...*/
+	ds = dev->ds_list[0];
 
-	dprintk("device_create: dev_id=%u, ip=%x, port=%hu, rpcclient %p\n",
-		dev->dev_id, ntohl(dev->ip_addr), ntohs(dev->port), mds_rpc);
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = ds->ds_ip_addr;
+	sin.sin_port = ds->ds_port;
+
+	dprintk("device_create: ip=%x, port=%hu, rpcclient %p\n",
+			ntohl(ds->ds_ip_addr), ntohs(ds->ds_port), mds_rpc);
 
 	/*
 	 * XXX Need to implement.
@@ -133,30 +206,63 @@ out:
 	return err;
 }
 
-static void
-device_destroy(struct nfs4_pnfs_dev_item *dev)
+/* Assumes lock is held */
+static int
+unhash_ds(struct nfs4_pnfs_ds *ds)
 {
+
+	if (!atomic_dec_and_test(&ds->ds_count))
+		return 0;
+
+	hlist_del_init(&ds->ds_node);
+	return 1;
+}
+
+static void
+destroy_ds(struct nfs4_pnfs_ds *ds)
+{
+	nfs4_proc_destroy_session(ds->ds_clp->cl_ds_session,
+					  ds->ds_clp->cl_rpcclient);
+	rpc_shutdown_client(ds->ds_clp->cl_rpcclient);
+	ds->ds_clp->cl_rpcclient = NULL;
+	kfree(ds);
+}
+
+/* Assumes lock is NOT held */
+static void
+device_destroy(struct nfs4_pnfs_dev_item *dev,
+	       struct nfs4_pnfs_dev_hlist *hlist)
+{
+	struct nfs4_pnfs_dev *fdev;
+	struct nfs4_pnfs_ds *ds;
+	HLIST_HEAD(release);
+	struct hlist_node *np;
+	int i, j;
+
 	if (!dev)
 		return;
 
-	dprintk("device_destroy: did=%u, ip=%x, port=%hu, rpcclient %p "
-		"flags %x\n",
-		dev->dev_id, ntohl(dev->ip_addr), ntohs(dev->port),
-		dev->server->client,
-		dev->server->nfs_client->cl_exchange_flags);
+	dprintk("device_destroy: did=%u dev_list: \n", dev->dev_id);
+	print_stripe_devs(dev);
 
-	/* if not created for DS just return */
-	if ((dev->server->nfs_client->cl_exchange_flags &
-	     EXCHGID4_FLAG_USE_PNFS_DS) &&
-	    !(dev->server->nfs_client->cl_exchange_flags &
-	      EXCHGID4_FLAG_USE_PNFS_MDS)) {
-		nfs4_proc_destroy_session(dev->server->session,
-					  dev->server->client);
-		/* BUG_ON(!atomic_sub_and_test(0, &dev->count)); */
-		rpc_shutdown_client(dev->server->client);
-		dev->server->client = NULL;
+	write_lock(&hlist->dev_lock);
+	hlist_del_rcu(&dev->hash_node);
+
+	fdev = &dev->stripe_devs[0];
+	for (i = 0; i < dev->stripe_count; i++) {
+		for (j = 0; j < fdev->num_ds; j++) {
+			ds = fdev->ds_list[j];
+			if (ds != NULL && unhash_ds(ds))
+				hlist_add_head(&ds->ds_node, &release);
+		}
+		fdev++;
 	}
-
+	write_unlock(&hlist->dev_lock);
+	hlist_for_each(np, &release) {
+		ds = hlist_entry(np, struct nfs4_pnfs_ds, ds_node);
+		destroy_ds(ds);
+	}
+	kfree(dev->stripe_devs);
 	kfree(dev);
 }
 
@@ -167,8 +273,10 @@ nfs4_pnfs_devlist_init(struct nfs4_pnfs_dev_hlist *hlist)
 
 	hlist->dev_lock = __RW_LOCK_UNLOCKED("pnfs_devlist_lock");
 
-	for (i = 0; i < NFS4_PNFS_DEV_HASH; i++)
+	for (i = 0; i < NFS4_PNFS_DEV_HASH; i++) {
 		INIT_HLIST_HEAD(&hlist->dev_list[i]);
+		INIT_HLIST_HEAD(&hlist->dev_dslist[i]);
+	}
 
 	return 0;
 }
@@ -192,8 +300,8 @@ nfs4_pnfs_devlist_destroy(struct nfs4_pnfs_dev_hlist *hlist)
 			struct nfs4_pnfs_dev_item *dev;
 			dev = hlist_entry(np, struct nfs4_pnfs_dev_item,
 					  hash_node);
-			hlist_del_rcu(&dev->hash_node);
-			device_destroy(dev);
+			/* device_destroy grabs hlist->dev_lock */
+			device_destroy(dev, hlist);
 		}
 	}
 }
@@ -221,61 +329,63 @@ nfs4_pnfs_device_add(struct filelayout_mount_type *mt,
 	/* Cleanup, if device was recently added */
 	if (tmp_dev != NULL) {
 		dprintk(" device found, not adding (after creation)\n");
-		device_destroy(dev);
+		device_destroy(dev, hlist);
 	}
 
 	return 0;
 }
 
-/* Decode opaque device data and return the result
- */
-static struct nfs4_pnfs_dev_item*
-decode_device(struct pnfs_device *dev)
+static void
+nfs4_pnfs_ds_add(struct filelayout_mount_type *mt, struct nfs4_pnfs_ds **dsp,
+		 u32 ip_addr, u32 port)
 {
-	int index, i, j, len;
-	int tmp[6];
-	uint32_t *p = (uint32_t *)dev->dev_addr_buf;
-	struct nfs4_pnfs_dev_item *file_dev;
+	struct nfs4_pnfs_ds *tmp_ds, *ds;
+	struct nfs4_pnfs_dev_hlist *hlist = mt->hlist;
+
+	*dsp = NULL;
+
+	ds = kzalloc(sizeof(*tmp_ds), GFP_KERNEL);
+	if (!ds)
+		return;
+
+	/* Initialize ds */
+	ds->ds_ip_addr = ip_addr;
+	ds->ds_port = port;
+	atomic_set(&ds->ds_count, 1);
+	INIT_HLIST_NODE(&ds->ds_node);
+
+	write_lock(&hlist->dev_lock);
+	tmp_ds = _data_server_lookup(hlist, ip_addr, port);
+	if (tmp_ds == NULL) {
+		_data_server_add(hlist, ds);
+		*dsp = ds;
+	}
+	write_unlock(&hlist->dev_lock);
+	if (tmp_ds != NULL) {
+		dprintk(" data server found, not adding (after creation)\n");
+		destroy_ds(ds);
+		*dsp = tmp_ds;
+	}
+}
+
+static struct nfs4_pnfs_ds *
+decode_and_add_ds(uint32_t **pp, struct filelayout_mount_type *mt)
+{
+	struct nfs4_pnfs_ds *ds = NULL;
 	char r_addr[29]; /* max size of ip/port string */
+	int len;
+	u32 ip_addr, port;
+	int tmp[6];
+	uint32_t *p = *pp;
 
-	file_dev = kmalloc(sizeof(struct nfs4_pnfs_dev_item), GFP_KERNEL);
-	if (file_dev == NULL)
-		return NULL;
-	/* Initialize dev */
-	INIT_HLIST_NODE(&file_dev->hash_node);
-	atomic_set(&file_dev->count, 0);
-
-	/* Device id */
-	file_dev->dev_id = dev->dev_id;
-
-	READ32(index);
-	for (i = 0; i < index; i++)  /* skip indices list */
-		READ32(j);
-
-	READ32(len);
-	BUG_ON(len != 1);    /* 1 DS per device id */
-
-	/* Get the device count */
-	READ32(dev->dev_count);
-
-	if (dev->dev_count > 1)
-		printk(KERN_NOTICE
-			"%s: Add loop for multipath dev_count %d dev_id %d\n",
-			__func__, dev->dev_count, dev->dev_id);
-
-	/* Decode contents of device*/
-
-	/* device addr --  r_netid, r_addr */
-
+	dprintk("%s enter\n", __func__);
 	/* check and skip r_netid */
 	READ32(len);
 	/* "tcp" */
 	if (len != 3) {
-		printk(KERN_ERR
-			"%s: ERROR: Device index %d dev_count %d len %d\n",
-			__func__, index, dev->dev_count, len);
-		kfree(file_dev);
-		return NULL;
+		printk("%s: ERROR: non TCP r_netid len %d\n",
+			__func__, len);
+		goto out_err;
 	}
 	/* Read the bytes into a temporary buffer */
 	/* TODO: should probably sanity check them */
@@ -283,21 +393,110 @@ decode_device(struct pnfs_device *dev)
 
 	READ32(len);
 	if (len > 29) {
-		printk(KERN_ERR "%s: ERROR: Device ip/port "
-			"string too long (%d)\n", __func__, len);
-		kfree(file_dev);
-		return NULL;
+		printk("%s: ERROR: Device ip/port too long (%d)\n",
+			__func__, len);
+		goto out_err;
 	}
-	memcpy(r_addr, p, len);
+	COPYMEM(r_addr, len);
+	*pp = p;
 	r_addr[len] = '\0';
 	sscanf(r_addr, "%d.%d.%d.%d.%d.%d", &tmp[0], &tmp[1],
 	       &tmp[2], &tmp[3], &tmp[4], &tmp[5]);
-	file_dev->ip_addr = htonl((tmp[0]<<24) | (tmp[1]<<16) |
-				  (tmp[2]<<8) | (tmp[3]));
-	file_dev->port = htons((tmp[4] << 8) | (tmp[5]));
-	dprintk("%s: addr:port string = %s\n", __func__, r_addr);
+	ip_addr = htonl((tmp[0]<<24) | (tmp[1]<<16) | (tmp[2]<<8) | (tmp[3]));
+	port = htons((tmp[4] << 8) | (tmp[5]));
 
+	nfs4_pnfs_ds_add(mt, &ds, ip_addr, port);
+
+	/* adding ds to stripe */
+	atomic_inc(&ds->ds_count);
+	dprintk("%s: addr:port string = %s\n", __func__, r_addr);
+	return ds;
+out_err:
+	dprintk("%s returned NULL\n", __func__);
+	return NULL;
+}
+
+/* Decode opaque device data and return the result
+ */
+static struct nfs4_pnfs_dev_item*
+decode_device(struct filelayout_mount_type *mt, struct pnfs_device *dev)
+{
+	int i, len;
+	uint32_t *p = (uint32_t *)dev->dev_addr_buf;
+	struct nfs4_pnfs_dev_item *file_dev;
+	struct nfs4_pnfs_dev *fdev;
+
+	/* Get the stripe count (number of stripe index) */
+	READ32(len);
+	if (len > NFS4_PNFS_MAX_STRIPE_CNT) {
+		printk(KERN_WARNING "%s: stripe count %d greater than "
+		       "supported maximum %d\n",
+			__func__, len, NFS4_PNFS_MAX_STRIPE_CNT);
+
+		goto out_err;
+	}
+
+	file_dev = kzalloc(sizeof(*file_dev), GFP_KERNEL);
+	if (!file_dev)
+		goto out_err;
+
+	file_dev->stripe_devs = kzalloc(sizeof(struct nfs4_pnfs_dev) * len,
+					GFP_KERNEL);
+	if (!file_dev->stripe_devs)
+		goto out_err_free;
+	file_dev->stripe_count = len;
+
+	/* Initialize dev */
+	INIT_HLIST_NODE(&file_dev->hash_node);
+
+	/* Device id */
+	file_dev->dev_id = dev->dev_id;
+
+	fdev = &file_dev->stripe_devs[0];
+	for (i = 0; i < len; i++) {
+		READ32(fdev->stripe_index);
+		fdev++;
+	}
+
+	/* Get the device count, which has to equal the stripe count */
+	READ32(len);
+	if (len != file_dev->stripe_count) {
+		printk("%s: ERROR: device count %d !=  index count %d\n",
+			__func__, len, file_dev->stripe_count);
+		goto out_err_free;
+	}
+
+	fdev = &file_dev->stripe_devs[0];
+	for (i = 0; i < file_dev->stripe_count; i++) {
+		int j, num;
+
+		/* Get the multipath count for this stripe index */
+		READ32(num);
+		if (num > NFS4_PNFS_MAX_MULTI_DS) {
+			printk(KERN_WARNING
+			       "%s: Multipath count %d not supported, "
+			       "setting to %d\n",
+				__func__, num, NFS4_PNFS_MAX_MULTI_DS);
+
+			num = NFS4_PNFS_MAX_MULTI_DS;
+		}
+
+		fdev->num_ds = num;
+
+		for (j = 0; j < fdev->num_ds; j++) {
+			fdev->ds_list[j] = decode_and_add_ds(&p, mt);
+			if (fdev->ds_list[j] == NULL)
+				goto out_err_free;
+		}
+		fdev++;
+	}
 	return file_dev;
+
+out_err_free:
+	device_destroy(file_dev, mt->hlist);
+out_err:
+	dprintk("%s ERROR: returning NULL\n", __func__);
+	return NULL;
 }
 
 /* Decode the opaque device specified in 'dev'
@@ -310,7 +509,7 @@ decode_and_add_device(struct filelayout_mount_type *mt, struct pnfs_device *dev)
 {
 	struct nfs4_pnfs_dev_item *file_dev;
 
-	file_dev = decode_device(dev);
+	file_dev = decode_device(mt, dev);
 	if (!file_dev) {
 		printk(KERN_WARNING "%s: Could not decode device\n",
 			__func__);
@@ -438,8 +637,10 @@ nfs4_pnfs_dserver_get(struct inode *inode,
 
 	dev_id = layout->devs[stripe_idx].dev_id;
 
-	dserver->dev_item = nfs4_pnfs_device_get(inode, dev_id);
-	if (dserver->dev_item == NULL)
+	/* NOTE: resolved in following patch.
+	 *dserver->dev = nfs4_pnfs_device_get(inode, dev_id); */
+
+	if (dserver->dev == NULL)
 		return 1;
 	dserver->fh = &layout->devs[stripe_idx].fh;
 
