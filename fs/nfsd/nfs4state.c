@@ -4206,7 +4206,7 @@ release_pnfs_ds_dev_list(struct nfs4_stateid *stp)
 }
 
 static int
-nfs4_add_pnfs_ds_dev(struct nfs4_stateid *stp, u32 devid)
+nfs4_add_pnfs_ds_dev(struct nfs4_stateid *stp, u32 dsid)
 {
 	struct pnfs_ds_dev_entry *ddp;
 
@@ -4216,7 +4216,7 @@ nfs4_add_pnfs_ds_dev(struct nfs4_stateid *stp, u32 devid)
 
 	INIT_LIST_HEAD(&ddp->dd_dev_entry);
 	list_add(&ddp->dd_dev_entry, &stp->st_pnfs_ds_id);
-	ddp->dd_devid = devid;
+	ddp->dd_dsid = dsid;
 	return 0;
 }
 
@@ -4677,7 +4677,7 @@ nfs4_pnfs_cb_get_state(struct super_block *sb, struct pnfs_get_state *arg)
 		/* XXX ANDROS: marc removed nfs4_check_fh - how come? */
 
 		/* arg->devid is the Data server id, set by the cluster fs */
-		status = nfs4_add_pnfs_ds_dev(stp, arg->devid);
+		status = nfs4_add_pnfs_ds_dev(stp, arg->dsid);
 		if (status)
 			goto out;
 
