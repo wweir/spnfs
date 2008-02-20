@@ -4860,6 +4860,12 @@ int nfs4_proc_create_session(struct nfs_client *clp,
 	ptr = (int *)session->sess_id;
 	dprintk("sessionid is: %d:%d:%d:%d\n", ptr[0], ptr[1], ptr[2], ptr[3]);
 
+#ifdef CONFIG_PNFS
+	/* Data servers do not have a lease */
+	if (clp->cl_ds_session != NULL)
+		goto out;
+#endif /* CONFIG_PNFS */
+
 	/* Get the lease time */
 	status = nfs4_proc_get_lease_time(clp, session, &fsinfo);
 	if (status == 0) {
