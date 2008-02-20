@@ -727,6 +727,7 @@ static struct file_system_type nfsd_fs_type = {
 extern int (*spnfs_init)(void);
 extern int (*spnfs_test)(void);
 extern void (*spnfs_delete)(void);
+extern struct nfs_fh * (*spnfs_getfh_vec)(int), *spnfs_getfh(int);
 
 int nfsd_spnfs_new(void);
 #if defined(CONFIG_PNFSD)
@@ -782,6 +783,7 @@ static int __init init_nfsd(void)
 	spnfs_test = spnfs_close;
 #endif /* CONFIG_PNFSD */
 	spnfs_delete = nfsd_spnfs_delete;
+	spnfs_getfh_vec = spnfs_getfh;
 
 	retval = register_filesystem(&nfsd_fs_type);
 	if (retval)
