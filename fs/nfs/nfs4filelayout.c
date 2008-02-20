@@ -279,8 +279,11 @@ ssize_t filelayout_read_pagelist(
 			data->args.fh = NFS_FH(inode);
 			status = 0;
 		} else {
-			data->pnfs_client = dserver.dev_item->server->client;
-			data->session = dserver.dev_item->server->session;
+			struct nfs4_pnfs_ds *ds = dserver.dev->ds_list[0];
+
+			/* just try the first data server for the index..*/
+			data->pnfs_client = ds->ds_clp->cl_rpcclient;
+			data->session = ds->ds_clp->cl_ds_session;
 			data->args.fh = dserver.fh;
 
 			/* Now get the file offset on the dserver
@@ -350,14 +353,17 @@ ssize_t filelayout_write_pagelist(
 					&dserver);
 	/* ANDROS: XXX should fail if no data server */
 	if (!status) {
-		data->pnfs_client = dserver.dev_item->server->client;
-		data->session = dserver.dev_item->server->session;
+		struct nfs4_pnfs_ds *ds = dserver.dev->ds_list[0];
+
+		/* just try the first data server for the index.. */
+		data->pnfs_client = ds->ds_clp->cl_rpcclient;
+		data->session = ds->ds_clp->cl_ds_session;
 		data->args.fh = dserver.fh;
 	}
-	dprintk("%s set wb_devid %d\n", __func__, dserver.dev_item[0].dev_id);
+	dprintk("%s set wb_devid %d\n", __func__, dserver.dev_id);
 	list_for_each(h, &data->pages) {
 		req = list_entry(h, struct nfs_page, wb_list);
-		req->wb_devid = dserver.dev_item[0].dev_id;
+		req->wb_devid = dserver.dev_id;
 	}
 
 	/* Now get the file offset on the dserver
@@ -490,6 +496,7 @@ filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino,
 	struct pnfs_layout_type *laytype;
 	struct nfs4_filelayout *nfslay;
 	struct nfs4_pnfs_dserver dserver;
+	struct nfs4_pnfs_ds *ds;
 	struct nfs_page *first;
 	struct nfs_page *req;
 	struct list_head *pos, *tmp;
@@ -520,8 +527,8 @@ filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino,
 		}
 		if (!dsdata)
 			goto out_bad;
-		dserver.dev_item = nfs4_pnfs_device_get(ino, dev_id);
-		if (dserver.dev_item == NULL)
+		dserver.dev = nfs4_pnfs_device_get(ino, dev_id);
+		if (dserver.dev == NULL)
 			return 1;
 		list_for_each_safe(pos, tmp, &data->pages) {
 			req = nfs_list_entry(pos);
@@ -544,8 +551,10 @@ filelayout_commit(struct pnfs_layout_type *layoutid, struct inode *ino,
 		dprintk("%s call nfs_commit_rpcsetup i %d devid %d\n",
 						__func__, i, dev_id);
 
-		dsdata->pnfs_client = dserver.dev_item->server->client;
-		dsdata->session =  dserver.dev_item->server->session;
+		/* just try the first data server for the index.. */
+		ds = dserver.dev->ds_list[0];
+		dsdata->pnfs_client = ds->ds_clp->cl_rpcclient;
+		dsdata->session =  ds->ds_clp->cl_ds_session;
 
 		/* TODO: Is the FH different from NFS_FH(data->inode)?
 		 * (set in nfs_commit_rpcsetup)
