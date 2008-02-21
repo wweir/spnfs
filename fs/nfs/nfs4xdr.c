@@ -275,10 +275,10 @@ static int nfs4_stat_to_errno(int);
 				    NFS4_PNFS_DEV_MAXNUM *		\
 				    (NFS4_PNFS_DEVICEID4_SIZE + 2 +	\
 				     NFS4_PNFS_DEV_MAXSIZE))
-#define encode_getdeviceinfo_maxsz (op_encode_hdr_maxsz + 2 + \
-				    NFS4_PNFS_DEVICEID4_SIZE)
-#define decode_getdeviceinfo_maxsz (op_decode_hdr_maxsz + 2 + \
-				   NFS4_PNFS_DEV_MAXSIZE)
+#define encode_getdeviceinfo_maxsz (op_encode_hdr_maxsz + 4 + \
+				    XDR_QUADLEN(NFS4_PNFS_DEVICEID4_SIZE))
+#define decode_getdeviceinfo_maxsz (op_decode_hdr_maxsz + 4 + \
+				    XDR_QUADLEN(NFS4_PNFS_DEV_MAXSIZE))
 #define encode_pnfs_layoutget_sz (op_encode_hdr_maxsz + 10 + \
 				  encode_stateid_maxsz)
 #define decode_pnfs_layoutget_maxsz	(op_decode_hdr_maxsz + 8 + \
@@ -741,11 +741,9 @@ static int nfs4_stat_to_errno(int);
 					decode_getdevicelist_maxsz)
 #define NFS41_enc_pnfs_getdeviceinfo_sz	(compound_encode_hdr_maxsz +    \
 					encode_sequence_maxsz +\
-					encode_putfh_maxsz +            \
 					encode_getdeviceinfo_maxsz)
 #define NFS41_dec_pnfs_getdeviceinfo_sz	(compound_decode_hdr_maxsz +    \
 					decode_sequence_maxsz + \
-					decode_putfh_maxsz +            \
 					decode_getdeviceinfo_maxsz)
 #define NFS41_enc_pnfs_layoutget_sz (compound_encode_hdr_maxsz + \
 				     encode_sequence_maxsz + \
@@ -1825,14 +1823,17 @@ static int encode_getdevicelist(struct xdr_stream *xdr,
 static int encode_getdeviceinfo(struct xdr_stream *xdr,
 				const struct nfs4_pnfs_getdeviceinfo_arg *args)
 {
-	uint32_t *p;
+	int has_bitmap = (args->dev_notify_types != 0);
+	__be32 *p;
 
-	RESERVE_SPACE(12 + NFS4_PNFS_DEVICEID4_SIZE);
-
+	RESERVE_SPACE(16 + NFS4_PNFS_DEVICEID4_SIZE + (has_bitmap * 4));
 	WRITE32(OP_GETDEVICEINFO);
 	WRITEMEM(args->dev_id->data, NFS4_PNFS_DEVICEID4_SIZE);
 	WRITE32(args->layoutclass);
 	WRITE32(NFS4_PNFS_DEV_MAXSIZE);
+	WRITE32(has_bitmap); 		/* bitmap array length 0 or 1 */
+	if (has_bitmap)
+		WRITE32(args->dev_notify_types);
 	return 0;
 }
 
@@ -3363,19 +3364,13 @@ static int nfs41_xdr_enc_pnfs_getdeviceinfo(struct rpc_rqst *req,
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
-		.nops = 3,
+		.nops = 2,
 	};
-	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
 	encode_compound_hdr(&xdr, &hdr, 1);
 	encode_sequence(&xdr, &args->seq_args);
-	status = encode_putfh(&xdr, args->fh);
-	if (status != 0)
-		goto out;
-	status = encode_getdeviceinfo(&xdr, args);
-out:
-	return status;
+	return encode_getdeviceinfo(&xdr, args);
 }
 
 /*
@@ -5512,23 +5507,43 @@ static int decode_getdevicelist(struct xdr_stream *xdr,
 static int decode_getdeviceinfo(struct xdr_stream *xdr,
 				struct pnfs_device *res)
 {
-	uint32_t *p;
-	uint32_t len, type;
+	__be32 *p;
+	uint32_t len, type, tlen, mincount;
 	int status;
 
 	status = decode_op_hdr(xdr, OP_GETDEVICEINFO);
-	if (status)
+	if (status) {
+		/* TODO: Do we want to resend getdeviceinfo with mincount? */
+		if (status == -NFS4ERR_TOOSMALL) {
+			READ_BUF(4);
+			READ32(mincount);
+			dprintk("%s: Min count too small. mincnt = %u\n",
+			       __func__, mincount);
+		}
 		return status;
+	}
 
-	READ_BUF(4);	/* TODO: confirm layout type */
+	READ_BUF(8);
 	READ32(type);
-	READ_BUF(4);
+	if (type != res->layout_type) {
+		dprintk("%s: layout mismatch req: %u res: %u\n",
+			__func__, res->layout_type, type);
+		return -EINVAL;
+	}
 	READ32(len);
 	READ_BUF(len);
 
 	COPYMEM(&res->dev_addr_buf, len);
 	res->dev_addr_len = len;
 
+	/* At most one bitmap word */
+	READ_BUF(4);
+	READ32(tlen);
+	if (tlen) {
+		READ_BUF(4);
+		READ32(res->dev_notify_types);
+	} else
+		res->dev_notify_types = 0;
 	return 0;
 }
 
@@ -7474,9 +7489,6 @@ static int nfs41_xdr_dec_pnfs_getdeviceinfo(struct rpc_rqst *rqstp,
 	if (status != 0)
 		goto out;
 	status = decode_sequence(&xdr, &res->seq_res);
-	if (status != 0)
-		goto out;
-	status = decode_putfh(&xdr);
 	if (status != 0)
 		goto out;
 	status = decode_getdeviceinfo(&xdr, res->dev);
