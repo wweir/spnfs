@@ -87,7 +87,15 @@ u64 nfs41_clientid(struct nfs_client *clp)
 {
 	return 0;
 }
-#endif
+
+struct rpc_cred *
+nfs41_get_state_renewal_cred(struct nfs_client *clp)
+{
+	if (clp->cl_ex_cred)
+		get_rpccred(clp->cl_ex_cred);
+	return (clp->cl_ex_cred);
+}
+#endif /* CONFIG_NFS_V4_1 */
 
 struct rpc_cred *nfs4_get_renew_cred(struct nfs_client *clp)
 {
