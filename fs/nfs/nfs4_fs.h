@@ -256,6 +256,11 @@ extern void nfs41_increment_lock_seqid(int status, struct nfs_seqid *seqid);
 #endif /* CONFIG_NFS_V4_1 */
 extern void nfs_free_seqid(struct nfs_seqid *seqid);
 
+/* write.c */
+extern int nfs_flush_one(struct inode *, struct list_head *, unsigned int,
+			 size_t, int);
+
+
 extern const nfs4_stateid zero_stateid;
 
 /* nfs4xdr.c */
