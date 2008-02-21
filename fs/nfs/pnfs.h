@@ -41,7 +41,6 @@ int pnfs_initialize(void);
 void pnfs_uninitialize(void);
 void pnfs_layoutcommit_done(struct pnfs_layoutcommit_data *data, int status);
 int pnfs_layoutcommit_inode(struct inode *inode, int sync);
-void pnfs_writeback_done_update(struct nfs_write_data *);
 void pnfs_update_last_write(struct nfs_inode *nfsi, loff_t offset, size_t extent);
 void pnfs_need_layoutcommit(struct nfs_inode *nfsi, struct nfs_open_context *ctx);
 int pnfs_enabled_sb(struct nfs_server *nfss);
