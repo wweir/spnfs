@@ -656,6 +656,9 @@ get_device_info(struct filelayout_mount_type *mt,
 		return NULL;
 
 	memcpy(&pdev->dev_id, dev_id, NFS4_PNFS_DEVICEID4_SIZE);
+	pdev->layout_type = LAYOUT_NFSV4_FILES;
+	/* TODO: Update types when CB_NOTIFY_DEVICEID is available */
+	pdev->dev_notify_types = 0;
 
 	rc = pnfs_callback_ops->nfs_getdeviceinfo(mt->fl_sb, fh, pdev);
 	dprintk("%s getdevice info returns %d\n", __func__, rc);
