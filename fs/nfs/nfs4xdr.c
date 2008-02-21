@@ -6618,11 +6618,10 @@ static int nfs41_xdr_dec_exchange_id(struct rpc_rqst *rqstp, uint32_t *p,
 
         xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
         status = decode_compound_hdr(&xdr, &hdr);
-
-	if (hdr.status)
-		return hdr.status;
-
-	status = decode_exchange_id(&xdr, res);
+	if (!status)
+		status = decode_exchange_id(&xdr, res);
+	if (!status)
+		status = -nfs4_stat_to_errno(hdr.status);
 
 	return status;
 }
