@@ -690,7 +690,8 @@ filelayout_clone_write_data(struct nfs_write_data *old)
 	new->args.offset = 0;
 	new->args.count  = 0;
 	new->res.count   = 0;
-	new->res.fattr   = old->res.fattr;
+	new->res.fattr   = &new->fattr;
+	nfs_fattr_init(&new->fattr);
 	new->res.verf    = &new->verf;
 	new->args.context = old->args.context;
 	new->call_ops = old->call_ops;
