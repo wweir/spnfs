@@ -146,7 +146,5 @@ extern void nfs_initiate_commit(struct nfs_write_data *, struct rpc_clnt *,
 extern int nfs_read_validate(struct rpc_task *, void *);
 extern void nfs_readdata_release(void *);
 extern int nfs_write_validate(struct rpc_task *, void *);
-extern int nfs_flush_one(struct inode *, struct list_head *, unsigned int,
-			 size_t, int);
 
 #endif /* FS_NFS_NFS4FILELAYOUT_H */

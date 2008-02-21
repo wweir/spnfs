@@ -1117,6 +1117,8 @@ pnfs_pageio_init_read(struct nfs_pageio_descriptor *pgio,
 void
 pnfs_pageio_init_write(struct nfs_pageio_descriptor *pgio, struct inode *inode)
 {
+	if (!pnfs_enabled_sb(NFS_SERVER(inode)))
+		return;
 	pgio->pg_iswrite = 1;
 	pgio->pg_threshold = pnfs_getthreshold(inode, 1);
 	pgio->pg_boundary = pnfs_getboundary(inode);
@@ -1290,7 +1292,7 @@ pnfs_writeback_done(struct nfs_write_data *data)
  * return 0 for success, 1 for legacy nfs fallback, negative for error
  */
 int
-__pnfs_flush_one(struct inode *inode, struct list_head *head,
+pnfs_flush_one(struct inode *inode, struct list_head *head,
 		 unsigned int npages, size_t count, int how)
 {
 	struct nfs_server *nfss = NFS_SERVER(inode);
@@ -1298,6 +1300,9 @@ __pnfs_flush_one(struct inode *inode, struct list_head *head,
 	struct nfs_page *req;
 	struct pnfs_layout_segment *lseg;
 	int status;
+
+	if (!pnfs_enabled_sb(nfss) || !nfss->pnfs_curr_ld->ld_io_ops->flush_one)
+		goto fallback;
 
 	req = nfs_list_entry(head->next);
 	status = pnfs_update_layout(inode,
@@ -1307,12 +1312,14 @@ __pnfs_flush_one(struct inode *inode, struct list_head *head,
 				    IOMODE_RW,
 				    &lseg);
 	if (status)
-		return 1;
+		goto fallback;
 	io_ops = nfss->pnfs_curr_ld->ld_io_ops;
 	status = io_ops->flush_one(lseg, head, npages, count, how);
 	put_lseg(lseg);
 
 	return status;
+fallback:
+	return nfs_flush_one(inode, head, npages, count, how);
 }
 
 /*
