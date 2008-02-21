@@ -6691,10 +6691,8 @@ static int nfs41_xdr_dec_get_lease_time(struct rpc_rqst *rqstp, uint32_t *p,
 
 	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
-	if (hdr.status)
-		return hdr.status;
-
-	status = decode_sequence(&xdr, &res->lr_seq_res);
+	if (!status)
+		status = decode_sequence(&xdr, &res->lr_seq_res);
 	if (!status)
 		status = decode_putrootfh(&xdr);
 	if (!status)
