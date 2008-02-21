@@ -27,6 +27,7 @@
 #include "internal.h"
 #include "iostat.h"
 #include "nfs4_fs.h"
+#include "pnfs.h"
 
 #define NFSDBG_FACILITY		NFSDBG_PAGECACHE
 
@@ -982,8 +983,7 @@ static void nfs_pageio_init_write(struct nfs_pageio_descriptor *pgio,
 	size_t wsize = NFS_SERVER(inode)->wsize;
 
 #ifdef CONFIG_PNFS
-	pgio->pg_boundary = 0;
-	pgio->pg_test = NULL;
+	pnfs_pageio_init_write(pgio, inode);
 #endif /* CONFIG_PNFS */
 
 	if (wsize < PAGE_CACHE_SIZE)
