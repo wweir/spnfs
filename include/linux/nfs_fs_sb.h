@@ -79,6 +79,7 @@ struct nfs_client {
 	u32			cl_seqid;
 	/* The flags used for obtaining the clientid during EXCHANGE_ID */
 	u32			cl_exchange_flags;
+	struct rpc_cred		*cl_ex_cred;	/* exchange_id credential */
 #endif
 };
 
