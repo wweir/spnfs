@@ -740,11 +740,9 @@ static int nfs4_stat_to_errno(int);
 					decode_getdevicelist_maxsz)
 #define NFS41_enc_pnfs_getdeviceinfo_sz	(compound_encode_hdr_maxsz +    \
 					encode_sequence_maxsz +\
-					encode_putfh_maxsz +            \
 					encode_getdeviceinfo_maxsz)
 #define NFS41_dec_pnfs_getdeviceinfo_sz	(compound_decode_hdr_maxsz +    \
 					decode_sequence_maxsz + \
-					decode_putfh_maxsz +            \
 					decode_getdeviceinfo_maxsz)
 #define NFS41_enc_pnfs_layoutget_sz (compound_encode_hdr_maxsz + \
 				     encode_sequence_maxsz + \
@@ -3382,22 +3380,13 @@ static int nfs41_xdr_enc_pnfs_getdeviceinfo(struct rpc_rqst *req,
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
-		.nops = 3,
+		.nops = 2,
 	};
-	int status;
 
 	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
 	encode_compound_hdr(&xdr, &hdr, 1);
 	encode_sequence(&xdr, &args->seq_args);
-	/* TODO: Need to get rid of putfh, not in draft-19
-	 * Need way to map devid to fsid, but fsid could be 128 bits (uuid)
-	 */
-	status = encode_putfh(&xdr, args->fh);
-	if (status != 0)
-		goto out;
-	status = encode_getdeviceinfo(&xdr, args);
-out:
-	return status;
+	return encode_getdeviceinfo(&xdr, args);
 }
 
 /*
@@ -7498,9 +7487,6 @@ static int nfs41_xdr_dec_pnfs_getdeviceinfo(struct rpc_rqst *rqstp,
 	if (status != 0)
 		goto out;
 	status = decode_sequence(&xdr, &res->seq_res);
-	if (status != 0)
-		goto out;
-	status = decode_putfh(&xdr);
 	if (status != 0)
 		goto out;
 	status = decode_getdeviceinfo(&xdr, res->dev);
