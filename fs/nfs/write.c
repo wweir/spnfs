@@ -999,25 +999,6 @@ static void nfs_pageio_init_write(struct nfs_pageio_descriptor *pgio,
 }
 
 #ifdef CONFIG_PNFS
-
-/*
- * pNFS write to Data Server path. Assumes bytes have been written
- * and pnfs_use_write() returns 1.
- */
-void
-pnfs_writeback_done_update(struct nfs_write_data *data)
-{
-	struct nfs_writeargs *argp = &data->args;
-	struct nfs_writeres *resp = &data->res;
-	struct nfs_inode *nfsi = NFS_I(data->inode);
-
-	pnfs_update_last_write(nfsi, argp->offset, resp->count);
-
-	if (resp->verf->committed == NFS_FILE_SYNC ||
-	    (data->how == FLUSH_STABLE && data->call_ops == NULL))
-		pnfs_need_layoutcommit(nfsi, argp->context);
-}
-
 void pnfs_writeback_done_norpc(struct rpc_task *task, void *calldata)
 {
 	printk("%s XXX Need to Implement\n", __func__);
