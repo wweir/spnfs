@@ -468,8 +468,6 @@ next_ds:
 		} else
 			filelayout_get_dserver(dserver);
 
-		req->wb_devip = ds->ds_ip_addr;
-		req->wb_devport = ds->ds_port;
 		req->wb_ops = &filelayout_io_operations;
 		req->wb_private = dserver;
 
@@ -553,7 +551,7 @@ ssize_t filelayout_write_pagelist(
 	data->ds_nfs_client = ds->ds_clp;
 	data->args.fh = dserver->fh;
 
-	dprintk("%s set wb_devip: wb_devport %x:%hu\n", __func__,
+	dprintk("%s using DS %x:%hu\n", __func__,
 		htonl(ds->ds_ip_addr), ntohs(ds->ds_port));
 
 	/* Get the file offset on the dserver. Set the write offset to
@@ -658,26 +656,66 @@ filelayout_free_lseg(struct pnfs_layout_segment *lseg)
 	memset(fls, 0, sizeof(*fls));
 }
 
-/* TODO: Technically we would need to execute a COMMIT op to each
- * data server on which a page in 'pages' exists.
- * Once we fix this, we will need to invoke the pnfs_commit_complete callback.
+/*
+ * Do two nfs_pnfs_dserver pointers point to the same structure?
+ * Just compare the first multipath servers.
+ */
+static int
+filelayout_same_ds(struct nfs4_pnfs_dserver *one, struct nfs4_pnfs_dserver *two)
+{
+	struct nfs4_pnfs_dev *d_one = one->dev, *d_two = two->dev;
+	struct nfs4_pnfs_ds *ds_one, *ds_two;
+
+	ds_one = d_one->ds_list[0];
+	ds_two = d_two->ds_list[0];
+	return (d_one->stripe_index == d_two->stripe_index &&
+		d_one->num_ds == d_two->num_ds &&
+		ds_one->ds_ip_addr == ds_two->ds_ip_addr &&
+		ds_one->ds_port == ds_two->ds_port);
+}
+
+/*
+ * Allocate a new nfs_write_data struct and initialize
+ */
+static struct nfs_write_data *
+filelayout_clone_write_data(struct nfs_write_data *old)
+{
+	static struct nfs_write_data *new;
+
+	new = nfs_commit_alloc();
+	if (!new)
+		goto out;
+	new->inode       = old->inode;
+	new->cred        = old->cred;
+	new->args.offset = 0;
+	new->args.count  = 0;
+	new->res.count   = 0;
+	new->res.fattr   = &new->fattr;
+	nfs_fattr_init(&new->fattr);
+	new->res.verf    = &new->verf;
+	new->args.context = old->args.context;
+	new->call_ops = old->call_ops;
+	new->how = old->how;
+out:
+	return new;
+}
+
+/*
+ * Execute a COMMIT op to the MDS or to each data server on which a page
+ * in 'pages' exists.
+ * Invoke the pnfs_commit_complete callback.
  */
 int
 filelayout_commit(struct pnfs_layout_type *layoutid, int sync,
 		  struct nfs_write_data *data)
 {
-	struct inode *ino = PNFS_INODE(layoutid);
-	struct nfs_write_data   *dsdata = NULL;
 	struct nfs4_filelayout *flo;
 	struct nfs4_filelayout_segment *nfslay;
-	struct nfs4_pnfs_dev_item *dev;
-	struct nfs4_pnfs_dev *fdev;
-	struct nfs4_pnfs_dserver dserver;
+	struct nfs_write_data   *dsdata = NULL;
+	struct nfs4_pnfs_dserver *dserver = NULL;
 	struct nfs4_pnfs_ds *ds;
-	struct nfs_page *first;
 	struct nfs_page *req;
-	struct list_head *pos, *tmp;
-	int i;
+	struct list_head *pos, *tmp, *head = &data->pages;
 
 	flo = PNFS_LD_DATA(layoutid);
 	nfslay = LSEG_LD_DATA(&flo->pnfs_lseg);
@@ -690,69 +728,49 @@ filelayout_commit(struct pnfs_layout_type *layoutid, int sync,
 		return 1;
 	}
 
-	dev = nfs4_pnfs_device_item_get(ino, nfslay->dev_id);
-	fdev = &dev->stripe_devs[0];
+	/* COMMIT to each Data Server */
+	while (!list_empty(head)) {
 
-	/* Gather pages per DS - Isn't this already done in nfs_pageio_init?*/
-	for (i = 0; i < nfslay->num_fh; i++) {
-		/* just try the first data server for the index..*/
-		ds = fdev->ds_list[0];
+		/* dserver and dsdata must be NULL */
+		req = nfs_list_entry(head->next);
 
-		if (!dsdata) {
-			unsigned int pgcnt = 0;
+		dserver = (struct nfs4_pnfs_dserver *)req->wb_private;
+		/* XXX BUG_ON(!dserver) ?*/
+		if (!dserver)
+			goto out_bad;
 
-			list_for_each_safe(pos, tmp, &data->pages) {
-				req = nfs_list_entry(pos);
-				if (req->wb_devip == ds->ds_ip_addr &&
-				    req->wb_devport == ds->ds_port)
-					pgcnt++;
-			}
-			dsdata = nfs_commit_alloc();
-		}
+		dsdata = filelayout_clone_write_data(data);
 		if (!dsdata)
 			goto out_bad;
-		list_for_each_safe(pos, tmp, &data->pages) {
+
+		/* Just try the first multipath data server */
+		ds = dserver->dev->ds_list[0];
+		dsdata->pnfs_client = ds->ds_clp->cl_rpcclient;
+		dsdata->ds_nfs_client = ds->ds_clp;
+		dsdata->args.fh = dserver->fh;
+
+		/* Gather all pages going to the data server */
+		list_for_each_safe(pos, tmp, head) {
 			req = nfs_list_entry(pos);
-			if (req->wb_devip == ds->ds_ip_addr &&
-			    req->wb_devport == ds->ds_port) {
+			if (filelayout_same_ds(dserver, req->wb_private)) {
 				nfs_list_remove_request(req);
 				nfs_list_add_request(req, &dsdata->pages);
 			}
 		}
-		if (list_empty(&dsdata->pages)) {
-			if (list_empty(&data->pages)) {
-				dprintk("%s exit i %d devid %d\n",
-					__func__, i, nfslay->dev_id);
-				nfs_commit_free(dsdata);
-				return 0;
-			} else
-				continue;
-		}
-		first = nfs_list_entry(dsdata->pages.next);
 
-		dprintk("%s call nfs_initiate_commit i %d devid %d\n",
-			__func__, i, nfslay->dev_id);
-
-		dsdata->pnfs_client = ds->ds_clp->cl_rpcclient;
-		dsdata->ds_nfs_client =  ds->ds_clp;
-		dserver.dev = fdev;
-
-		/* TODO: Is the FH different from NFS_FH(data->inode)?
-		 * (set in nfs_commit_rpcsetup)
-		 */
-		dserver.fh = &nfslay->fh_array[i];
-		dsdata->args.fh = dserver.fh;
-
+		/* Send COMMIT to data server */
 		nfs_initiate_commit(dsdata, dsdata->pnfs_client, sync);
-		dsdata = NULL;
-		fdev++;
-	}
 
+		/* reset for next data server */
+		dsdata = NULL;
+		dserver = NULL;
+	}
 	/* Release original commit data since it is not used */
 	nfs_commit_free(data);
 	return 0;
 
 out_bad:
+	/* XXX should we send COMMIT to MDS e.g. not free data and return 1 ? */
 	nfs_commit_free(data);
 	return -ENOMEM;
 }
