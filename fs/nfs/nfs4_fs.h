@@ -168,6 +168,7 @@ struct nfs4_state_recovery_ops {
 
 struct nfs4_state_maintenance_ops {
 	int (*sched_state_renewal)(struct nfs_client *, struct rpc_cred *);
+	struct rpc_cred * (*get_state_renewal_cred)(struct nfs_client *);
 };
 
 extern struct dentry_operations nfs4_dentry_operations;
@@ -225,6 +226,9 @@ extern void nfs4_renew_state(struct work_struct *);
 
 /* nfs4state.c */
 struct rpc_cred *nfs4_get_renew_cred(struct nfs_client *clp);
+#ifdef CONFIG_NFS_V4_1
+struct rpc_cred *nfs41_get_state_renewal_cred(struct nfs_client *clp);
+#endif /* CONFIG_NFS_V4_1 */
 
 extern struct nfs4_state_owner * nfs4_get_state_owner(struct nfs_server *, struct rpc_cred *);
 extern void nfs4_put_state_owner(struct nfs4_state_owner *);
