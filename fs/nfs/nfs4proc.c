@@ -3088,10 +3088,14 @@ static int pnfs4_write_done(struct rpc_task *task, struct nfs_write_data *data)
 			nfs_post_op_update_inode_force_wcc(data->inode,
 							data->res.fattr);
 			renew_lease(mds_svr, data->timestamp);
-		} else
+		} else {
 			pnfs_update_last_write(NFS_I(data->inode),
 					       data->args.offset,
 					       data->res.count);
+			/* Mark for LAYOUTCOMMIT */
+			pnfs_need_layoutcommit(NFS_I(data->inode),
+						data->args.context);
+		}
 	}
 	return 0;
 }
