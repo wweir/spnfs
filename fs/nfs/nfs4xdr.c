@@ -59,9 +59,6 @@
 #define errno_NFSERR_IO		EIO
 
 static int nfs4_stat_to_errno(int);
-#if defined(CONFIG_NFS_V4_1)
-static int nr_sequence_quads;
-#endif /* CONFIG_NFS_V4_1 */
 
 /* NFSv4 COMPOUND tags are only wanted for debugging purposes */
 #ifdef DEBUG
@@ -6646,10 +6643,6 @@ static int nfs41_xdr_dec_create_session(struct rpc_rqst *rqstp, uint32_t *p,
 		status = decode_create_session(&xdr, res);
 	if (!status)
 		status = -nfs4_stat_to_errno(hdr.status);
-	if (!status) {
-		/* Decode session succeeded; set nr_sequence_quads */
-		nr_sequence_quads = decode_sequence_maxsz;
-	}
 	return status;
 }
 
