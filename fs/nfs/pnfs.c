@@ -1286,20 +1286,38 @@ pnfs_writeback_done(struct nfs_write_data *data)
 	data->call_ops->rpc_release(data);
 }
 
+/*
+ * return 0 for success, 1 for legacy nfs fallback, negative for error
+ */
 int
 pnfs_flush_one(struct inode *inode, struct list_head *head,
-	       unsigned int npages, size_t count, int how)
+		 unsigned int npages, size_t count, int how)
 {
-	struct nfs_inode *nfsi = NFS_I(inode);
 	struct nfs_server *nfss = NFS_SERVER(inode);
 	struct layoutdriver_io_operations *io_ops;
+	struct nfs_page *req;
+	struct pnfs_layout_segment *lseg;
+	int status;
 
-	if (nfsi->current_layout != NULL &&
-	    (nfss->pnfs_curr_ld->ld_io_ops->flush_one)) {
-		io_ops = nfss->pnfs_curr_ld->ld_io_ops;
-		return io_ops->flush_one(inode, head, npages, count, how);
-	} else
-		return nfs_flush_one(inode, head, npages, count, how);
+	if (!pnfs_enabled_sb(nfss) || !nfss->pnfs_curr_ld->ld_io_ops->flush_one)
+		goto fallback;
+
+	req = nfs_list_entry(head->next);
+	status = pnfs_update_layout(inode,
+				    req->wb_context,
+				    count,
+				    req->wb_offset,
+				    IOMODE_RW,
+				    &lseg);
+	if (status)
+		goto fallback;
+	io_ops = nfss->pnfs_curr_ld->ld_io_ops;
+	status = io_ops->flush_one(lseg, head, npages, count, how);
+	put_lseg(lseg);
+
+	return status;
+fallback:
+	return nfs_flush_one(inode, head, npages, count, how);
 }
 
 /*
@@ -1552,6 +1570,7 @@ pnfs_commit_done(struct nfs_write_data *data)
 {
 	dprintk("%s: Begin (status %d)\n", __func__, data->task.tk_status);
 
+	put_lseg(data->lseg);
 	data->call_ops->rpc_call_done(&data->task, data);
 	data->call_ops->rpc_release(data);
 }
@@ -1562,22 +1581,48 @@ pnfs_commit(struct nfs_write_data *data, int sync)
 	int result = 0;
 	struct nfs_inode *nfsi = NFS_I(data->inode);
 	struct nfs_server *nfss = NFS_SERVER(data->inode);
+	struct pnfs_layout_segment *lseg;
+	struct nfs_page *first, *last, *p;
+	int npages;
+
 	dprintk("%s: Begin\n", __func__);
 
 	/* If the layout driver doesn't define its own commit function
-	 * OR no layout have been retrieved,
 	 * use standard NFSv4 commit
 	 */
-	if (!nfsi->current_layout) {
+	first = last = nfs_list_entry(data->pages.next);
+	npages = 0;
+	list_for_each_entry(p, &data->pages, wb_list) {
+		last = p;
+		npages++;
+	}
+	/* FIXME: we really ought to keep the layout segment that we used
+	   to write the page around for committing it and never ask for a
+	   new one.  If it was recalled we better commit the data first
+	   before returning it, otherwise the data needs to be rewritten,
+	   either with a new layout or to the MDS */
+	result = pnfs_update_layout(data->inode,
+				    NULL,
+				    ((npages - 1) << PAGE_CACHE_SHIFT) +
+				     first->wb_bytes +
+				     (first != last) ? last->wb_bytes : 0,
+				    first->wb_offset,
+				    IOMODE_RW,
+				    &lseg);
+	/* If no layout have been retrieved,
+	 * use standard NFSv4 commit
+	 */
+	if (result) {
 		/* TODO: This doesn't match o_direct commit
 		 * processing.  We need to align regular
 		 * and o_direct commit processing.
 		 */
-		dprintk("%s: Not using pNFS\n", __func__);
+		dprintk("%s: no layout. Not using pNFS.\n", __func__);
 		return 1;
 	}
 
 	dprintk("%s: Calling layout driver commit\n", __func__);
+	data->lseg = lseg;
 	result = nfss->pnfs_curr_ld->ld_io_ops->commit(nfsi->current_layout,
 						       sync, data);
 

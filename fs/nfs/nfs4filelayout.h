@@ -80,7 +80,7 @@ struct nfs4_pnfs_dserver {
 struct nfs4_filelayout_segment {
 	u32 stripe_type;
 	u32 commit_through_mds;
-	u64 stripe_unit;
+	u32 stripe_unit;
 	u32 first_stripe_index;
 	u64 pattern_offset;
 	struct pnfs_deviceid dev_id;
@@ -92,7 +92,7 @@ struct nfs4_filelayout {
 	int uncommitted_write;
 	loff_t last_commit_size;
 	u64 layout_id;
-	struct pnfs_layout_segment pnfs_lseg;
+	u32 stripe_unit;
 };
 
 struct filelayout_mount_type {
@@ -106,8 +106,7 @@ char *deviceid_fmt(const struct pnfs_deviceid *dev_id);
 int  nfs4_pnfs_devlist_init(struct nfs4_pnfs_dev_hlist *hlist);
 void nfs4_pnfs_devlist_destroy(struct nfs4_pnfs_dev_hlist *hlist);
 
-int nfs4_pnfs_dserver_get(struct inode *inode,
-			  struct nfs4_filelayout *layout,
+int nfs4_pnfs_dserver_get(struct pnfs_layout_segment *lseg,
 			  loff_t offset,
 			  size_t count,
 			  struct nfs4_pnfs_dserver *dserver);
