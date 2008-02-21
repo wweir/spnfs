@@ -6642,11 +6642,10 @@ static int nfs41_xdr_dec_create_session(struct rpc_rqst *rqstp, uint32_t *p,
 
 	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
 	status = decode_compound_hdr(&xdr, &hdr);
-	if (hdr.status)
-		return hdr.status;
-
-	status = decode_create_session(&xdr, res);
-
+	if (!status)
+		status = decode_create_session(&xdr, res);
+	if (!status)
+		status = -nfs4_stat_to_errno(hdr.status);
 	if (!status) {
 		/* Decode session succeeded; set nr_sequence_quads */
 		nr_sequence_quads = decode_sequence_maxsz;
