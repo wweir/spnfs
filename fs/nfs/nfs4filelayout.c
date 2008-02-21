@@ -163,14 +163,11 @@ filelayout_uninitialize_mountpoint(struct pnfs_mount_type *mountid)
  * layout type is STRIPE_DENSE or STRIPE_SPARSE
  */
 loff_t
-filelayout_get_dserver_offset(loff_t offset, struct nfs4_filelayout *flo)
+filelayout_get_dserver_offset(loff_t offset,
+			      struct nfs4_filelayout_segment *layout)
 {
-	struct nfs4_filelayout_segment *layout;
-
-	if (flo == NULL)
+	if (!layout)
 		return offset;
-
-	layout = LSEG_LD_DATA(&flo->pnfs_lseg);
 
 	switch (layout->stripe_type) {
 	case STRIPE_SPARSE:
@@ -263,14 +260,16 @@ ssize_t filelayout_read_pagelist(
 {
 	struct inode *inode = PNFS_INODE(layoutid);
 	struct nfs4_filelayout *nfslay = NULL;
+	struct nfs4_filelayout_segment *flseg = NULL;
 	struct nfs4_pnfs_dserver dserver;
 	int status;
 
 	if (layoutid) {
 		nfslay = PNFS_LD_DATA(layoutid);
+		flseg = LSEG_LD_DATA(data->lseg);
+
 		/* Retrieve the correct rpc_client for the byte range */
-		status = nfs4_pnfs_dserver_get(inode,
-						nfslay,
+		status = nfs4_pnfs_dserver_get(data->lseg,
 						offset,
 						count,
 						&dserver);
@@ -295,7 +294,7 @@ ssize_t filelayout_read_pagelist(
 			 * save the original offset in orig_offset
 			 */
 			data->args.offset =
-				filelayout_get_dserver_offset(offset, nfslay);
+				filelayout_get_dserver_offset(offset, flseg);
 			data->orig_offset = offset;
 		}
 	} else { /* If no layout use MDS */
@@ -310,7 +309,7 @@ ssize_t filelayout_read_pagelist(
 	 * Set the write offset to this offset, and
 	 * save the original offset in orig_offset
 	 */
-	data->args.offset = filelayout_get_dserver_offset(offset, nfslay);
+	data->args.offset = filelayout_get_dserver_offset(offset, flseg);
 	data->orig_offset = offset;
 
 	BUG_ON(data->pnfsflags & PNFS_ISSYNC);
@@ -382,7 +381,7 @@ filelayout_free_request_data(struct nfs_page *req)
 }
 
 static struct nfs4_pnfs_ds *
-filelayout_create_init_ds(struct inode *inode, struct nfs4_filelayout *nfslay,
+filelayout_create_init_ds(struct pnfs_layout_segment *lseg,
 			loff_t file_offset, size_t wb_bytes,
 			struct nfs4_pnfs_dserver **dsp)
 {
@@ -398,8 +397,7 @@ filelayout_create_init_ds(struct inode *inode, struct nfs4_filelayout *nfslay,
 	}
 
 	/* get the data server that serves this page */
-	status = nfs4_pnfs_dserver_get(inode, nfslay, file_offset,
-					wb_bytes, dserver);
+	status = nfs4_pnfs_dserver_get(lseg, file_offset, wb_bytes, dserver);
 
 	if (status != 0) {
 		dprintk("%s failed to get dataserver. status %d\n",
@@ -423,11 +421,10 @@ out_err:
 * TODO: If stripesz < PAGE_SIZE, use i/o through MDS
 *
 */
-int filelayout_flush_one(struct inode *inode, struct list_head *head,
-			 unsigned int npages, size_t count, int how)
+int filelayout_flush_one(struct pnfs_layout_segment *lseg,
+			 struct list_head *head, unsigned int npages,
+			 size_t count, int how)
 {
-	struct pnfs_layout_type *ltype = NFS_I(inode)->current_layout;
-	struct nfs4_filelayout *nfslay = PNFS_LD_DATA(ltype);
 	struct nfs4_pnfs_dserver *dserver = NULL;
 	struct nfs4_pnfs_ds *ds = NULL;  /* current stripe data server */
 	struct nfs_page *req;
@@ -436,11 +433,11 @@ int filelayout_flush_one(struct inode *inode, struct list_head *head,
 	struct list_head dslist;
 	int status = -ENOMEM, use_ds = 0, ndspages = 0;
 
-	dprintk("--> %s npages %d, count %Zd, ltype %p nfslay %p\n", __func__,
-				npages, count, ltype, nfslay);
+	dprintk("--> %s npages %d, count %Zd, lseg %p\n", __func__,
+				npages, count, lseg);
 
 	INIT_LIST_HEAD(&dslist);
-	stripesz = filelayout_get_stripesize(NFS_I(inode)->current_layout);
+	stripesz = filelayout_get_stripesize(lseg->layout);
 	dprintk("%s stripesize %Zd\n", __func__, stripesz);
 
 	/* split up the list according to DS */
@@ -451,8 +448,7 @@ next_ds:
 		file_offset = req->wb_index << PAGE_CACHE_SHIFT;
 
 		if (!use_ds) {
-			ds = filelayout_create_init_ds(inode, nfslay,
-						       file_offset,
+			ds = filelayout_create_init_ds(lseg, file_offset,
 						       req->wb_bytes, &dserver);
 			if (IS_ERR(ds)) {
 				status = PTR_ERR(ds);
@@ -490,7 +486,8 @@ send:
 	/* XXX should recover to send through MDS */
 	dprintk("%s Send: ndspages %d dstotal %Zd list_empty %d \n",
 				__func__, ndspages, dstotal, list_empty(head));
-	status = nfs_flush_one(inode, &dslist, ndspages, dstotal, how);
+	status = nfs_flush_one(PNFS_INODE(lseg->layout), &dslist, ndspages,
+			       dstotal, how);
 	if (status < 0)
 		goto out;
 
@@ -521,7 +518,7 @@ ssize_t filelayout_write_pagelist(
 	int sync,
 	struct nfs_write_data *data)
 {
-	struct nfs4_filelayout *nfslay = PNFS_LD_DATA(layoutid);
+	struct nfs4_filelayout_segment *flseg = LSEG_LD_DATA(data->lseg);
 	struct nfs4_pnfs_dserver *dserver = NULL;
 	struct nfs4_pnfs_ds *ds;
 	struct nfs_page *req = NULL;
@@ -555,7 +552,7 @@ ssize_t filelayout_write_pagelist(
 	/* Get the file offset on the dserver. Set the write offset to
 	 * this offset and save the original offset.
 	 */
-	data->args.offset = filelayout_get_dserver_offset(offset, nfslay);
+	data->args.offset = filelayout_get_dserver_offset(offset, flseg);
 	data->orig_offset = offset;
 
 	/* Perform an asynchronous write The offset will be reset in the
@@ -577,8 +574,7 @@ filelayout_alloc_layout(struct pnfs_mount_type *mountid, struct inode *inode)
 {
 	dprintk("NFS_FILELAYOUT: allocating layout\n");
 	return kzalloc(sizeof(struct pnfs_layout_type) +
-		       sizeof(struct nfs4_filelayout) +
-		       sizeof(struct nfs4_filelayout_segment), GFP_KERNEL);
+		       sizeof(struct nfs4_filelayout), GFP_KERNEL);
 }
 
 /* Free a filelayout layout structure
@@ -593,12 +589,11 @@ filelayout_free_layout(struct pnfs_layout_type *layoutid)
 /* Decode layout and store in layoutid.  Overwrite any existing layout
  * information for this file.
  */
-static struct pnfs_layout_type*
-filelayout_set_layout(struct pnfs_layout_type *layoutid,
+static void
+filelayout_set_layout(struct nfs4_filelayout *flo,
+			struct nfs4_filelayout_segment *fl,
 			struct nfs4_pnfs_layoutget_res *lgr)
 {
-	struct nfs4_filelayout *flo = PNFS_LD_DATA(layoutid);
-	struct nfs4_filelayout_segment *fl = LSEG_LD_DATA(&flo->pnfs_lseg);
 	int i;
 	uint32_t *p = (uint32_t *)lgr->layout.buf;
 	uint32_t nfl_util;
@@ -615,6 +610,14 @@ filelayout_set_layout(struct pnfs_layout_type *layoutid,
 		fl->stripe_type = STRIPE_SPARSE;
 	fl->stripe_unit = nfl_util & ~NFL4_UFLG_MASK;
 
+	if (!flo->stripe_unit)
+		flo->stripe_unit = fl->stripe_unit;
+	else if (flo->stripe_unit != fl->stripe_unit) {
+		printk(KERN_NOTICE "%s: updating strip_unit from %u to %u\n",
+			__func__, flo->stripe_unit, fl->stripe_unit);
+		flo->stripe_unit = fl->stripe_unit;
+	}
+
 	READ32(fl->first_stripe_index);
 	READ64(fl->pattern_offset);
 	READ32(fl->num_fh);
@@ -630,29 +633,28 @@ filelayout_set_layout(struct pnfs_layout_type *layoutid,
 		dprintk("DEBUG: %s: fh len %d\n", __func__,
 					fl->fh_array[i].size);
 	}
-
-	return layoutid;
 }
 
 static struct pnfs_layout_segment *
 filelayout_alloc_lseg(struct pnfs_layout_type *layoutid,
 		      struct nfs4_pnfs_layoutget_res *lgr)
 {
-	struct nfs4_filelayout *fl;
+	struct nfs4_filelayout *flo = PNFS_LD_DATA(layoutid);
+	struct pnfs_layout_segment *lseg;
 
-	filelayout_set_layout(layoutid, lgr);
+	lseg = kzalloc(sizeof(struct pnfs_layout_segment) +
+		       sizeof(struct nfs4_filelayout_segment), GFP_KERNEL);
+	if (!lseg)
+		return NULL;
 
-	fl = PNFS_LD_DATA(layoutid);
-	return &fl->pnfs_lseg;
+	filelayout_set_layout(flo, LSEG_LD_DATA(lseg), lgr);
+	return lseg;
 }
 
 static void
 filelayout_free_lseg(struct pnfs_layout_segment *lseg)
 {
-	struct nfs4_filelayout *flo = PNFS_LD_DATA(lseg->layout);
-	struct nfs4_filelayout_segment *fls = LSEG_LD_DATA(&flo->pnfs_lseg);
-
-	memset(fls, 0, sizeof(*fls));
+	kfree(lseg);
 }
 
 /*
@@ -708,7 +710,6 @@ int
 filelayout_commit(struct pnfs_layout_type *layoutid, int sync,
 		  struct nfs_write_data *data)
 {
-	struct nfs4_filelayout *flo;
 	struct nfs4_filelayout_segment *nfslay;
 	struct nfs_write_data   *dsdata = NULL;
 	struct nfs4_pnfs_dserver *dserver = NULL;
@@ -716,8 +717,7 @@ filelayout_commit(struct pnfs_layout_type *layoutid, int sync,
 	struct nfs_page *req;
 	struct list_head *pos, *tmp, *head = &data->pages;
 
-	flo = PNFS_LD_DATA(layoutid);
-	nfslay = LSEG_LD_DATA(&flo->pnfs_lseg);
+	nfslay = LSEG_LD_DATA(data->lseg);
 
 	dprintk("%s data %p pnfs_client %p nfslay %p\n",
 			__func__, data, data->pnfs_client, nfslay);
@@ -780,10 +780,8 @@ ssize_t
 filelayout_get_stripesize(struct pnfs_layout_type *layoutid)
 {
 	struct nfs4_filelayout *flo = PNFS_LD_DATA(layoutid);
-	struct nfs4_filelayout_segment *fl = LSEG_LD_DATA(&flo->pnfs_lseg);
 
-	ssize_t stripesize = fl->stripe_unit;
-	return stripesize;
+	return flo->stripe_unit;
 }
 
 /* Split wsize/rsize chunks so they do not span multiple data servers
