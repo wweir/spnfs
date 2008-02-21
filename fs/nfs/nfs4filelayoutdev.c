@@ -699,21 +699,19 @@ nfs4_pnfs_device_item_get(struct filelayout_mount_type *mt,
  * in 'inode' by filling in the contents of 'dserver'.
  */
 int
-nfs4_pnfs_dserver_get(struct inode *inode,
-		      struct nfs4_filelayout *flo,
+nfs4_pnfs_dserver_get(struct pnfs_layout_segment *lseg,
 		      loff_t offset,
 		      size_t count,
 		      struct nfs4_pnfs_dserver *dserver)
 {
-	struct nfs4_filelayout_segment *layout;
+	struct nfs4_filelayout_segment *layout = LSEG_LD_DATA(lseg);
+	struct inode *inode = PNFS_INODE(lseg->layout);
 	struct nfs4_pnfs_dev_item *di;
 	u64 tmp;
 	u32 stripe_idx, end_idx;
 
-	if (!flo)
+	if (!layout)
 		return 1;
-
-	layout = LSEG_LD_DATA(&flo->pnfs_lseg);
 
 	di = nfs4_pnfs_device_item_get(FILE_MT(inode), NFS_FH(inode),
 				       &layout->dev_id);
@@ -732,7 +730,7 @@ nfs4_pnfs_dserver_get(struct inode *inode,
 	end_idx = do_div(tmp, di->stripe_count) + layout->first_stripe_index;
 
 	dprintk("%s: offset=%Lu, count=%Zu, si=%u, dsi=%u, "
-		"stripe_count=%u, stripe_unit=%Lu first_stripe_index %d\n",
+		"stripe_count=%u, stripe_unit=%u first_stripe_index %d\n",
 		__func__,
 		offset, count, stripe_idx, end_idx, di->stripe_count,
 		layout->stripe_unit, layout->first_stripe_index);
