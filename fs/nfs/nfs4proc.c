@@ -48,6 +48,7 @@
 #include <linux/smp_lock.h>
 #include <linux/namei.h>
 #include <linux/mount.h>
+#include <linux/module.h>
 
 #include "nfs4_fs.h"
 #include "delegation.h"
@@ -4345,9 +4346,94 @@ int nfs4_proc_fs_locations(struct inode *dir, const struct qstr *name,
 }
 
 #ifdef CONFIG_NFS_V4_1
+int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
+{
+	nfs4_verifier verifier;
+	struct nfs41_exchange_id_args args = {
+		.flags = clp->cl_exchange_flags,
+	};
+	struct nfs41_exchange_id_res res = {
+		.client = clp,
+	};
+	int status;
+	int loop = 0;
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_EXCHANGE_ID],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+		.rpc_cred = cred,
+	};
+	u32 *p;
+
+	dprintk("--> %s\n", __func__);
+	BUG_ON(clp == NULL);
+	p = (u32 *)verifier.data;
+	*p++ = htonl((u32)clp->cl_boot_time.tv_sec);
+	*p = htonl((u32)clp->cl_boot_time.tv_nsec);
+	args.verifier = &verifier;
+
+	while (1) {
+		args.id_len = scnprintf(args.id, sizeof(args.id),
+				"%s/%u.%u.%u.%u %s %u",
+				clp->cl_ipaddr,
+				NIPQUAD(clp->cl_addr.__data),
+				"AUTH_SYS", clp->cl_id_uniquifier);
+
+		status = rpc_call_sync(clp->cl_rpcclient, &msg, 0);
+
+		if (status != NFS4ERR_CLID_INUSE)
+			break;
+
+		if (signalled())
+			break;
+
+		if (loop++ & 1)
+			ssleep(clp->cl_lease_time + 1);
+		else if (++clp->cl_id_uniquifier == 0)
+			break;
+	}
+	if (status == 0) {
+		struct rpc_clnt *clnt = clp->cl_rpcclient;
+
+		/* NFSv4.1 will use machine creds acquired at mount, and will
+		 * need to remember which creds were used for the EXCHANGE_ID.
+		 * Add an rpc cred pointer to struct nfs_client to hold
+		 * the EXCHANGE_ID cred, and enable AUTH_UNIX mounts.
+		 */
+		if (clnt->cl_auth->au_flavor == RPC_AUTH_UNIX &&
+						current->fsuid == 0) {
+
+			dprintk("%s cl_ex_cred %p [NULL]\n", __func__,
+						clp->cl_ex_cred);
+
+			clp->cl_ex_cred = rpcauth_lookupcred(clnt->cl_auth, 0);
+			atomic_inc(&clp->cl_ex_cred->cr_count);
+
+			dprintk("%s set cl_ex_cred %p\n",
+						__func__, clp->cl_ex_cred);
+		} else {
+			dprintk("%s not AUTH_SYS don't save EXCHANGE_ID cred\n",
+				__func__);
+		}
+	}
+
+	dprintk("<-- %s status= %d\n", __func__, status);
+	return status;
+}
+EXPORT_SYMBOL(_nfs4_proc_exchange_id);
+
 int nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
 {
-	return -1;	/* stub */
+	struct nfs_server *server;
+
+	/*
+	 * Since we're going to blow away the client id, invalidate all the
+	 * sessions that were associated with this clientid.
+	 */
+	list_for_each_entry(server, &clp->cl_superblocks, client_link)
+		nfs41_set_session_expired(server->session);
+
+	return _nfs4_proc_exchange_id(clp, cred);
 }
 
 /* Destroy the slot table */
@@ -4465,11 +4551,13 @@ struct nfs4_state_recovery_ops nfs41_network_partition_recovery_ops = {
 
 struct nfs4_state_maintenance_ops nfs40_state_renewal_ops = {
 	.sched_state_renewal = nfs4_proc_async_renew,
+	.get_state_renewal_cred = nfs4_get_renew_cred,
 };
 
 #if defined(CONFIG_NFS_V4_1)
 struct nfs4_state_maintenance_ops nfs41_state_renewal_ops = {
 	.sched_state_renewal = nfs41_proc_async_sequence,
+	.get_state_renewal_cred = nfs41_get_state_renewal_cred,
 };
 #endif
 
