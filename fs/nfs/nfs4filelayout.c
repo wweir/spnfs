@@ -605,8 +605,12 @@ filelayout_gather_across_stripes(struct pnfs_mount_type *mountid)
 
 /*
  * filelayout_pg_test(). Called by nfs_can_coalesce_requests()
- * return 1 :  prev and req on same stripe.
- * return 0 :  pref and req on different stripe.
+ *
+ * For writes which come from the flush daemon, set the bsize on the fly.
+ * reads set the bsize in pnfs_pageio_init_read.
+ *
+ * return 1 :  coalesce page
+ * return 0 :  don't coalesce page
  */
 int
 filelayout_pg_test(struct nfs_pageio_descriptor *pgio, struct nfs_page *prev,
@@ -614,6 +618,14 @@ filelayout_pg_test(struct nfs_pageio_descriptor *pgio, struct nfs_page *prev,
 {
 	u32 p_stripe, r_stripe;
 
+	if (!pgio->pg_iswrite)
+		goto boundary;
+
+	if (pgio->pg_bsize != NFS_SERVER(pgio->pg_inode)->ds_wsize &&
+	    pgio->pg_count > pgio->pg_threshold)
+		pgio->pg_bsize = NFS_SERVER(pgio->pg_inode)->ds_wsize;
+
+boundary:
 	if (pgio->pg_boundary == 0)
 		return 1;
 	p_stripe = prev->wb_index << PAGE_CACHE_SHIFT;
