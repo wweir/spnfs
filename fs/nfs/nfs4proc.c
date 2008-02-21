@@ -3129,14 +3129,9 @@ static int pnfs4_commit_done(struct rpc_task *task, struct nfs_write_data *data)
 		return -EAGAIN;
 	}
 
-	if (task->tk_status >= 0) {
-		/* Update inode if commit to MDS */
-		if (!data->ds_nfs_client)
-			nfs_refresh_inode(data->inode, data->res.fattr);
-
-		/* Mark for LAYOUTCOMMIT */
-		pnfs_need_layoutcommit(NFS_I(data->inode), data->args.context);
-	}
+	/* Update inode if commit to MDS */
+	if (task->tk_status >= 0 && !data->ds_nfs_client)
+		nfs_refresh_inode(data->inode, data->res.fattr);
 	dprintk("<-- %s\n", __func__);
 	return 0;
 }
