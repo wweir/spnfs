@@ -5219,6 +5219,7 @@ int nfs4_pnfs_getdeviceinfo(struct super_block *sb,
 		.fh = fh,
 		.dev_id = &dev->dev_id,
 		.layoutclass = server->pnfs_curr_ld->id,
+		.dev_notify_types = dev->dev_notify_types,
 	};
 	struct nfs4_pnfs_getdeviceinfo_res res = {
 		.dev = dev,

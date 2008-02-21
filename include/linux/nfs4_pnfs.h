@@ -183,9 +183,11 @@ struct layoutdriver_policy_operations {
 
 struct pnfs_device {
 	struct pnfs_deviceid dev_id;
+	unsigned int  layout_type;
 	unsigned int  dev_count;
 	unsigned int  dev_addr_len;
 	char          dev_addr_buf[NFS4_PNFS_DEV_MAXSIZE];
+	unsigned int  dev_notify_types;
 };
 
 struct pnfs_devicelist {
