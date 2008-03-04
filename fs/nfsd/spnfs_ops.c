@@ -26,6 +26,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ******************************************************************************/
 
+#if defined(CONFIG_PNFSD)
 /* DMXXX: includes taken from spnfs_com.c.  Don't need so many: revisit */
 #include <linux/module.h>
 #include <linux/mutex.h>
@@ -59,8 +60,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * to perform tasks in userspace
  *
  */
-
-#if defined(CONFIG_PNFSD)
 
 extern struct spnfs *global_spnfs;
 
