@@ -37,6 +37,7 @@
  *  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  *  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#if defined(CONFIG_PNFSD)
 
 #include <linux/module.h>
 #include <linux/mutex.h>
@@ -271,3 +272,4 @@ int spnfs_enabled(void)
 {
 	return spnfs_enabled_at_some_point;
 }
+#endif /* CONFIG_PNFSD */
