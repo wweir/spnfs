@@ -1197,7 +1197,7 @@ nfsd4_getdevinfo(struct svc_rqst *rqstp,
 {
 	struct super_block *sb;
 	struct svc_export *exp = NULL;
-	u32 fsidv = 0;	/* FIXME: extract the fsid from the device ID arg */
+	u32 fsidv = gdp->gd_devid.pnfs_fsid;
 	int status;
 
 	dprintk("%s: type %u dev_id %llx:%llx maxcnt %u\n",
