@@ -1781,7 +1781,7 @@ nfsd_unlink(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 	if (EX_ISSYNC(fhp->fh_export))
 		host_err = nfsd_sync_dir(dentry);
 #if defined(CONFIG_NFSD_V4)
-#if defined(CONFIG_PNFS)
+#if defined(CONFIG_PNFSD)
 	/*
 	 * spnfs: notify spnfsd of removal to destroy stripes
 	 */
@@ -1802,7 +1802,7 @@ nfsd_unlink(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 				"remove stripes for inode: %ld\n", ino);
 		}
 	}
-#endif /* defined(CONFIG_PNFS) */
+#endif /* defined(CONFIG_PNFSD) */
 #endif /* defined(CONFIG_NFSD_V4) */
 
 out_nfserr:
