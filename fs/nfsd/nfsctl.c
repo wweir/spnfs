@@ -674,16 +674,16 @@ static struct file_system_type nfsd_fs_type = {
 	.kill_sb	= kill_litter_super,
 };
 
+#if defined(CONFIG_PNFSD)
 extern int (*spnfs_init)(void);
 extern int (*spnfs_test)(void);
 extern void (*spnfs_delete)(void);
 extern struct nfs_fh * (*spnfs_getfh_vec)(int), *spnfs_getfh(int);
 
 int nfsd_spnfs_new(void);
-#if defined(CONFIG_PNFSD)
 int spnfs_close(void);
-#endif /* CONFIG_PNFSD */
 void nfsd_spnfs_delete(void);
+#endif /* CONFIG_PNFSD */
 
 static int __init init_nfsd(void)
 {
@@ -698,12 +698,12 @@ static int __init init_nfsd(void)
 	nfsd_export_init();	/* Exports table */
 	nfsd_lockd_init();	/* lockd->nfsd callbacks */
 	nfsd_idmap_init();      /* Name to ID mapping */
-	spnfs_init = nfsd_spnfs_new;
 #if defined(CONFIG_PNFSD)
+	spnfs_init = nfsd_spnfs_new;
 	spnfs_test = spnfs_close;
-#endif /* CONFIG_PNFSD */
 	spnfs_delete = nfsd_spnfs_delete;
 	spnfs_getfh_vec = spnfs_getfh;
+#endif /* CONFIG_PNFSD */
 
 	if (proc_mkdir("fs/nfs", NULL)) {
 		struct proc_dir_entry *entry;
@@ -725,8 +725,10 @@ static int __init init_nfsd(void)
 
 static void __exit exit_nfsd(void)
 {
+#if defined(CONFIG_PNFSD)
 	spnfs_init = NULL;
 	spnfs_test = NULL;
+#endif /* CONFIG_PNFSD */
 
 	nfsd_export_shutdown();
 	nfsd_cache_shutdown();
