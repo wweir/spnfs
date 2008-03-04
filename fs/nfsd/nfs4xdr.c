@@ -3259,7 +3259,7 @@ nfsd4_encode_devlist_iterator(struct nfsd4_compoundres *resp,
 		/* TODO: Need to encode an identifier that uniquely
 		 * identifies the export. (fsid)
 		 */
-		WRITE64(0LL);			/* devid major */
+		WRITE64((__be64)gdevl->gd_fhp->fh_export->ex_fsid);
 		WRITE64(iter_arg.devid);	/* devid minor */
 		ADJUST_ARGS();
 
@@ -3505,6 +3505,7 @@ nfsd4_encode_layoutget(struct nfsd4_compoundres *resp,
 	args.minlength = lgp->lg_minlength;
 	args.seg = lgp->lg_seg;
 	args.fh = &lgp->lg_fhp->fh_handle;
+	args.fsid = lgp->lg_fhp->fh_export->ex_fsid;
 
 	/* Set xdr info so file system can encode layout */
 	args.xdr.p   = resp->p;
