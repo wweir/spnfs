@@ -180,7 +180,7 @@ struct rpc_xprt {
 	struct svc_serv		*serv;		/* The RPC service which will */
 						/* process the callback */
 	unsigned int		bc_alloc_count;	/* Total number of preallocs */
-	rwlock_t		bc_pa_lock;	/* Protects the preallocated */
+	spinlock_t		bc_pa_lock;	/* Protects the preallocated */
 						/* items */
 	struct list_head	bc_pa_list;	/* List of preallocated */
 						/* backchannel rpc_rqst's */

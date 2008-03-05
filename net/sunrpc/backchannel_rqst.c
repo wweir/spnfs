@@ -146,10 +146,10 @@ int xprt_setup_backchannel(struct rpc_xprt *xprt, unsigned int min_reqs)
 	/*
 	 * Add the temporary list to the backchannel preallocation list
 	 */
-	write_lock(&xprt->bc_pa_lock);
+	spin_lock_bh(&xprt->bc_pa_lock);
 	list_splice(&tmp_list, &xprt->bc_pa_list);
 	xprt_inc_alloc_count(xprt, min_reqs);
-	write_unlock(&xprt->bc_pa_lock);
+	spin_unlock_bh(&xprt->bc_pa_lock);
 
 	dprintk("RPC:       setup backchannel transport done\n");
 	return 0;
@@ -182,7 +182,7 @@ void xprt_destroy_backchannel(struct rpc_xprt *xprt, unsigned int max_reqs)
 	dprintk("RPC:        destroy backchannel transport\n");
 
 	BUG_ON(max_reqs == 0);
-	write_lock(&xprt->bc_pa_lock);
+	spin_lock_bh(&xprt->bc_pa_lock);
 	xprt_dec_alloc_count(xprt, max_reqs);
 	list_for_each_entry_safe(req, tmp, &xprt->bc_pa_list,
 					  rq_bc_pa_list) {
@@ -191,7 +191,7 @@ void xprt_destroy_backchannel(struct rpc_xprt *xprt, unsigned int max_reqs)
 		if (--max_reqs == 0)
 			break;
 	}
-	write_unlock(&xprt->bc_pa_lock);
+	spin_unlock_bh(&xprt->bc_pa_lock);
 
 	dprintk("RPC:        backchannel list empty= %s\n",
 		list_empty(&xprt->bc_pa_list) ? "true" : "false");
@@ -211,7 +211,7 @@ struct rpc_rqst *xprt_alloc_bc_request(struct rpc_xprt *xprt)
 	struct rpc_rqst *req;
 
 	dprintk("RPC:       allocate a backchannel request\n");
-	write_lock(&xprt->bc_pa_lock);
+	spin_lock_bh(&xprt->bc_pa_lock);
 	if (!list_empty(&xprt->bc_pa_list)) {
 		req = list_first_entry(&xprt->bc_pa_list, struct rpc_rqst,
 				rq_bc_pa_list);
@@ -219,7 +219,7 @@ struct rpc_rqst *xprt_alloc_bc_request(struct rpc_xprt *xprt)
 	} else {
 		req = NULL;
 	}
-	write_unlock(&xprt->bc_pa_lock);
+	spin_unlock_bh(&xprt->bc_pa_lock);
 
 	if (req != NULL) {
 		set_bit(RPC_BC_PA_IN_USE, &req->rq_bc_pa_state);
@@ -261,9 +261,9 @@ void xprt_free_bc_request(struct rpc_rqst *req)
 	 * Return it to the list of preallocations so that it
 	 * may be reused by a new callback request.
 	 */
-	write_lock(&xprt->bc_pa_lock);
+	spin_lock_bh(&xprt->bc_pa_lock);
 	list_add(&req->rq_bc_pa_list, &xprt->bc_pa_list);
-	write_unlock(&xprt->bc_pa_lock);
+	spin_unlock_bh(&xprt->bc_pa_lock);
 }
 EXPORT_SYMBOL(xprt_free_bc_request);
 

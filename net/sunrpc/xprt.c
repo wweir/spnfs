@@ -1052,7 +1052,7 @@ found:
 	kref_init(&xprt->kref);
 	spin_lock_init(&xprt->transport_lock);
 	spin_lock_init(&xprt->reserve_lock);
-	rwlock_init(&xprt->bc_pa_lock);
+	spin_lock_init(&xprt->bc_pa_lock);
 
 	INIT_LIST_HEAD(&xprt->free);
 	INIT_LIST_HEAD(&xprt->recv);
