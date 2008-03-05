@@ -306,6 +306,7 @@ destroy_ds(struct nfs4_pnfs_ds *ds)
 					  ds->ds_clp->cl_rpcclient);
 		rpc_shutdown_client(ds->ds_clp->cl_rpcclient);
 		ds->ds_clp->cl_rpcclient = NULL;
+		nfs_put_client(ds->ds_clp);
 	}
 	kfree(ds);
 }
@@ -609,6 +610,7 @@ decode_and_add_device(struct filelayout_mount_type *mt, struct pnfs_device *dev)
 	if (!file_dev) {
 		printk(KERN_WARNING "%s: Could not decode device\n",
 			__func__);
+		device_destroy(file_dev, mt->hlist);
 		return NULL;
 	}
 
