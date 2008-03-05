@@ -581,6 +581,7 @@ static __be32 process_op(uint32_t minorversion, int nop,
 		case OP_CB_RECALL_SLOT:
 		case OP_CB_WANTS_CANCELLED:
 		case OP_CB_NOTIFY_LOCK:
+		case OP_CB_NOTIFY_DEVICEID:
 			op = &callback_ops[0];
 			status = htonl(NFS4ERR_NOTSUPP);
 			break;
