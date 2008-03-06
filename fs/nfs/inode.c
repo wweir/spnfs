@@ -1321,7 +1321,9 @@ static void __exit exit_nfs_fs(void)
 #ifdef CONFIG_PROC_FS
 	rpc_proc_unregister("nfs");
 #endif
+#ifdef CONFIG_PNFS
 	pnfs_uninitialize();
+#endif
 	unregister_nfs_fs();
 	nfs_fs_proc_exit();
 }
