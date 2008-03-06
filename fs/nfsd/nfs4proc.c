@@ -1066,7 +1066,7 @@ nfsd4_layoutcommit(struct svc_rqst *rqstp,
 	dprintk("NFSD: nfsd4_layoutcommit \n");
 	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
 	if (status) {
-		printk("%s: verify filehandle failed\n", __FUNCTION__);
+		printk("%s: verify filehandle failed\n", __func__);
 		goto out;
 	}
 
@@ -1092,11 +1092,12 @@ nfsd4_layoutcommit(struct svc_rqst *rqstp,
 	 * locks.
 	 * TODO: Is this correct for all back ends?
 	 */
-	dprintk("%s:new size: %llu old size: %lld\n",
-		__FUNCTION__, lcp->lc_last_wr + 1, ino->i_size);
+	dprintk("%s:new offset: %d new size: %llu old size: %lld\n",
+		__func__, lcp->lc_newoffset, lcp->lc_last_wr + 1, ino->i_size);
 
 	fh_lock(current_fh);
-	if ((lcp->lc_last_wr + 1) <= ino->i_size) {
+	if ((lcp->lc_newoffset == 0) ||
+	    ((lcp->lc_last_wr + 1) <= ino->i_size)) {
 		status = 0;
 		lcp->lc_size_chg = 0;
 		fh_unlock(current_fh);
@@ -1107,15 +1108,15 @@ nfsd4_layoutcommit(struct svc_rqst *rqstp,
 	lcp->lc_seg.clientid = *(u64 *)&current_ses->cs_sid.clientid;
 
 	/* Try our best to update the file size */
-	dprintk("%s: Modifying file size\n", __FUNCTION__);
+	dprintk("%s: Modifying file size\n", __func__);
 	ia.ia_valid = ATTR_SIZE;
 	ia.ia_size = lcp->lc_last_wr + 1;
 	if (sb->s_export_op->layout_commit) {
 		status = sb->s_export_op->layout_commit(ino, lcp);
-		dprintk("%s:layout_commit result %d\n", __FUNCTION__, status);
+		dprintk("%s:layout_commit result %d\n", __func__, status);
 	} else {
 		status = notify_change(current_fh->fh_dentry, &ia);
-		dprintk("%s:notify_change result %d\n", __FUNCTION__, status);
+		dprintk("%s:notify_change result %d\n", __func__, status);
 	}
 
 	fh_unlock(current_fh);
@@ -1123,7 +1124,7 @@ nfsd4_layoutcommit(struct svc_rqst *rqstp,
 	if (!status) {
 		if (EX_ISSYNC(current_fh->fh_export)) {
 			dprintk("%s:Synchronously writing inode size %llu\n",
-				__FUNCTION__, ino->i_size);
+				__func__, ino->i_size);
 			write_inode_now(ino, 1);
 		}
 		lcp->lc_size_chg = 1;
