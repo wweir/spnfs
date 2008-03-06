@@ -69,6 +69,6 @@ static inline int nfs_inode_return_delegation(struct inode *inode)
 {
 	return 0;
 }
-#endif /* defined(CONFIG_NFS_V4) */
+#endif
 
 #endif
