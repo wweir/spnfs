@@ -139,7 +139,7 @@ extern __be32 *nfs4_decode_dirent(__be32 *p, struct nfs_entry *entry, int plus);
 
 /* nfs4proc.c */
 #ifdef CONFIG_NFS_V4
-extern struct rpc_procinfo nfs4_procedures[];
+extern struct rpc_procinfo *nfs4_procedures;
 #endif
 
 /* dir.c */
