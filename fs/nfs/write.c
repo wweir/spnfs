@@ -869,6 +869,9 @@ void nfs_initiate_write(struct nfs_write_data *data,
  */
 static void nfs_retry_request(struct nfs_page *req)
 {
+#ifdef CONFIG_PNFS
+	clear_bit(PG_USE_PNFS, &req->wb_flags);
+#endif
 	nfs_redirty_request(req);
 	nfs_end_page_writeback(req->wb_page);
 	nfs_clear_page_tag_locked(req);
