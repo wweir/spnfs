@@ -352,10 +352,19 @@ static int nfs_write_begin(struct file *file, struct address_space *mapping,
 	*pagep = page;
 
 	ret = nfs_flush_incompatible(file, page);
-	if (ret) {
-		unlock_page(page);
-		page_cache_release(page);
-	}
+	if (ret)
+		goto out_err;
+#ifdef CONFIG_PNFS
+	ret = pnfs_write_begin(file, page, pos, len, flags, fsdata);
+	if (ret)
+		goto out_err;
+#endif /* CONFIG_PNFS */
+	return 0;
+
+ out_err:
+	unlock_page(page);
+	page_cache_release(page);
+	*pagep = NULL;
 	return ret;
 }
 
@@ -372,6 +381,9 @@ static int nfs_write_end(struct file *file, struct address_space *mapping,
 
 	unlock_page(page);
 	page_cache_release(page);
+#ifdef CONFIG_PNFS
+	pnfs_free_fsdata(fsdata);
+#endif /* CONFIG_PNFS */
 
 	return status < 0 ? status : copied;
 }
