@@ -125,12 +125,13 @@ const u32 nfs4_pathconf_bitmap[2] = {
 	0
 };
 
-const u32 nfs4_fsinfo_bitmap[2] = { FATTR4_WORD0_MAXFILESIZE
+const u32 nfs4_fsinfo_bitmap[3] = { FATTR4_WORD0_MAXFILESIZE
 			| FATTR4_WORD0_MAXREAD
 			| FATTR4_WORD0_MAXWRITE
 			| FATTR4_WORD0_LEASE_TIME,
 #ifdef CONFIG_PNFS
-			FATTR4_WORD1_FS_LAYOUT_TYPES
+			FATTR4_WORD1_FS_LAYOUT_TYPES,
+			FATTR4_WORD2_LAYOUT_BLKSIZE
 #else /* CONFIG_PNFS */
 			0
 #endif /* CONFIG_PNFS */
