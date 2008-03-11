@@ -1944,6 +1944,26 @@ out_unlock:
 	goto out;
 }
 
+void pnfs_modify_new_request(struct inode *inode, struct nfs_page *req,
+			     void *fsdata)
+{
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	struct pnfs_layout_segment *lseg = NULL;
+	loff_t pos;
+	unsigned count;
+
+	if (!nfss->pnfs_curr_ld || !nfss->pnfs_curr_ld->ld_io_ops ||
+	    !nfss->pnfs_curr_ld->ld_io_ops->new_request)
+		return;
+
+	pos = ((loff_t)req->wb_index << PAGE_CACHE_SHIFT) + req->wb_offset;
+	count = req->wb_bytes;
+	lseg = pnfs_find_get_lseg(inode, pos, count, IOMODE_RW);
+	nfss->pnfs_curr_ld->ld_io_ops->new_request(lseg, req, pos, count,
+						   fsdata);
+	put_lseg(lseg);
+}
+
 void pnfs_free_request_data(struct nfs_page *req)
 {
 	struct layoutdriver_io_operations *lo;
