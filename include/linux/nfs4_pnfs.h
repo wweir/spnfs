@@ -116,8 +116,11 @@ struct layoutdriver_io_operations {
 	/* Functions that use the pagecache.
 	 * If use_pagecache == 1, then these functions must be implemented.
 	 */
-	/* read and write pagelist should return just 0 (success) or a
-	 * negative error code.
+	/* read and write pagelist should return just 0 (to indicate
+	 * the layout code has taken control) or 1 (to indicate the
+	 * layoutcode wishes to fall back to normal nfs.)  If 0 is returned,
+	 * information can be passed back through nfs_data->res and
+	 * nfs_data->task.tk_status.
 	 */
 	int (*read_pagelist) (struct pnfs_layout_type *layoutid,
 			      struct page **pages, unsigned int pgbase,
