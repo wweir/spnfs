@@ -39,6 +39,7 @@
 #include <linux/slab.h>
 
 #include <linux/sunrpc/svc.h>
+#include <linux/sunrpc/svcsock.h>
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/cache.h>
 #include <linux/mount.h>
@@ -1298,6 +1299,11 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 			unconf->cl_exchange_flags & EXCHGID4_FLAG_USE_PNFS_DS)
 			session->flags &= ~SESSION4_BACK_CHAN;
 
+		if (session->flags & SESSION4_BACK_CHAN) {
+			unconf->cl_cb_xprt = rqstp->rq_xprt;
+			unconf->cl_callback.cb_prog = session->callback_prog;
+			nfsd4_probe_callback(unconf);
+		}
 		conf = unconf;
 	}
 
