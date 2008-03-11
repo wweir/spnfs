@@ -52,16 +52,24 @@
 
 #define NFSPROC4_CB_NULL 0
 #define NFSPROC4_CB_COMPOUND 1
+#define NFS4_STATEID_SIZE 16
+
+#if defined(CONFIG_NFSD_V4_1)
+#define NFS4_CB_PROGRAM 0x40000000
+#endif
 
 /* Index of predefined Linux callback client operations */
 
 enum {
-        NFSPROC4_CLNT_CB_NULL = 0,
+	NFSPROC4_CLNT_CB_NULL = 0,
 	NFSPROC4_CLNT_CB_RECALL,
+	NFSPROC4_CLNT_CB_SEQUENCE,
 };
 
 enum nfs_cb_opnum4 {
 	OP_CB_RECALL            = 4,
+	OP_CB_LAYOUT            = 5,
+	OP_CB_SEQUENCE          = 11,
 };
 
 #define NFS4_MAXTAGLEN		20
@@ -77,9 +85,38 @@ enum nfs_cb_opnum4 {
 #define NFS4_enc_cb_recall_sz		(cb_compound_enc_hdr_sz +       \
 					1 + enc_stateid_sz +            \
 					enc_nfs4_fh_sz)
-
 #define NFS4_dec_cb_recall_sz		(cb_compound_dec_hdr_sz  +      \
 					op_dec_sz)
+
+#if defined(CONFIG_NFSD_V4_1)
+#define NFS41_enc_cb_null_sz		0
+#define NFS41_dec_cb_null_sz		0
+#define cb_compound41_enc_hdr_sz	4
+#define cb_compound41_dec_hdr_sz	(3 + (NFS4_MAXTAGLEN >> 2))
+#define sessionid_sz			(NFS4_MAX_SESSIONID_LEN >> 2)
+#define cb_sequence41_enc_sz		(sessionid_sz + 4 +             \
+					1 /* no referring calls list yet */)
+#define cb_sequence41_dec_sz		(op_dec_sz + sessionid_sz + 4)
+#define NFS41_enc_cb_recall_sz		(cb_compound41_enc_hdr_sz +     \
+					cb_sequence41_enc_sz +          \
+					1 + enc_stateid_sz +            \
+					enc_nfs4_fh_sz)
+#define NFS41_dec_cb_recall_sz		(cb_compound_dec_hdr_sz  +      \
+					cb_sequence41_dec_sz +          \
+					op_dec_sz)
+
+struct nfs41_rpc_args {
+	struct nfs4_callback     *args_callback;
+	void                     *args_op;
+	struct nfs41_cb_sequence *args_seq;
+};
+
+struct nfs41_rpc_res {
+	struct nfs4_callback     *res_callback;
+	void                     *res_op;
+	struct nfs41_cb_sequence *res_seq;
+};
+#endif /* defined(CONFIG_NFSD_V4_1) */
 
 /*
 * Generic encode routines from fs/nfs/nfs4xdr.c
@@ -135,11 +172,18 @@ xdr_error:                                      \
 		return -EIO; \
 	} \
 } while (0)
+#define COPYMEM(x,nbytes) do {			\
+	memcpy((x), p, nbytes);			\
+	p += XDR_QUADLEN(nbytes);		\
+} while (0)
 
 struct nfs4_cb_compound_hdr {
-	int		status;
-	u32		ident;
+	/* args */
+	u32		ident;		/* minorversion 0 only */
 	u32		nops;
+
+	/* res */
+	int		status;
 	u32		taglen;
 	char *		tag;
 };
@@ -208,7 +252,7 @@ encode_cb_compound_hdr(struct xdr_stream *xdr, struct nfs4_cb_compound_hdr *hdr)
 
 	RESERVE_SPACE(16);
 	WRITE32(0);            /* tag length is always 0 */
-	WRITE32(NFS4_MINOR_VERSION);
+	WRITE32(0);		/* minorversion */
 	WRITE32(hdr->ident);
 	WRITE32(hdr->nops);
 	return 0;
@@ -228,6 +272,14 @@ encode_cb_recall(struct xdr_stream *xdr, struct nfs4_cb_recall *cb_rec)
 	WRITEMEM(cb_rec->cbr_fhval, len);
 	return 0;
 }
+
+#if defined(CONFIG_NFSD_V4_1)
+static int
+encode_cb_sequence(struct xdr_stream *xdr, struct nfs41_cb_sequence *args)
+{
+	return -1;	/* stub */
+}
+#endif /* defined(CONFIG_NFSD_V4_1) */
 
 static int
 nfs4_xdr_enc_cb_null(struct rpc_rqst *req, __be32 *p)
@@ -253,6 +305,29 @@ nfs4_xdr_enc_cb_recall(struct rpc_rqst *req, __be32 *p, struct nfs4_cb_recall *a
 	return (encode_cb_recall(&xdr, args));
 }
 
+
+#if defined(CONFIG_NFSD_V4_1)
+static int
+encode_cb_compound41_hdr(struct xdr_stream *xdr,
+			 struct nfs4_cb_compound_hdr *hdr)
+{
+	u32 *p;
+
+	RESERVE_SPACE(16);
+	WRITE32(0);		/* tag length is always 0 */
+	WRITE32(1);		/* minorversion */
+	WRITE32(0);		/* callback_ident not used in 4.1 */
+	WRITE32(hdr->nops);
+	return 0;
+}
+
+static int
+nfs41_xdr_enc_cb_recall(struct rpc_rqst *req, u32 *p,
+			struct nfs41_rpc_args *rpc_args)
+{
+	return -1;	/* stub */
+}
+#endif /* defined(CONFIG_NFSD_V4_1) */
 
 static int
 decode_cb_compound_hdr(struct xdr_stream *xdr, struct nfs4_cb_compound_hdr *hdr){
@@ -311,6 +386,21 @@ out:
 	return status;
 }
 
+#if defined(CONFIG_NFSD_V4_1)
+static int
+decode_cb_sequence(struct xdr_stream *xdr, struct nfs41_cb_sequence *res)
+{
+	return -1;	/* stub */
+}
+
+static int
+nfs41_xdr_dec_cb_recall(struct rpc_rqst *rqstp, u32 *p,
+			struct nfs41_rpc_res *rpc_res)
+{
+	return -1;	/* stub */
+}
+#endif /* defined(CONFIG_NFSD_V4_1) */
+
 /*
  * RPC procedure tables
  */
@@ -331,19 +421,44 @@ static struct rpc_procinfo     nfs4_cb_procedures[] = {
 };
 
 static struct rpc_version       nfs_cb_version4 = {
-        .number                 = 1,
+	.number                 = 0,
         .nrprocs                = ARRAY_SIZE(nfs4_cb_procedures),
         .procs                  = nfs4_cb_procedures
 };
 
+#if defined(CONFIG_NFSD_V4_1)
+#define PROC41(proc, call, argtype, restype)                            \
+[NFSPROC4_CLNT_##proc] = {                                              \
+	.p_proc   = NFSPROC4_CB_##call,                                 \
+	.p_encode = (kxdrproc_t) nfs41_xdr_##argtype,                   \
+	.p_decode = (kxdrproc_t) nfs41_xdr_##restype,                   \
+	.p_arglen = NFS41_##argtype##_sz,                               \
+	.p_replen = NFS41_##restype##_sz,                               \
+	.p_statidx = NFSPROC4_CB_##call,                                \
+	.p_name   = #proc,                                              \
+}
+
+static struct rpc_procinfo     nfs41_cb_procedures[] = {
+	PROC(CB_NULL,        NULL,       enc_cb_null,        dec_cb_null),
+	PROC41(CB_RECALL,    COMPOUND,   enc_cb_recall,      dec_cb_recall),
+};
+
+static struct rpc_version       nfs_cb_version41 = {
+	.number                 = 1,
+	.nrprocs                = ARRAY_SIZE(nfs41_cb_procedures),
+	.procs                  = nfs41_cb_procedures
+};
+#endif /* defined(CONFIG_NFSD_V4_1) */
+
 static struct rpc_version *	nfs_cb_version[] = {
-	NULL,
 	&nfs_cb_version4,
+#if defined(CONFIG_NFSD_V4_1)
+	&nfs_cb_version41,
+#endif
 };
 
 /* Reference counting, callback cleanup, etc., all look racy as heck.
  * And why is cb_set an atomic? */
-
 static int do_probe_callback(void *data)
 {
 	struct nfs4_client *clp = data;
@@ -380,7 +495,10 @@ static int do_probe_callback(void *data)
 	addr.sin_addr.s_addr = htonl(cb->cb_addr);
 
 	/* Initialize rpc_program */
-	program->name = "nfs4_cb";
+	if (!clp->cl_cb_xprt)
+		program->name = "nfs4_cb";
+	else
+		program->name = "nfs41_cb";
 	program->number = cb->cb_prog;
 	program->nrvers = ARRAY_SIZE(nfs_cb_version);
 	program->version = nfs_cb_version;
@@ -408,6 +526,7 @@ static int do_probe_callback(void *data)
 	put_nfs4_client(clp);
 	return 0;
 out_release_client:
+	dprintk("NFSD: synchronous CB_NULL failed. status=%d\n", status);
 	rpc_shutdown_client(client);
 out_err:
 	put_nfs4_client(clp);
@@ -433,8 +552,6 @@ nfsd4_probe_callback(struct nfs4_client *clp)
 
 	if (IS_ERR(t))
 		atomic_dec(&clp->cl_count);
-
-	return;
 }
 
 /*
