@@ -381,9 +381,6 @@ extern __be32 nfs4_check_open_reclaim(clientid_t *clid);
 extern void put_nfs4_client(struct nfs4_client *clp);
 extern void nfs4_free_stateowner(struct kref *kref);
 extern void nfsd4_probe_callback(struct nfs4_client *clp);
-#if defined(CONFIG_NFSD_V4_1)
-extern void nfsd41_probe_callback(struct nfs4_client *clp);
-#endif /* CONFIG_NFSD_V4_1 */
 extern void nfsd4_cb_recall(struct nfs4_delegation *dp);
 extern void nfs4_put_delegation(struct nfs4_delegation *dp);
 extern __be32 nfs4_make_rec_clidname(char *clidname, struct xdr_netobj *clname);
