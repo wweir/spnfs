@@ -658,7 +658,7 @@ pnfs_inject_layout(struct pnfs_layout_type *lo,
 	struct pnfs_layout_segment *lseg;
 
 	dprintk("%s Begin\n", __func__);
-
+	/* FIXME - BUG - this is called while holding nfsi->lo_lock spinlock */
 	lseg = PNFS_LD_IO_OPS(lo)->alloc_lseg(lo, lgr);
 	if (!lseg || IS_ERR(lseg)) {
 		if (!lseg)
