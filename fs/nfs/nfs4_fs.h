@@ -228,6 +228,10 @@ extern const nfs4_stateid zero_stateid;
 /* nfs4xdr.c */
 extern __be32 *nfs4_decode_dirent(__be32 *p, struct nfs_entry *entry, int plus);
 extern struct rpc_procinfo *nfs4_procedures;
+#if defined(CONFIG_NFS_V4_1)
+extern struct rpc_version *nfs4_minorversions[];
+extern struct rpc_procinfo *nfs4_minorversion_procedures[];
+#endif /* CONFIG_NFS_V4_1 */
 
 struct nfs4_mount_data;
 
