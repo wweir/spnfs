@@ -3728,6 +3728,10 @@ const struct nfs_rpc_ops nfs_v4_clientops = {
 	.clear_acl_cache = nfs4_zap_acl_attr,
 };
 
+const struct nfs_rpc_ops *nfsv4_minorversion_clientops[] = {
+	&nfs_v4_clientops,
+};
+
 /*
  * Local variables:
  *  c-basic-offset: 8

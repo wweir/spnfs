@@ -5228,13 +5228,45 @@ struct rpc_procinfo	nfs40_procedures[] = {
   PROC(FS_LOCATIONS,	enc_fs_locations, dec_fs_locations, 0),
 };
 
-struct rpc_version		nfs_version4 = {
-	.number			= 4,
-	.nrprocs		= ARRAY_SIZE(nfs40_procedures),
-	.procs			= nfs40_procedures
+#if defined(CONFIG_NFS_V4_1)
+struct rpc_procinfo	nfs41_procedures[] = {
+};
+#endif /* CONFIG_NFS_V4_1 */
+
+struct rpc_version      nfs_version4 = {
+	.number                 = 4,
 };
 
-struct rpc_procinfo *nfs4_procedures = nfs40_procedures;
+struct rpc_version      nfs_version40 = {
+	.number                 = 4,
+	.nrprocs                = ARRAY_SIZE(nfs40_procedures),
+	.procs                  = nfs40_procedures
+};
+
+#ifdef CONFIG_NFS_V4_1
+struct rpc_version      nfs_version41 = {
+	.number                 = 4,
+	.nrprocs                = ARRAY_SIZE(nfs41_procedures),
+	.procs                  = nfs41_procedures
+};
+
+#endif /* CONFIG_NFS_V4_1 */
+
+struct rpc_version *nfs4_minorversions[] = {
+	&nfs_version40,
+#if defined(CONFIG_NFS_V4_1)
+	&nfs_version41,
+#endif
+};
+
+struct rpc_procinfo *nfs4_minorversion_procedures[] = {
+	nfs40_procedures,
+#if defined(CONFIG_NFS_V4_1)
+	nfs41_procedures,
+#endif
+};
+
+struct rpc_procinfo *nfs4_procedures;
 
 /*
  * Local variables:

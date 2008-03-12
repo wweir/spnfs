@@ -7,6 +7,10 @@
 
 #include <asm/atomic.h>
 
+#ifdef CONFIG_NFS_V4_1
+#include <linux/nfs4_session.h>
+#endif
+
 struct nfs_iostats;
 struct nlm_host;
 
@@ -67,6 +71,14 @@ struct nfs_client {
 	 */
 	char			cl_ipaddr[48];
 	unsigned char		cl_id_uniquifier;
+	u32			cl_minorversion;
+#endif
+
+#ifdef CONFIG_NFS_V4_1
+	/* The sequence id to use for the next CREATE_SESSION */
+	u32			cl_seqid;
+	/* The flags used for obtaining the clientid during EXCHANGE_ID */
+	u32			cl_exchange_flags;
 #endif
 };
 
@@ -113,6 +125,11 @@ struct nfs_server {
 						   that are supported on this
 						   filesystem */
 #endif
+
+#ifdef CONFIG_NFS_V4_1
+	struct nfs4_session    *session;	/* NFSv4.1 session */
+#endif
+
 	void (*destroy)(struct nfs_server *);
 
 	atomic_t active; /* Keep trace of any activity to this server */
