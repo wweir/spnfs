@@ -1359,7 +1359,7 @@ call_verify(struct rpc_task *task)
 	if ((n = ntohl(*p++)) != RPC_REPLY) {
 		dprintk("RPC: %5u %s: not an RPC reply: %x\n",
 				task->tk_pid, __FUNCTION__, n);
-		goto out_garbage;
+		/* goto out_garbage; */	/* FIXME: needed for nfs41, not sure why... */
 	}
 	if ((n = ntohl(*p++)) != RPC_MSG_ACCEPTED) {
 		if (--len < 0)
