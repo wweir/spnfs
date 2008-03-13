@@ -116,8 +116,17 @@ struct layoutdriver_io_operations {
 	/* Functions that use the pagecache.
 	 * If use_pagecache == 1, then these functions must be implemented.
 	 */
-	ssize_t (*read_pagelist) (struct pnfs_layout_type *layoutid, struct page **pages, unsigned int pgbase, unsigned nr_pages, loff_t offset, size_t count, struct nfs_read_data *nfs_data);
-	ssize_t (*write_pagelist) (struct pnfs_layout_type *layoutid, struct page **pages, unsigned int pgbase, unsigned nr_pages, loff_t offset, size_t count, int sync, struct nfs_write_data *nfs_data);
+	/* read and write pagelist should return just 0 (success) or a
+	 * negative error code.
+	 */
+	int (*read_pagelist) (struct pnfs_layout_type *layoutid,
+			      struct page **pages, unsigned int pgbase,
+			      unsigned nr_pages, loff_t offset, size_t count,
+			      struct nfs_read_data *nfs_data);
+	int (*write_pagelist) (struct pnfs_layout_type *layoutid,
+			       struct page **pages, unsigned int pgbase,
+			       unsigned nr_pages, loff_t offset, size_t count,
+			       int sync, struct nfs_write_data *nfs_data);
 	int (*flush_one) (struct pnfs_layout_segment *, struct list_head *head, unsigned int npages, size_t count, int how);
 	void (*free_request_data) (struct nfs_page *);
 
