@@ -4531,18 +4531,21 @@ int nfs4_init_slot_table(struct nfs4_channel *channel)
 	struct nfs4_slot *slot;
 	int ret = 0;
 
+	slot = kzalloc(channel->chan_attrs.max_reqs * sizeof(struct nfs4_slot),
+		       GFP_ATOMIC);
+	if (!slot)
+		return -ENOMEM;
+
 	tbl = &channel->slot_table;
 
 	spin_lock(&tbl->slot_tbl_lock);
-
-	tbl->max_slots = channel->chan_attrs.max_reqs;
-
-	tbl->slots = kzalloc(channel->chan_attrs.max_reqs *
-				sizeof(struct nfs4_slot), GFP_ATOMIC);
-	if (!tbl->slots) {
-		ret = -ENOMEM;
+	if (tbl->slots != NULL) {
+		kfree(slot);
 		goto out;
 	}
+
+	tbl->max_slots = channel->chan_attrs.max_reqs;
+	tbl->slots = slot;
 
 	for (i = 0; i < channel->chan_attrs.max_reqs; ++i) {
 		slot = &tbl->slots[i];
