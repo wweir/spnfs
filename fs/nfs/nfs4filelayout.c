@@ -249,7 +249,7 @@ struct rpc_call_ops filelayout_write_call_ops = {
  * TODO:
  * 1. This is a lot of arguments, create special non-nfs-specific structure?
  */
-ssize_t filelayout_read_pagelist(
+static int filelayout_read_pagelist(
 	struct pnfs_layout_type *layoutid,
 	struct page **pages,
 	unsigned int pgbase,
@@ -508,7 +508,7 @@ out:
  *
  * TODO: See filelayout_read_pagelist.
  */
-ssize_t filelayout_write_pagelist(
+static int filelayout_write_pagelist(
 	struct pnfs_layout_type *layoutid,
 	struct page **pages,
 	unsigned int pgbase,

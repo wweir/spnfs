@@ -1418,13 +1418,6 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 
 	if (status)
 		put_lseg(lseg);
-	if (status > 0) {
-		dprintk("%s: LD write_pagelist returned status %d > 0\n", __func__, status);
-		pnfs_update_last_write(nfsi, args->offset, status);
-		pnfs_need_layoutcommit(nfsi, wdata->args.context);
-		status = 0;
-	}
-
 out:
 	dprintk("%s: End Status %d\n", __func__, status);
 	return status;
@@ -1499,11 +1492,6 @@ pnfs_readpages(struct nfs_read_data *rdata)
 							rdata);
 	if (status)
 		put_lseg(lseg);
-	if (status > 0) {
-		dprintk("%s: LD read_pagelist returned status %d > 0\n", __func__, status);
-		status = 0;
-	}
-
  out:
 	dprintk("%s: End Status %d\n", __func__, status);
 	return status;
