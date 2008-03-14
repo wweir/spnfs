@@ -5244,24 +5244,25 @@ static int
 nfs4_pnfs_layoutreturn_validate(struct rpc_task *task, void *calldata)
 {
 	struct nfs4_pnfs_layoutreturn *lrp = calldata;
-	struct inode *ino = lrp->args->inode;
+	struct inode *ino = lrp->args.inode;
 	struct nfs_server *server = NFS_SERVER(ino);
 
 	dprintk("--> %s\n", __func__);
 	return nfs41_call_validate_seq_args(server, server->session,
-					    &lrp->args->seq_args,
-					    &lrp->res->seq_res,
+					    &lrp->args.seq_args,
+					    &lrp->res.seq_res,
 					    0, task);
 }
 
 static void nfs4_pnfs_layoutreturn_done(struct rpc_task *task, void *calldata)
 {
 	struct nfs4_pnfs_layoutreturn *lrp = calldata;
-	struct inode *ino = lrp->args->inode; struct nfs_server *server = NFS_SERVER(ino);
+	struct inode *ino = lrp->args.inode;
+	struct nfs_server *server = NFS_SERVER(ino);
 
 	dprintk("--> %s\n", __func__);
 
-	nfs4_sequence_done(server, &lrp->res->seq_res, task->tk_status);
+	nfs4_sequence_done(server, &lrp->res.seq_res, task->tk_status);
 	if (RPC_ASSASSINATED(task))
 		return;
 
@@ -5271,7 +5272,7 @@ static void nfs4_pnfs_layoutreturn_done(struct rpc_task *task, void *calldata)
 static void nfs4_pnfs_layoutreturn_release(void *calldata)
 {
 	struct nfs4_pnfs_layoutreturn *lrp = calldata;
-	struct nfs_inode *nfsi = NFS_I(lrp->args->inode);
+	struct nfs_inode *nfsi = NFS_I(lrp->args.inode);
 	struct pnfs_layout_type *lo;
 
 	lo = nfsi->current_layout;
@@ -5279,6 +5280,7 @@ static void nfs4_pnfs_layoutreturn_release(void *calldata)
 
 	dprintk("--> %s\n", __func__);
 	pnfs_layout_release(lo);
+	kfree(calldata);
 	dprintk("<-- %s\n", __func__);
 }
 
@@ -5290,13 +5292,13 @@ static const struct rpc_call_ops nfs4_pnfs_layoutreturn_call_ops = {
 
 static int pnfs4_proc_layoutreturn(struct nfs4_pnfs_layoutreturn *lrp)
 {
-	struct inode *ino = lrp->args->inode;
+	struct inode *ino = lrp->args.inode;
 	struct nfs_server *server = NFS_SERVER(ino);
 	struct rpc_task *task;
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_PNFS_LAYOUTRETURN],
-		.rpc_argp = lrp->args,
-		.rpc_resp = lrp->res,
+		.rpc_argp = &lrp->args,
+		.rpc_resp = &lrp->res,
 	};
 	struct rpc_task_setup task_setup_data = {
 		.rpc_client = server->client,
