@@ -536,7 +536,8 @@ pnfs_free_layout(struct pnfs_layout_type *lo,
 }
 
 int
-pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range)
+pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range,
+		enum pnfs_layoutrecall_type type)
 {
 	struct pnfs_layout_type *lo;
 	struct nfs_inode *nfsi = NFS_I(ino);
@@ -552,7 +553,7 @@ pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range)
 
 	arg.reclaim = 0;
 	arg.layout_type = server->pnfs_curr_ld->id;
-	arg.return_type = RETURN_FILE;
+	arg.return_type = type;
 	if (range)
 		arg.lseg = *range;
 	else {

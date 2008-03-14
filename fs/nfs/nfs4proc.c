@@ -2149,7 +2149,7 @@ pnfs4_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 		if (p_ops && p_ops->layoutret_on_setattr) {
 			if (nfsi->layoutcommit_ctx)
 				pnfs_layoutcommit_inode(inode, 0);
-			pnfs_return_layout(inode, NULL);
+			pnfs_return_layout(inode, NULL, RECALL_FILE);
 		}
 	}
 	return nfs4_proc_setattr(dentry, fattr, sattr);
