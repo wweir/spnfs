@@ -366,6 +366,15 @@ put_unlock_current_layout(struct nfs_inode *nfsi,
 	spin_unlock(&nfsi->lo_lock);
 }
 
+void
+pnfs_layout_release(struct pnfs_layout_type *lo)
+{
+	struct nfs_inode *nfsi = NFS_I(lo->inode);
+
+	spin_lock(&nfsi->lo_lock);
+	put_unlock_current_layout(nfsi, lo);
+}
+
 static inline void
 init_lseg(struct pnfs_layout_type *lo, struct pnfs_layout_segment *lseg)
 {
