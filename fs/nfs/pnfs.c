@@ -535,74 +535,62 @@ pnfs_free_layout(struct pnfs_layout_type *lo,
 	dprintk("%s:Return\n", __FUNCTION__);
 }
 
+static int
+return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range,
+	      enum pnfs_layoutrecall_type type)
+{
+	struct nfs4_pnfs_layoutreturn *lrp;
+	struct nfs_server *server = NFS_SERVER(ino);
+	int status = -ENOMEM;
+
+	dprintk("--> %s\n", __func__);
+
+	lrp = kzalloc(sizeof(*lrp), GFP_KERNEL);
+	if (lrp == NULL)
+		goto out;
+	lrp->args.reclaim = 0;
+	lrp->args.layout_type = server->pnfs_curr_ld->id;
+	lrp->args.return_type = type;
+	lrp->args.lseg = *range;
+	lrp->args.inode = ino;
+
+	status = server->nfs_client->rpc_ops->pnfs_layoutreturn(lrp);
+out:
+	dprintk("<-- %s status: %d\n", __func__, status);
+	return status;
+}
+
 int
 pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range,
 		enum pnfs_layoutrecall_type type)
 {
 	struct pnfs_layout_type *lo;
 	struct nfs_inode *nfsi = NFS_I(ino);
-	struct nfs_server *server = NFS_SERVER(ino);
-	struct nfs4_pnfs_layoutreturn_arg arg;
+	struct nfs4_pnfs_layout_segment arg;
 	int status;
 
-	lo = get_lock_current_layout(nfsi);
-	dprintk("%s:Begin layout %p\n", __func__, lo);
+	dprintk("--> %s\n", __func__);
 
-	if (lo == NULL)
-		return 0;
-
-	arg.reclaim = 0;
-	arg.layout_type = server->pnfs_curr_ld->id;
-	arg.return_type = type;
 	if (range)
-		arg.lseg = *range;
+		arg = *range;
 	else {
-		arg.lseg.iomode = IOMODE_ANY /* for now */;
-		arg.lseg.offset = 0;
-		arg.lseg.length = ~0;
+		arg.iomode = IOMODE_ANY;
+		arg.offset = 0;
+		arg.length = ~0;
 	}
-	arg.inode = ino;
-
-	pnfs_free_layout(lo, &arg.lseg);
-	put_unlock_current_layout(nfsi, lo);
-
-	status = pnfs_return_layout_rpc(server, &arg);
-
-	dprintk("%s:Exit status %d\n", __func__, status);
-	return status;
-}
-
-int
-pnfs_return_layout_rpc(struct nfs_server *server,
-			struct nfs4_pnfs_layoutreturn_arg *argp)
-{
-	int status;
-	struct nfs4_pnfs_layoutreturn_res res;
-	struct nfs4_pnfs_layoutreturn gdata = {
-		.args = argp,
-		.res = &res,
-	};
-	dprintk("%s:Begin\n", __func__);
-
-	/* XXX Need to setup the sequence */
-/*
-	status = server->nfs_client->rpc_ops->setup_sequence(
-				server->session,
-				argp->minorversion_info,
-				res.minorversion_info)
-	if (status)
+	if (type == RECALL_FILE) {
+		lo = get_lock_current_layout(nfsi);
+		if (lo == NULL) {
+			status = -EIO;
 			goto out;
-*/
-	/* Return layout to server */
-	status = server->nfs_client->rpc_ops->pnfs_layoutreturn(&gdata);
+		}
+		pnfs_free_layout(lo, &arg);
+		spin_unlock(&nfsi->lo_lock);
+	}
 
-/*
-	server->nfs_client->rpc_ops->sequence_done(server->session,
-				res.minorversion_info, status);
-
+	status = return_layout(ino, &arg, type);
 out:
-*/
-	dprintk("%s:Exit status %d\n", __func__, status);
+	dprintk("<-- %s status: %d\n", __func__, status);
 	return status;
 }
 

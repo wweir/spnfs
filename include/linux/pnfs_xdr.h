@@ -113,8 +113,8 @@ struct nfs4_pnfs_layoutreturn_res {
 };
 
 struct nfs4_pnfs_layoutreturn {
-	struct nfs4_pnfs_layoutreturn_arg *args;
-	struct nfs4_pnfs_layoutreturn_res *res;
+	struct nfs4_pnfs_layoutreturn_arg args;
+	struct nfs4_pnfs_layoutreturn_res res;
 	struct rpc_cred *cred;
 	int rpc_status;
 };
