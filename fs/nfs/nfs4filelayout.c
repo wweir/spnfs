@@ -305,13 +305,6 @@ static int filelayout_read_pagelist(
 	}
 
 	/* Perform an asynchronous read */
-	/* Now get the file offset on the dserver
-	 * Set the write offset to this offset, and
-	 * save the original offset in orig_offset
-	 */
-	data->args.offset = filelayout_get_dserver_offset(offset, flseg);
-	data->orig_offset = offset;
-
 	BUG_ON(data->pnfsflags & PNFS_ISSYNC);
 	nfs_initiate_read(data, data->pnfs_client, &filelayout_read_call_ops);
 
