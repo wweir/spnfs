@@ -330,7 +330,7 @@ device_destroy(struct nfs4_pnfs_dev_item *dev,
 	print_stripe_devs(dev);
 
 	write_lock(&hlist->dev_lock);
-	hlist_del_rcu(&dev->hash_node);
+	hlist_del_init(&dev->hash_node);
 
 	fdev = &dev->stripe_devs[0];
 	for (i = 0; i < dev->stripe_count; i++) {
@@ -344,6 +344,7 @@ device_destroy(struct nfs4_pnfs_dev_item *dev,
 	write_unlock(&hlist->dev_lock);
 	hlist_for_each(np, &release) {
 		ds = hlist_entry(np, struct nfs4_pnfs_ds, ds_node);
+		hlist_del(&ds->ds_node);
 		destroy_ds(ds);
 	}
 	kfree(dev->stripe_devs);
@@ -541,12 +542,8 @@ decode_device(struct filelayout_mount_type *mt, struct pnfs_device *dev)
 					GFP_KERNEL);
 	if (!file_dev->stripe_devs)
 		goto out_err_free;
+
 	file_dev->stripe_count = len;
-
-	/* Initialize dev */
-	INIT_HLIST_NODE(&file_dev->hash_node);
-
-	/* Device id */
 	memcpy(&file_dev->dev_id, &dev->dev_id, NFS4_PNFS_DEVICEID4_SIZE);
 
 	fdev = &file_dev->stripe_devs[0];

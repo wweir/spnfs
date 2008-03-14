@@ -48,7 +48,7 @@ struct nfs4_pnfs_dev {
 
 /* stripe_count is length of dev_list, bounded by NFS4_PNFS_MAX_STRIPE_CNT */
 struct nfs4_pnfs_dev_item {
-	struct hlist_node	hash_node;	/* nfs4_pnfs_dev_hlist dev_list */
+	struct hlist_node	hash_node;   /* nfs4_pnfs_dev_hlist dev_list */
 	struct pnfs_deviceid	dev_id;
 	u32 			stripe_count;
 	struct nfs4_pnfs_dev	*stripe_devs;
