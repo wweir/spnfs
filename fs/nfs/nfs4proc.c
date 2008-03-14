@@ -5117,28 +5117,28 @@ static int
 nfs4_pnfs_layoutget_validate(struct rpc_task *task, void *calldata)
 {
 	struct nfs4_pnfs_layoutget *lgp = calldata;
-	struct inode *ino = lgp->args->inode;
+	struct inode *ino = lgp->args.inode;
 	struct nfs_server *server = NFS_SERVER(ino);
 	struct nfs4_session *session = server->session;
 
 	dprintk("--> %s\n", __func__);
 	return nfs41_call_validate_seq_args(server, session,
-					    &lgp->args->seq_args,
-					    &lgp->res->seq_res,
+					    &lgp->args.seq_args,
+					    &lgp->res.seq_res,
 					    0, task);
 }
 
 static void nfs4_pnfs_layoutget_done(struct rpc_task *task, void *calldata)
 {
 	struct nfs4_pnfs_layoutget *lgp = calldata;
-	struct inode *ino = lgp->args->inode;
+	struct inode *ino = lgp->args.inode;
 	struct nfs_server *server = NFS_SERVER(ino);
 	struct nfs_inode *nfsi = NFS_I(ino);
 	struct pnfs_layout_type *lo;
 
 	dprintk("--> %s\n", __func__);
 
-	nfs4_sequence_done(server, &lgp->res->seq_res, task->tk_status);
+	nfs4_sequence_done(server, &lgp->res.seq_res, task->tk_status);
 	if (RPC_ASSASSINATED(task))
 		return;
 	lo = nfsi->current_layout;
@@ -5163,13 +5163,13 @@ static const struct rpc_call_ops nfs4_pnfs_layoutget_call_ops = {
 
 static int nfs4_proc_pnfs_layoutget(struct nfs4_pnfs_layoutget *lgp)
 {
-	struct inode *ino = lgp->args->inode;
+	struct inode *ino = lgp->args.inode;
 	struct nfs_server *server = NFS_SERVER(ino);
 	struct rpc_task *task;
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_PNFS_LAYOUTGET],
-		.rpc_argp = lgp->args,
-		.rpc_resp = lgp->res,
+		.rpc_argp = &lgp->args,
+		.rpc_resp = &lgp->res,
 	};
 	struct rpc_task_setup task_setup_data = {
 		.rpc_client = server->client,
