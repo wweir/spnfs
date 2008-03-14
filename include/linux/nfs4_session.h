@@ -7,11 +7,6 @@
 #include <linux/smp_lock.h>
 #include <linux/sunrpc/sched.h>
 
-/* The flags for the nfs4_slot struct */
-#define NFS4_SLOT_BUSY		0X0	/* Slot in use */
-#define NFS4_SLOT_RECLAIMED	0x1	/* Slot has been reclaimed by
-					   the server */
-
 struct nfs4_channel_attrs {
 	u32			headerpadsz;
 	u32			max_rqst_sz;
@@ -23,17 +18,24 @@ struct nfs4_channel_attrs {
 };
 
 struct nfs4_slot {
-	u32		 	slot_nr;
 	u32		 	seq_nr;
-	unsigned long		flags;
 };
 
 struct nfs4_slot_table {
 	struct nfs4_slot 	*slots;
+	unsigned long		*used_slots;
+	unsigned long		_used_slots;	/* used when max_slots fits */
 	spinlock_t		slot_tbl_lock;
 	struct rpc_wait_queue	slot_tbl_waitq;
 	int			max_slots;
+	int			lowest_free_slotid;	/* lower bound hint */
+	int			highest_used_slotid;
 };
+
+static inline int slot_idx(struct nfs4_slot_table *tbl, struct nfs4_slot *sp)
+{
+	return sp - tbl->slots;
+}
 
 struct nfs4_channel {
 	struct nfs4_channel_attrs 	chan_attrs;
