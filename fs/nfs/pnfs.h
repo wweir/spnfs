@@ -47,6 +47,9 @@ void pnfs_update_layout_commit(struct inode *, struct list_head *, pgoff_t, unsi
 int pnfs_flush_one(struct inode *, struct list_head *, unsigned int, size_t, int);
 void pnfs_free_request_data(struct nfs_page *req);
 ssize_t pnfs_file_write(struct file *, const char __user *, size_t, loff_t *);
+void pnfs_get_layout_done(struct pnfs_layout_type *,
+			  struct nfs4_pnfs_layoutget *, int);
+
 
 #endif /* CONFIG_PNFS */
 

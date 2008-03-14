@@ -832,8 +832,9 @@ pnfs_update_layout(struct inode *ino,
 
 	lo = get_lock_alloc_layout(ino, nfss->pnfs_curr_ld->ld_io_ops);
 	if (IS_ERR(lo)) {
+		dprintk("%s ERROR: can't get pnfs_layout_type\n", __func__);
 		result = PTR_ERR(lo);
-		goto ret;
+		goto out;
 	}
 
 	arg.lseg.iomode = iomode;
@@ -843,110 +844,135 @@ pnfs_update_layout(struct inode *ino,
 	lseg = pnfs_has_layout(lo, &arg.lseg, lsegpp != NULL);
 	if (lseg) {
 		dprintk("%s: Using cached layout %p for %llu@%llu iomode %d)\n",
-			__FUNCTION__,
+			__func__,
 			nfsi->current_layout,
 			arg.lseg.length,
 			arg.lseg.offset,
 			arg.lseg.iomode);
 
 		result = 0;
-		goto out;
+		goto out_put;
 	}
 
 	/* if get layout already failed once goto out */
 	if (nfsi->pnfs_layout_state & NFS_INO_LAYOUT_FAILED) {
 		if (unlikely(nfsi->pnfs_layout_suspend &&
 		    get_seconds() >= nfsi->pnfs_layout_suspend)) {
-			dprintk("%s: layout_get resumed\n", __FUNCTION__);
+			dprintk("%s: layout_get resumed\n", __func__);
 			nfsi->pnfs_layout_state &= ~NFS_INO_LAYOUT_FAILED;
 			nfsi->pnfs_layout_suspend = 0;
 		} else {
 			result = 1;
-			goto out;
+			goto out_put;
 		}
 	}
 
 	res.layout.buf = NULL;
 	memcpy(&lo->stateid.data, &arg.stateid.data, NFS4_STATEID_SIZE);
 	spin_unlock(&nfsi->lo_lock);
-	result = get_layout(ino, ctx, &arg, &res);
-	spin_lock(&nfsi->lo_lock);
-	/* FIXME: check for reordering using the returned sequence id */
-	memcpy(&res.stateid.data, &lo->stateid.data, NFS4_STATEID_SIZE);
 
-	/* we got a reference on nfsi->current_layout hence it must never
-	 * change, even while nfsi->lo_lock was not held.
-	 */
+	result = get_layout(ino, ctx, &arg, &res);
+out:
+	dprintk("%s end (err:%d) state 0x%lx lseg %p\n",
+			__func__, result, nfsi->pnfs_layout_state, lseg);
+	return result;
+out_put:
+	if (lsegpp)
+		*lsegpp = lseg;
+	put_unlock_current_layout(nfsi, lo);
+	goto out;
+}
+
+void
+pnfs_get_layout_done(struct pnfs_layout_type *lo,
+		     struct nfs4_pnfs_layoutget *lgp,
+		     int rpc_status)
+{
+	struct nfs4_pnfs_layoutget_res *res = lgp->res;
+	struct pnfs_layout_segment *lseg = NULL;
+	struct nfs_inode *nfsi = NFS_I(lo->inode);
+
+	dprintk("-->%s\n", __func__);
+
+	spin_lock(&nfsi->lo_lock);
+
 	BUG_ON(nfsi->current_layout != lo);
 
-	if (result) {
+	/* FIXME: check for reordering using the returned sequence id */
+	memcpy(&res->stateid.data, &lo->stateid.data, NFS4_STATEID_SIZE);
+
+	lgp->status = rpc_status;
+	if (rpc_status) {
 		dprintk("%s: ERROR retrieving layout %d\n",
-		       __FUNCTION__, result);
+			__func__, rpc_status);
 
-		switch (result) {
-		case -ENOENT:	/* NFS4ERR_BADLAYOUT */
-			/* transient error, don't mark with NFS_INO_LAYOUT_FAILED */
-			result = 1;
+		switch (rpc_status) {
+		case -ENOENT:   /* NFS4ERR_BADLAYOUT */
+			/* transient error, don't mark with
+			 * NFS_INO_LAYOUT_FAILED */
+			lgp->status = 1;
 			break;
-
-		case -EAGAIN:	/* NFS4ERR_LAYOUTTRYLATER, NFS4ERR_RECALLCONFLICT, NFS4ERR_LOCKED */
+		case -EAGAIN:   /* NFS4ERR_LAYOUTTRYLATER,
+				 * NFS4ERR_RECALLCONFLICT, NFS4ERR_LOCKED
+				 */
 			nfsi->pnfs_layout_suspend = get_seconds() + 1;
 			dprintk("%s: layout_get suspended until %ld\n",
-				__FUNCTION__, nfsi->pnfs_layout_suspend);
+				__func__, nfsi->pnfs_layout_suspend);
 			break;
-		case -EINVAL:	/* NFS4ERR_INVAL, NFSERR_BADIOMODE, NFS4ERR_UNKNOWN_LAYOUTTYPE */
+		case -EINVAL:   /* NFS4ERR_INVAL, NFSERR_BADIOMODE,
+				 * NFS4ERR_UNKNOWN_LAYOUTTYPE
+				 */
 		case -ENOTSUPP:	/* NFS4ERR_LAYOUTUNAVAILABLE */
 		case -ETOOSMALL:/* NFS4ERR_TOOSMALL */
 		default:
 			/* suspend layout get for ever for this file */
 			nfsi->pnfs_layout_suspend = 0;
 			dprintk("%s: no layout_get until %ld\n",
-				__FUNCTION__, nfsi->pnfs_layout_suspend);
+				__func__, nfsi->pnfs_layout_suspend);
 			/* mark with NFS_INO_LAYOUT_FAILED */
 			break;
 		}
 		goto get_out;
 	}
 
-	if (res.layout.len <= 0) {
+	if (res->layout.len <= 0) {
 		printk(KERN_ERR
 		       "%s: ERROR!  Layout size is ZERO!\n", __FUNCTION__);
-		result =  -EIO;
+		lgp->status =  -EIO;
 		goto get_out;
 	}
 
 	/* Inject layout blob into I/O device driver */
-	lseg = pnfs_inject_layout(lo, &res, lsegpp != NULL);
+	lseg = pnfs_inject_layout(lo, res, lgp->lsegpp != NULL);
 	if (IS_ERR(lseg)) {
-		result =  PTR_ERR(lseg);
+		lgp->status = PTR_ERR(lseg);
 		lseg = NULL;
 		printk(KERN_ERR "%s: ERROR!  Could not inject layout (%d)\n",
-		       __FUNCTION__, result);
+			__func__, lgp->status);
 		goto get_out;
 	}
 
-	if (res.return_on_close) {
-		lo->roc_iomode |= res.lseg.iomode;
+	if (res->return_on_close) {
+		lo->roc_iomode |= res->lseg.iomode;
 		if (!lo->roc_iomode)
 			lo->roc_iomode = IOMODE_ANY;
 	}
+	lgp->status = 0;
 
-	result = 0;
 get_out:
 	/* remember that get layout failed and don't try again */
-	if (result < 0)
+	if (lgp->status < 0)
 		nfsi->pnfs_layout_state |= NFS_INO_LAYOUT_FAILED;
+	spin_unlock(&nfsi->lo_lock);
 
-	/* res.layout.buf kalloc'ed by the xdr decoder? */
-	kfree(res.layout.buf);
-out:
-	put_unlock_current_layout(nfsi, lo);
-ret:
+	/* res->layout.buf kalloc'ed by the xdr decoder? */
+	kfree(res->layout.buf);
+
 	dprintk("%s end (err:%d) state 0x%lx lseg %p\n",
-		__FUNCTION__, result, nfsi->pnfs_layout_state, lseg);
-	if (lsegpp)
-		*lsegpp = lseg;
-	return result;
+		__func__, lgp->status, nfsi->pnfs_layout_state, lseg);
+	if (lgp->lsegpp)
+		*lgp->lsegpp = lseg;
+	return;
 }
 
 /* Return true if a layout driver is being used for this mountpoint */
