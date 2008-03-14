@@ -49,7 +49,7 @@ void pnfs_free_request_data(struct nfs_page *req);
 ssize_t pnfs_file_write(struct file *, const char __user *, size_t, loff_t *);
 void pnfs_get_layout_done(struct pnfs_layout_type *,
 			  struct nfs4_pnfs_layoutget *, int);
-
+void pnfs_layout_release(struct pnfs_layout_type *);
 
 #endif /* CONFIG_PNFS */
 
