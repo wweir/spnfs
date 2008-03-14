@@ -5204,21 +5204,84 @@ int nfs41_proc_async_sequence(struct nfs_client *clp, struct rpc_cred *cred)
 #endif /* CONFIG_NFS_V4_1 */
 
 #ifdef CONFIG_PNFS
-static int nfs4_proc_pnfs_layoutget(struct nfs4_pnfs_layoutget *layout)
+static void nfs4_pnfs_layoutget_prepare(struct rpc_task *task, void *calldata)
 {
-	struct inode *ino = layout->args->inode;
-	int status;
+	struct nfs4_pnfs_layoutget *lgp = calldata;
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_PNFS_LAYOUTGET],
-		.rpc_argp = layout->args,
-		.rpc_resp = layout->res,
+		.rpc_argp = lgp->args,
+		.rpc_resp = lgp->res,
 	};
+
+	dprintk("--> %s\n", __func__);
+	rpc_call_setup(task, &msg, 0);
+	dprintk("<-- %s\n", __func__);
+}
+
+static int
+nfs4_pnfs_layoutget_validate(struct rpc_task *task, void *calldata)
+{
+	struct nfs4_pnfs_layoutget *lgp = calldata;
+	struct inode *ino = lgp->args->inode;
+	struct nfs_server *server = NFS_SERVER(ino);
+	struct nfs4_session *session = server->session;
+
+	dprintk("--> %s\n", __func__);
+	return nfs41_call_validate_seq_args(server, session,
+					    &lgp->args->seq_args,
+					    &lgp->res->seq_res,
+					    0, task);
+}
+
+static void nfs4_pnfs_layoutget_done(struct rpc_task *task, void *calldata)
+{
+	struct nfs4_pnfs_layoutget *lgp = calldata;
+	struct inode *ino = lgp->args->inode;
 	struct nfs_server *server = NFS_SERVER(ino);
 
-	NFS4_VALIDATE_STATE(server);
-	status = NFS4_RPC_CALL_SYNC(server, NFS_CLIENT(ino), &msg,
-		layout->args, layout->res, 0);
+	dprintk("--> %s\n", __func__);
 
+	nfs4_sequence_done(server, &lgp->res->seq_res, task->tk_status);
+	if (RPC_ASSASSINATED(task))
+		return;
+
+	dprintk("<-- %s\n", __func__);
+}
+
+static void nfs4_pnfs_layoutget_release(void *calldata)
+{
+	dprintk("--> %s\n", __func__);
+	/* pnfs_layout_release here */
+	dprintk("<-- %s\n", __func__);
+}
+
+static const struct rpc_call_ops nfs4_pnfs_layoutget_call_ops = {
+	.rpc_call_validate_args = nfs4_pnfs_layoutget_validate,
+	.rpc_call_prepare = nfs4_pnfs_layoutget_prepare,
+	.rpc_call_done = nfs4_pnfs_layoutget_done,
+	.rpc_release = nfs4_pnfs_layoutget_release,
+};
+
+static int nfs4_proc_pnfs_layoutget(struct nfs4_pnfs_layoutget *lgp)
+{
+	struct inode *ino = lgp->args->inode;
+	struct nfs_server *server = NFS_SERVER(ino);
+	struct rpc_task *task;
+	int status;
+
+	dprintk("--> %s\n", __func__);
+
+	NFS4_VALIDATE_STATE(server);
+	task = rpc_run_task(server->client, RPC_TASK_ASYNC,
+			    &nfs4_pnfs_layoutget_call_ops, lgp);
+	if (IS_ERR(task))
+		return PTR_ERR(task);
+	status = nfs4_wait_for_completion_rpc_task(task);
+	if (status == 0)
+		status = task->tk_status;
+	rpc_put_task(task);
+
+	dprintk("<-- %s\n", __func__);
 	return status;
 }
 
