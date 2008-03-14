@@ -5150,8 +5150,16 @@ static void nfs4_pnfs_layoutget_done(struct rpc_task *task, void *calldata)
 
 static void nfs4_pnfs_layoutget_release(void *calldata)
 {
+	struct nfs4_pnfs_layoutget *lgp = calldata;
+	struct nfs_inode *nfsi = NFS_I(lgp->args.inode);
+	struct pnfs_layout_type *lo;
+
+	lo = nfsi->current_layout;
+	BUG_ON(!lo);
+
 	dprintk("--> %s\n", __func__);
-	/* pnfs_layout_release here */
+	pnfs_layout_release(lo);
+	kfree(calldata);
 	dprintk("<-- %s\n", __func__);
 }
 
