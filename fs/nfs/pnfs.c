@@ -826,13 +826,13 @@ pnfs_update_layout(struct inode *ino,
 	struct nfs4_pnfs_layoutget_arg arg;
 	struct nfs_inode *nfsi = NFS_I(ino);
 	struct nfs_server *nfss = NFS_SERVER(ino);
-	struct pnfs_layout_type *layout_new;
+	struct pnfs_layout_type *lo;
 	struct pnfs_layout_segment *lseg = NULL;
 	int result = -EIO;
 
-	layout_new = get_lock_alloc_layout(ino, nfss->pnfs_curr_ld->ld_io_ops);
-	if (IS_ERR(layout_new)) {
-		result = PTR_ERR(layout_new);
+	lo = get_lock_alloc_layout(ino, nfss->pnfs_curr_ld->ld_io_ops);
+	if (IS_ERR(lo)) {
+		result = PTR_ERR(lo);
 		goto ret;
 	}
 
@@ -840,7 +840,7 @@ pnfs_update_layout(struct inode *ino,
 	arg.lseg.offset = pos;
 	arg.lseg.length = count;
 	/* Check to see if the layout for the given range already exists */
-	lseg = pnfs_has_layout(layout_new, &arg.lseg, lsegpp != NULL);
+	lseg = pnfs_has_layout(lo, &arg.lseg, lsegpp != NULL);
 	if (lseg) {
 		dprintk("%s: Using cached layout %p for %llu@%llu iomode %d)\n",
 			__FUNCTION__,
@@ -867,17 +867,17 @@ pnfs_update_layout(struct inode *ino,
 	}
 
 	res.layout.buf = NULL;
-	memcpy(&layout_new->stateid.data, &arg.stateid.data, NFS4_STATEID_SIZE);
+	memcpy(&lo->stateid.data, &arg.stateid.data, NFS4_STATEID_SIZE);
 	spin_unlock(&nfsi->lo_lock);
 	result = get_layout(ino, ctx, &arg, &res);
 	spin_lock(&nfsi->lo_lock);
 	/* FIXME: check for reordering using the returned sequence id */
-	memcpy(&res.stateid.data, &layout_new->stateid.data, NFS4_STATEID_SIZE);
+	memcpy(&res.stateid.data, &lo->stateid.data, NFS4_STATEID_SIZE);
 
 	/* we got a reference on nfsi->current_layout hence it must never
 	 * change, even while nfsi->lo_lock was not held.
 	 */
-	BUG_ON(nfsi->current_layout != layout_new);
+	BUG_ON(nfsi->current_layout != lo);
 
 	if (result) {
 		dprintk("%s: ERROR retrieving layout %d\n",
@@ -916,7 +916,7 @@ pnfs_update_layout(struct inode *ino,
 	}
 
 	/* Inject layout blob into I/O device driver */
-	lseg = pnfs_inject_layout(layout_new, &res, lsegpp != NULL);
+	lseg = pnfs_inject_layout(lo, &res, lsegpp != NULL);
 	if (IS_ERR(lseg)) {
 		result =  PTR_ERR(lseg);
 		lseg = NULL;
@@ -926,9 +926,9 @@ pnfs_update_layout(struct inode *ino,
 	}
 
 	if (res.return_on_close) {
-		layout_new->roc_iomode |= res.lseg.iomode;
-		if (!layout_new->roc_iomode)
-			layout_new->roc_iomode = IOMODE_ANY;
+		lo->roc_iomode |= res.lseg.iomode;
+		if (!lo->roc_iomode)
+			lo->roc_iomode = IOMODE_ANY;
 	}
 
 	result = 0;
@@ -940,7 +940,7 @@ get_out:
 	/* res.layout.buf kalloc'ed by the xdr decoder? */
 	kfree(res.layout.buf);
 out:
-	put_unlock_current_layout(nfsi, layout_new);
+	put_unlock_current_layout(nfsi, lo);
 ret:
 	dprintk("%s end (err:%d) state 0x%lx lseg %p\n",
 		__FUNCTION__, result, nfsi->pnfs_layout_state, lseg);
