@@ -465,25 +465,32 @@ lo_seg_intersecting(struct nfs4_pnfs_layout_segment *l1,
 static int
 get_layout(struct inode *ino,
 	   struct nfs_open_context *ctx,
-	   struct nfs4_pnfs_layoutget_arg *arg,
-	   struct nfs4_pnfs_layoutget_res *res)
+	   struct nfs4_pnfs_layout_segment *range,
+	   struct pnfs_layout_segment **lsegpp)
 {
 	int status;
 	struct nfs_server *server = NFS_SERVER(ino);
-	struct nfs4_pnfs_layoutget gdata = {
-		.args = arg,
-		.res = res,
-	};
-	dprintk("%s:Begin\n", __func__);
+	struct nfs4_pnfs_layoutget *lgp;
 
-	arg->type = server->pnfs_curr_ld->id;
-	arg->minlength = arg->lseg.length;
-	arg->maxcount = PNFS_LAYOUT_MAXSIZE;
-	arg->inode = ino;
-	arg->ctx = ctx;
+	dprintk("--> %s\n", __func__);
+
+	lgp = kzalloc(sizeof(*lgp), GFP_KERNEL);
+	if (lgp == NULL)
+		return -ENOMEM;
+	lgp->args.lseg.iomode = range->iomode;
+	lgp->args.lseg.offset = range->offset;
+	lgp->args.lseg.length = range->length;
+	lgp->args.type = server->pnfs_curr_ld->id;
+	lgp->args.minlength = lgp->args.lseg.length;
+	lgp->args.maxcount = PNFS_LAYOUT_MAXSIZE;
+	lgp->args.inode = ino;
+	lgp->args.ctx = ctx;
+	lgp->lsegpp = lsegpp;
 
 	/* Retrieve layout information from server */
-	status = NFS_PROTO(ino)->pnfs_layoutget(&gdata);
+	status = NFS_PROTO(ino)->pnfs_layoutget(lgp);
+
+	dprintk("<-- %s status %d\n", __func__, status);
 	return status;
 }
 
@@ -815,8 +822,11 @@ pnfs_update_layout(struct inode *ino,
 		   enum pnfs_iomode iomode,
 		   struct pnfs_layout_segment **lsegpp)
 {
-	struct nfs4_pnfs_layoutget_res res;
-	struct nfs4_pnfs_layoutget_arg arg;
+	struct nfs4_pnfs_layout_segment arg = {
+		.iomode = iomode,
+		.offset = pos,
+		.length = count
+	};
 	struct nfs_inode *nfsi = NFS_I(ino);
 	struct nfs_server *nfss = NFS_SERVER(ino);
 	struct pnfs_layout_type *lo;
@@ -830,18 +840,15 @@ pnfs_update_layout(struct inode *ino,
 		goto out;
 	}
 
-	arg.lseg.iomode = iomode;
-	arg.lseg.offset = pos;
-	arg.lseg.length = count;
 	/* Check to see if the layout for the given range already exists */
-	lseg = pnfs_has_layout(lo, &arg.lseg, lsegpp != NULL);
+	lseg = pnfs_has_layout(lo, &arg, lsegpp != NULL);
 	if (lseg) {
 		dprintk("%s: Using cached layout %p for %llu@%llu iomode %d)\n",
 			__func__,
 			nfsi->current_layout,
-			arg.lseg.length,
-			arg.lseg.offset,
-			arg.lseg.iomode);
+			arg.length,
+			arg.offset,
+			arg.iomode);
 
 		result = 0;
 		goto out_put;
@@ -860,11 +867,9 @@ pnfs_update_layout(struct inode *ino,
 		}
 	}
 
-	res.layout.buf = NULL;
-	memcpy(&lo->stateid.data, &arg.stateid.data, NFS4_STATEID_SIZE);
 	spin_unlock(&nfsi->lo_lock);
 
-	result = get_layout(ino, ctx, &arg, &res);
+	result = get_layout(ino, ctx, &arg, lsegpp);
 out:
 	dprintk("%s end (err:%d) state 0x%lx lseg %p\n",
 			__func__, result, nfsi->pnfs_layout_state, lseg);
@@ -881,7 +886,7 @@ pnfs_get_layout_done(struct pnfs_layout_type *lo,
 		     struct nfs4_pnfs_layoutget *lgp,
 		     int rpc_status)
 {
-	struct nfs4_pnfs_layoutget_res *res = lgp->res;
+	struct nfs4_pnfs_layoutget_res *res = &lgp->res;
 	struct pnfs_layout_segment *lseg = NULL;
 	struct nfs_inode *nfsi = NFS_I(lo->inode);
 
@@ -890,9 +895,6 @@ pnfs_get_layout_done(struct pnfs_layout_type *lo,
 	spin_lock(&nfsi->lo_lock);
 
 	BUG_ON(nfsi->current_layout != lo);
-
-	/* FIXME: check for reordering using the returned sequence id */
-	memcpy(&res->stateid.data, &lo->stateid.data, NFS4_STATEID_SIZE);
 
 	lgp->status = rpc_status;
 	if (rpc_status) {
