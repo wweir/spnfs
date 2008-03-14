@@ -326,9 +326,6 @@ static struct nfs4_slot *nfs4_find_slot(struct nfs4_slot_table *tbl,
 	slot = __nfs4_find_slot(tbl);
 	spin_unlock(&tbl->slot_tbl_lock);
 
-	if (slot)
-		rpc_wake_up_task(task);
-
 	return slot;
 }
 
