@@ -210,6 +210,63 @@ static void renew_lease(const struct nfs_server *server, unsigned long timestamp
 }
 
 #if defined(CONFIG_NFS_V4_1)
+
+static inline unsigned long *idx2bmp(unsigned long *base, int idx, int *bit)
+{
+	base += idx / BITS_PER_LONG;
+	if (bit)
+		*bit = idx & (BITS_PER_LONG - 1);
+	return base;
+}
+
+static inline int bmp2idx(unsigned long *base, unsigned long *bmp,
+			  int bit)
+{
+	return ((bmp - base) * BITS_PER_LONG) + bit;
+}
+
+static inline void nfs41_free_slot(struct nfs4_slot_table *tbl,
+				   struct nfs4_slot *slot)
+{
+	int slotid = slot_idx(tbl, slot);
+	unsigned long *used, u;
+	int bit;
+
+	spin_lock(&tbl->slot_tbl_lock);
+	/* clear used bit in bitmap */
+	used = idx2bmp(tbl->used_slots, slotid, &bit);
+	*used &= ~(1 << bit);
+
+	if (slotid < tbl->lowest_free_slotid)
+		tbl->lowest_free_slotid = slotid;
+
+	/* update highest_used_slotid when it is freed */
+	if (slotid == tbl->highest_used_slotid) {
+		tbl->highest_used_slotid = -1;
+		slotid--;
+		/* scan down for the highest used slotid */
+		while (slotid >= 0) {
+			used = idx2bmp(tbl->used_slots, slotid, NULL);
+			u = *used;
+			if (!u) {
+				/* all slots marked free in this word */
+				slotid -= BITS_PER_LONG;
+				continue;
+			}
+#if BITS_PER_LONG == 64
+			bit = fls64(u) - 1;
+#else
+			bit = fls(u) - 1;
+#endif
+			tbl->highest_used_slotid = bmp2idx(tbl->used_slots,
+							   used, bit);
+			break;
+		}
+	}
+	spin_unlock(&tbl->slot_tbl_lock);
+	rpc_wake_up_next(&tbl->slot_tbl_waitq);
+}
+
 /* For pNFS filelayout data servers:
  * the nfs_client is NULL - to signal no lease update.
  * session is the data server.
@@ -235,7 +292,7 @@ static int nfs41_sequence_done(struct nfs_client *clp,
 	slot = res->sr_slot;
 	if (slot == NULL) {
 		dprintk("%s: no slot: status %d\n", __func__, status);
-		goto out;	/* session recovery probably failed */
+		goto ret;	/* session recovery probably failed */
 	}
 
 	switch (status) {
@@ -267,12 +324,7 @@ static int nfs41_sequence_done(struct nfs_client *clp,
 		spin_unlock(&clp->cl_lock);
 	}
 no_update:
-	/* Clear the 'busy' bit on the slot that was used */
-	smp_mb__before_clear_bit();
-	clear_bit(NFS4_SLOT_BUSY, &slot->flags);
-	smp_mb__after_clear_bit();
-out:
-	rpc_wake_up_next(&tbl->slot_tbl_waitq);
+	nfs41_free_slot(tbl, slot);
 ret:
 	return status;
 }
@@ -299,33 +351,46 @@ static int nfs4_sequence_done(struct nfs_server *server,
 	return ret;
 }
 
-static struct nfs4_slot *__nfs4_find_slot(struct nfs4_slot_table *tbl)
+static inline struct nfs4_slot *nfs4_find_slot(struct nfs4_slot_table *tbl,
+					       struct rpc_task *task,
+					       struct nfs41_sequence_args *args)
 {
-	int i;
-	struct nfs4_slot *slot;
-
-	for (i = 0; i < tbl->max_slots; ++i) {
-		slot = &tbl->slots[i];
-		if (!test_bit(NFS4_SLOT_BUSY, &slot->flags)) {
-			set_bit(NFS4_SLOT_BUSY, &slot->flags);
-			return slot;
-		}
-	}
-
-	return NULL;
-}
-
-static struct nfs4_slot *nfs4_find_slot(struct nfs4_slot_table *tbl,
-					struct rpc_task *task)
-{
-	struct nfs4_slot *slot;
-
-	rpc_sleep_on(&tbl->slot_tbl_waitq, task, NULL, NULL);
+	int bit, slotid;
+	struct nfs4_slot *slot = NULL;
+	unsigned long *used, u;
 
 	spin_lock(&tbl->slot_tbl_lock);
-	slot = __nfs4_find_slot(tbl);
+	slotid = tbl->lowest_free_slotid;
+	while (slotid < tbl->max_slots) {
+		used = idx2bmp(tbl->used_slots, slotid, NULL);
+		u = *used;
+		if (u == ~0UL) {
+			/* all slots marked used in this word */
+			slotid += BITS_PER_LONG;
+			continue;
+		}
+		/* find first slot marked free in word */
+		bit = ffz(u);
+		slotid = bmp2idx(tbl->used_slots, used, bit);
+		/* mark slot used.  note that we don't do that if
+		 * slotid >= tbl->max_slots so not to confuse
+		 * highest_used_slotid algorithm */
+		if (slotid < tbl->max_slots) {
+			*used |= (1 << bit);
+			if (slotid > tbl->highest_used_slotid)
+				tbl->highest_used_slotid = slotid;
+			slot = tbl->slots + slotid;
+			args->sa_seqid = slot->seq_nr;
+			args->sa_slotid = slotid;
+			args->sa_max_slotid = tbl->highest_used_slotid;
+			slotid++;	/* for updating lowest_free_slot */
+		}
+		break;
+	}
+	tbl->lowest_free_slotid = slotid;
 	spin_unlock(&tbl->slot_tbl_lock);
-
+	dprintk("<-- %s slot %p slotid %d\n", __func__,
+		slot, slot ? slot_idx(tbl, slot) : -1);
 	return slot;
 }
 
@@ -338,21 +403,22 @@ static int nfs41_setup_sequence(struct nfs4_session *session,
 	struct nfs4_slot *slot;
 	struct nfs4_slot_table *tbl;
 
+	dprintk("--> %s\n", __func__);
 	tbl = &session->fore_channel.slot_table;
-	slot = nfs4_find_slot(tbl, task);
+	slot = nfs4_find_slot(tbl, task, args);
 
-	if (!slot)
+	if (!slot) {
+		rpc_sleep_on(&tbl->slot_tbl_waitq, task, NULL, NULL);
+		dprintk("<-- %s: no free slots\n", __func__);
 		return -EAGAIN;
+	}
 
 	memcpy(args->sa_sessionid.data, session->sess_id,
 	       NFS4_MAX_SESSIONID_LEN);
-	args->sa_slotid = slot->slot_nr;
-	args->sa_seqid = slot->seq_nr;
 	args->sa_cache_this = cache_reply;
 
-	spin_lock(&tbl->slot_tbl_lock);
-	args->sa_max_slotid = tbl->max_slots;
-	spin_unlock(&tbl->slot_tbl_lock);
+	dprintk("<-- %s slot=%p slotid=%d seqid=%d\n", __func__,
+		slot, args->sa_slotid, slot->seq_nr);
 
 	res->sr_slot = slot;
 	res->sr_renewal_time = jiffies;
@@ -4523,37 +4589,56 @@ int nfs4_proc_get_lease_time(struct nfs_client *clp,
 /* Initialize a slot table */
 int nfs4_init_slot_table(struct nfs4_channel *channel)
 {
-	int i;
-	struct nfs4_slot_table *tbl;
+	struct nfs4_slot_table *tbl = &channel->slot_table;
+	int i, max_slots = channel->chan_attrs.max_reqs;
 	struct nfs4_slot *slot;
-	int ret = 0;
+	unsigned long *used;
+	int ret = -ENOMEM;
 
-	slot = kzalloc(channel->chan_attrs.max_reqs * sizeof(struct nfs4_slot),
-		       GFP_ATOMIC);
+	dprintk("--> %s: max_reqs=%u\n", __func__,
+		channel->chan_attrs.max_reqs);
+	slot = kzalloc(max_slots * sizeof(struct nfs4_slot), GFP_ATOMIC);
 	if (!slot)
-		return -ENOMEM;
+		goto out;
+	for (i = 0; i < max_slots; ++i)
+		slot[i].seq_nr = 1;
 
-	tbl = &channel->slot_table;
+	if (max_slots <= BITS_PER_LONG)
+		used = &tbl->_used_slots;	/* use word in tbl */
+	else {
+		/* allocate enough unsigned longs for max_slots bits */
+		used = kzalloc(sizeof(unsigned long) *
+				DIV_ROUND_UP(max_slots, BITS_PER_LONG),
+			       GFP_ATOMIC);
+		if (!used)
+			goto out_free;
+	}
+	ret = 0;
 
 	spin_lock(&tbl->slot_tbl_lock);
 	if (tbl->slots != NULL) {
-		kfree(slot);
-		goto out;
+		spin_unlock(&tbl->slot_tbl_lock);
+		dprintk("%s: slot table already initialized. tbl=%p slots=%p\n",
+			__func__, tbl, tbl->slots);
+		WARN_ON(1);
+		goto out_free;
 	}
-
-	tbl->max_slots = channel->chan_attrs.max_reqs;
+	tbl->max_slots = max_slots;
 	tbl->slots = slot;
-
-	for (i = 0; i < channel->chan_attrs.max_reqs; ++i) {
-		slot = &tbl->slots[i];
-		slot->slot_nr = i;
-		slot->seq_nr = 1;
-		slot->flags = 0;
-	}
-
-out:
+	tbl->used_slots = used;
+	tbl->lowest_free_slotid = 0;
+	tbl->highest_used_slotid = -1;
 	spin_unlock(&tbl->slot_tbl_lock);
+	dprintk("%s: tbl=%p slots=%p max_slots=%d\n", __func__,
+		tbl, tbl->slots, tbl->max_slots);
+out:
+	dprintk("<-- %s: return %d\n", __func__, ret);
 	return ret;
+out_free:
+	kfree(slot);
+	if (used != &tbl->_used_slots)
+		kfree(used);
+	goto out;
 }
 
 /* Destroy the slot table */
@@ -4564,6 +4649,8 @@ static void nfs4_destroy_slot_table(struct nfs4_channel *channel)
 	 */
 	kfree(channel->slot_table.slots);
 	channel->slot_table.slots = NULL;
+	if (channel->slot_table.used_slots != &channel->slot_table._used_slots)
+		kfree(channel->slot_table.used_slots);
 
 	return;
 }
