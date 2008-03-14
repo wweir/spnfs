@@ -163,11 +163,9 @@ static int pnfs_recall_layout(void *data)
 {
 	struct inode *inode, *ino;
 	struct nfs_client *clp;
-	struct nfs_server *server = NULL;
 	struct cb_pnfs_layoutrecallargs rl;
 	struct recall_layout_threadargs *args =
 		(struct recall_layout_threadargs *)data;
-	struct nfs4_pnfs_layoutreturn_arg lr_arg;
 	int status;
 
 	daemonize("nfsv4-layoutreturn");
@@ -178,7 +176,6 @@ static int pnfs_recall_layout(void *data)
 
 	clp = args->clp;
 	inode = args->inode;
-	server = NFS_SERVER(inode);
 	rl = args->rl;
 	args->result = 0;
 	complete(&args->started);
@@ -195,7 +192,9 @@ static int pnfs_recall_layout(void *data)
  */
 
 	if (rl.cbl_recall_type == RECALL_FILE) {
-		pnfs_return_layout(inode, &rl.cbl_seg);
+		status = pnfs_return_layout(inode, &rl.cbl_seg, RECALL_FILE);
+		if (status)
+			dprintk("%s RECALL_FILE error: %d\n", __func__, status);
 		goto out;
 	}
 
@@ -204,22 +203,16 @@ static int pnfs_recall_layout(void *data)
 
 	/* FIXME: This loop is inefficient, running in O(|s_inodes|^2) */
 	while ((ino = nfs_layoutrecall_find_inode(clp, &rl)) != NULL) {
-		pnfs_return_layout(ino, &rl.cbl_seg);
+		/* XXX need to check status on pnfs_return_layout */
+		pnfs_return_layout(ino, &rl.cbl_seg, RECALL_FILE);
 		iput(ino);
 	}
 
 	/* send final layoutreturn */
-	lr_arg.reclaim = 0;
-	lr_arg.layout_type = server->pnfs_curr_ld->id;
-	lr_arg.return_type = rl.cbl_recall_type;
-	lr_arg.lseg = rl.cbl_seg;
-	lr_arg.inode = inode;
-
-	status = pnfs_return_layout_rpc(server, &lr_arg);
+	status = pnfs_return_layout(inode, &rl.cbl_seg, rl.cbl_recall_type);
 	if (status)
-		printk(KERN_INFO
-		       "%s: ignoring pnfs_return_layout_rpc status=%d\n",
-		       __func__, status);
+		printk(KERN_INFO "%s: ignoring pnfs_return_layout status=%d\n",
+				__func__, status);
 out:
 	iput(inode);
 	module_put_and_exit(0);
