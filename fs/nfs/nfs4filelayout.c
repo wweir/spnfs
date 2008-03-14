@@ -260,48 +260,40 @@ static int filelayout_read_pagelist(
 {
 	struct inode *inode = PNFS_INODE(layoutid);
 	struct nfs4_filelayout *nfslay = NULL;
-	struct nfs4_filelayout_segment *flseg = NULL;
+	struct nfs4_filelayout_segment *flseg;
 	struct nfs4_pnfs_dserver dserver;
 	int status;
 
-	if (layoutid) {
-		nfslay = PNFS_LD_DATA(layoutid);
-		flseg = LSEG_LD_DATA(data->lseg);
+	nfslay = PNFS_LD_DATA(layoutid);
+	flseg = LSEG_LD_DATA(data->lseg);
 
-		/* Retrieve the correct rpc_client for the byte range */
-		status = nfs4_pnfs_dserver_get(data->lseg,
-						offset,
-						count,
-						&dserver);
-		if (status) {
-			printk(KERN_ERR
-				"%s: dserver get failed status %d use MDS\n",
-				__func__, status);
-			data->pnfs_client = NFS_CLIENT(inode);
-			data->ds_nfs_client = NULL;
-			data->args.fh = NFS_FH(inode);
-			status = 0;
-		} else {
-			struct nfs4_pnfs_ds *ds = dserver.dev->ds_list[0];
-
-			/* just try the first data server for the index..*/
-			data->pnfs_client = ds->ds_clp->cl_rpcclient;
-			data->ds_nfs_client = ds->ds_clp;
-			data->args.fh = dserver.fh;
-
-			/* Now get the file offset on the dserver
-			 * Set the read offset to this offset, and
-			 * save the original offset in orig_offset
-			 */
-			data->args.offset =
-				filelayout_get_dserver_offset(offset, flseg);
-			data->orig_offset = offset;
-		}
-	} else { /* If no layout use MDS */
-		dprintk("%s: no layout, use MDS\n", __func__);
+	/* Retrieve the correct rpc_client for the byte range */
+	status = nfs4_pnfs_dserver_get(data->lseg,
+				       offset,
+				       count,
+				       &dserver);
+	if (status) {
+		printk(KERN_ERR "%s: dserver get failed status %d use MDS\n",
+		       __func__, status);
 		data->pnfs_client = NFS_CLIENT(inode);
 		data->ds_nfs_client = NULL;
 		data->args.fh = NFS_FH(inode);
+		status = 0;
+	} else {
+		struct nfs4_pnfs_ds *ds = dserver.dev->ds_list[0];
+
+		/* just try the first data server for the index..*/
+		data->pnfs_client = ds->ds_clp->cl_rpcclient;
+		data->ds_nfs_client = ds->ds_clp;
+		data->args.fh = dserver.fh;
+
+		/* Now get the file offset on the dserver
+		 * Set the read offset to this offset, and
+		 * save the original offset in orig_offset
+		 */
+		data->args.offset = filelayout_get_dserver_offset(offset,
+								  flseg);
+		data->orig_offset = offset;
 	}
 
 	/* Perform an asynchronous read */
