@@ -1754,19 +1754,10 @@ int nfs4_do_close(struct path *path, struct nfs4_state *state, int wait)
 	calldata->arg.seqid = nfs_alloc_seqid(&state->owner->so_seqid);
 	if (calldata->arg.seqid == NULL)
 		goto out_free_calldata;
-	switch (server->nfs_client->cl_minorversion) {
+	calldata->arg.stateid = &state->open_stateid;
 #ifdef CONFIG_NFS_V4_1
-	case 1:
-		calldata->arg.stateid = &state->stateid;
-		memset(&calldata->arg.stateid->data, 0, 4);
-		break;
+	memset(&calldata->arg.stateid->data, 0, 4);
 #endif /* CONFIG_NFS_V4_1 */
-	case 0:
-		calldata->arg.stateid = &state->open_stateid;
-		break;
-	default:
-		BUG();
-	}
 	calldata->arg.bitmask = server->attr_bitmask;
 	calldata->res.fattr = &calldata->fattr;
 	calldata->res.server = server;
