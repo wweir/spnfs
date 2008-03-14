@@ -5133,13 +5133,18 @@ static void nfs4_pnfs_layoutget_done(struct rpc_task *task, void *calldata)
 	struct nfs4_pnfs_layoutget *lgp = calldata;
 	struct inode *ino = lgp->args->inode;
 	struct nfs_server *server = NFS_SERVER(ino);
+	struct nfs_inode *nfsi = NFS_I(ino);
+	struct pnfs_layout_type *lo;
 
 	dprintk("--> %s\n", __func__);
 
 	nfs4_sequence_done(server, &lgp->res->seq_res, task->tk_status);
 	if (RPC_ASSASSINATED(task))
 		return;
+	lo = nfsi->current_layout;
+	BUG_ON(!lo);
 
+	pnfs_get_layout_done(lo, lgp, task->tk_status);
 	dprintk("<-- %s\n", __func__);
 }
 
@@ -5184,7 +5189,7 @@ static int nfs4_proc_pnfs_layoutget(struct nfs4_pnfs_layoutget *lgp)
 	}
 	status = nfs4_wait_for_completion_rpc_task(task);
 	if (status == 0)
-		status = task->tk_status;
+		status = lgp->status;
 	rpc_put_task(task);
 out:
 	dprintk("<-- %s\n", __func__);
