@@ -5240,20 +5240,86 @@ static int pnfs4_proc_layoutcommit(struct pnfs_layoutcommit_data *data)
 	return err;
 }
 
-static int pnfs4_proc_layoutreturn(struct nfs4_pnfs_layoutreturn *layout)
+static int
+nfs4_pnfs_layoutreturn_validate(struct rpc_task *task, void *calldata)
 {
-	struct inode *ino = layout->args->inode;
+	struct nfs4_pnfs_layoutreturn *lrp = calldata;
+	struct inode *ino = lrp->args->inode;
+	struct nfs_server *server = NFS_SERVER(ino);
+
+	dprintk("--> %s\n", __func__);
+	return nfs41_call_validate_seq_args(server, server->session,
+					    &lrp->args->seq_args,
+					    &lrp->res->seq_res,
+					    0, task);
+}
+
+static void nfs4_pnfs_layoutreturn_done(struct rpc_task *task, void *calldata)
+{
+	struct nfs4_pnfs_layoutreturn *lrp = calldata;
+	struct inode *ino = lrp->args->inode; struct nfs_server *server = NFS_SERVER(ino);
+
+	dprintk("--> %s\n", __func__);
+
+	nfs4_sequence_done(server, &lrp->res->seq_res, task->tk_status);
+	if (RPC_ASSASSINATED(task))
+		return;
+
+	dprintk("<-- %s\n", __func__);
+}
+
+static void nfs4_pnfs_layoutreturn_release(void *calldata)
+{
+	struct nfs4_pnfs_layoutreturn *lrp = calldata;
+	struct nfs_inode *nfsi = NFS_I(lrp->args->inode);
+	struct pnfs_layout_type *lo;
+
+	lo = nfsi->current_layout;
+	BUG_ON(!lo);
+
+	dprintk("--> %s\n", __func__);
+	pnfs_layout_release(lo);
+	dprintk("<-- %s\n", __func__);
+}
+
+static const struct rpc_call_ops nfs4_pnfs_layoutreturn_call_ops = {
+	.rpc_call_validate_args = nfs4_pnfs_layoutreturn_validate,
+	.rpc_call_done = nfs4_pnfs_layoutreturn_done,
+	.rpc_release = nfs4_pnfs_layoutreturn_release,
+};
+
+static int pnfs4_proc_layoutreturn(struct nfs4_pnfs_layoutreturn *lrp)
+{
+	struct inode *ino = lrp->args->inode;
+	struct nfs_server *server = NFS_SERVER(ino);
+	struct rpc_task *task;
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_PNFS_LAYOUTRETURN],
-		.rpc_argp = layout->args,
-		.rpc_resp = layout->res,
+		.rpc_argp = lrp->args,
+		.rpc_resp = lrp->res,
+	};
+	struct rpc_task_setup task_setup_data = {
+		.rpc_client = server->client,
+		.rpc_message = &msg,
+		.callback_ops = &nfs4_pnfs_layoutreturn_call_ops,
+		.callback_data = lrp,
+		.flags = RPC_TASK_ASYNC,
 	};
 	int status;
 
-	status = nfs4_call_sync(NFS_SERVER(ino), NFS_CLIENT(ino), &msg,
-				layout->args, layout->res, 0);
-	dprintk("NFS reply layoutreturn: %d\n", status);
+	dprintk("--> %s\n", __func__);
 
+	task = rpc_run_task(&task_setup_data);
+	if (IS_ERR(task)) {
+		status = PTR_ERR(task);
+		goto out;
+	}
+	status = nfs4_wait_for_completion_rpc_task(task);
+	if (status == 0)
+		status = task->tk_status;
+	rpc_put_task(task);
+out:
+	dprintk("<-- %s\n", __func__);
 	return status;
 }
 
