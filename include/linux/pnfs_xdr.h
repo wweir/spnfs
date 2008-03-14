@@ -58,6 +58,8 @@ struct nfs4_pnfs_layoutget_res {
 struct nfs4_pnfs_layoutget {
 	struct nfs4_pnfs_layoutget_arg *args;
 	struct nfs4_pnfs_layoutget_res *res;
+	struct pnfs_layout_segment **lsegpp;
+	int status;
 };
 
 struct pnfs_layoutcommit_arg {
