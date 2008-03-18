@@ -681,9 +681,13 @@ static int nfs4_stat_to_errno(int);
 #define NFS41_dec_sequence_sz \
 				0	/* stub */
 #define NFS41_enc_get_lease_time_sz	(compound_encode_hdr_maxsz + \
-					 0 /* stub */)
+					 encode_sequence_maxsz + \
+					 encode_putrootfh_maxsz + \
+					 encode_fsinfo_maxsz)
 #define NFS41_dec_get_lease_time_sz	(compound_decode_hdr_maxsz + \
-					 0 /* stub */)
+					 decode_sequence_maxsz + \
+					 decode_putrootfh_maxsz + \
+					 decode_fsinfo_maxsz)
 #define NFS41_enc_error_sz		(0)
 #define NFS41_dec_error_sz		(0)
 #endif /* CONFIG_NFS_V4_1 */
@@ -3129,9 +3133,26 @@ static int nfs41_xdr_enc_sequence(struct rpc_rqst *req, uint32_t *p,
  * a GET_LEASE_TIME request
  */
 static int nfs41_xdr_enc_get_lease_time(struct rpc_rqst *req, uint32_t *p,
-					void *args)
+					struct nfs4_get_lease_time_args *args)
 {
-	return -1;	/* stub */
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 3,
+	};
+	int status;
+	const u32 lease_bitmap[2] = { FATTR4_WORD0_LEASE_TIME, 0 };
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+	status = encode_sequence(&xdr, &args->la_seq_args);
+	if (status)
+		goto out;
+	status = encode_putrootfh(&xdr);
+	if (status)
+		goto out;
+	status = encode_fsinfo(&xdr, lease_bitmap);
+ out:
+	return status;
 }
 #endif /* CONFIG_NFS_V4_1 */
 
@@ -6460,9 +6481,23 @@ static int nfs41_xdr_dec_sequence(struct rpc_rqst *rqstp, uint32_t *p,
  * a GET_LEASE_TIME request
  */
 static int nfs41_xdr_dec_get_lease_time(struct rpc_rqst *rqstp, uint32_t *p,
-					void *res)
+					struct nfs4_get_lease_time_res *res)
 {
-	return -1;	/* stub */
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (!status)
+		status = decode_sequence(&xdr, &res->lr_seq_res);
+	if (!status)
+		status = decode_putrootfh(&xdr);
+	if (!status)
+		status = decode_fsinfo(&xdr, res->lr_fsinfo);
+	if (status)
+		status = -nfs4_stat_to_errno(hdr.status);
+	return status;
 }
 #endif /* CONFIG_NFS_V4_1 */
 
