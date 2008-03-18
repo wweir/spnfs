@@ -4436,6 +4436,123 @@ int nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
 	return _nfs4_proc_exchange_id(clp, cred);
 }
 
+struct nfs4_get_lease_time_data {
+	struct nfs4_get_lease_time_args *args;
+	struct nfs4_get_lease_time_res *res;
+	struct nfs_client *clp;
+	struct nfs4_session *session;
+};
+
+static void nfs4_get_lease_time_prepare(struct rpc_task *task,
+					void *calldata)
+{
+	int ret;
+	struct nfs4_get_lease_time_data *data =
+			(struct nfs4_get_lease_time_data *)calldata;
+
+	dprintk("--> %s\n", __func__);
+	/* just setup sequence, do not trigger session recovery
+	   since we're invoked within one */
+	ret = nfs41_setup_sequence(data->session,
+					&data->args->la_seq_args,
+					&data->res->lr_seq_res, 0, task);
+
+	BUG_ON(ret == -EAGAIN);
+	rpc_call_start(task);
+	dprintk("<-- %s\n", __func__);
+}
+
+static void nfs4_get_lease_time_done(struct rpc_task *task,
+					void *calldata)
+{
+	struct nfs4_get_lease_time_data *data =
+			(struct nfs4_get_lease_time_data *)calldata;
+
+	dprintk("--> %s\n", __func__);
+	nfs41_sequence_done(data->clp, data->session,
+				&data->res->lr_seq_res, task->tk_status);
+	dprintk("<-- %s\n", __func__);
+}
+
+struct rpc_call_ops nfs4_get_lease_time_ops = {
+	.rpc_call_prepare = nfs4_get_lease_time_prepare,
+	.rpc_call_done = nfs4_get_lease_time_done,
+};
+
+int nfs4_proc_get_lease_time(struct nfs_client *clp,
+		struct nfs4_session *session, struct nfs_fsinfo *fsinfo)
+{
+	struct rpc_task *task;
+	struct nfs4_get_lease_time_args args;
+	struct nfs4_get_lease_time_res res = {
+		.lr_fsinfo = fsinfo,
+	};
+	struct nfs4_get_lease_time_data data = {
+		.args = &args,
+		.res = &res,
+		.clp = clp,
+		.session = session,
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_GET_LEASE_TIME],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+	};
+	struct rpc_task_setup task_setup = {
+		.rpc_client = session->clnt,
+		.rpc_message = &msg,
+		.callback_ops = &nfs4_get_lease_time_ops,
+		.callback_data = &data
+	};
+	int status;
+
+	dprintk("--> %s\n", __func__);
+	task = rpc_run_task(&task_setup);
+
+	if (IS_ERR(task))
+		status = PTR_ERR(task);
+	else {
+		status = task->tk_status;
+		rpc_put_task(task);
+	}
+	dprintk("<-- %s return %d\n", __func__, status);
+
+	return status;
+}
+
+/* Initialize a slot table */
+int nfs4_init_slot_table(struct nfs4_channel *channel)
+{
+	int i;
+	struct nfs4_slot_table *tbl;
+	struct nfs4_slot *slot;
+	int ret = 0;
+
+	tbl = &channel->slot_table;
+
+	spin_lock(&tbl->slot_tbl_lock);
+
+	tbl->max_slots = channel->chan_attrs.max_reqs;
+
+	tbl->slots = kzalloc(channel->chan_attrs.max_reqs *
+				sizeof(struct nfs4_slot), GFP_ATOMIC);
+	if (!tbl->slots) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	for (i = 0; i < channel->chan_attrs.max_reqs; ++i) {
+		slot = &tbl->slots[i];
+		slot->slot_nr = i;
+		slot->seq_nr = 1;
+		slot->flags = 0;
+	}
+
+out:
+	spin_unlock(&tbl->slot_tbl_lock);
+	return ret;
+}
+
 /* Destroy the slot table */
 static void nfs4_destroy_slot_table(struct nfs4_channel *channel)
 {
