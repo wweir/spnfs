@@ -4455,11 +4455,16 @@ static void nfs4_get_lease_time_prepare(struct rpc_task *task,
 	struct nfs4_get_lease_time_data *data =
 			(struct nfs4_get_lease_time_data *)calldata;
 
+	dprintk("--> %s\n", __func__);
+	/* just setup sequence, do not trigger session recovery
+	   since we're invoked within one */
 	ret = nfs41_setup_sequence(data->session,
 					&data->args->la_seq_args,
 					&data->res->lr_seq_res, 0, task);
 
 	BUG_ON(ret == -EAGAIN);
+	rpc_call_start(task);
+	dprintk("<-- %s\n", __func__);
 }
 
 static void nfs4_get_lease_time_done(struct rpc_task *task,
@@ -4468,8 +4473,10 @@ static void nfs4_get_lease_time_done(struct rpc_task *task,
 	struct nfs4_get_lease_time_data *data =
 			(struct nfs4_get_lease_time_data *)calldata;
 
+	dprintk("--> %s\n", __func__);
 	nfs41_sequence_done(data->clp, data->session,
 				&data->res->lr_seq_res, task->tk_status);
+	dprintk("<-- %s\n", __func__);
 }
 
 struct rpc_call_ops nfs4_get_lease_time_ops = {
@@ -4504,6 +4511,7 @@ int nfs4_proc_get_lease_time(struct nfs_client *clp,
 	};
 	int status;
 
+	dprintk("--> %s\n", __func__);
 	task = rpc_run_task(&task_setup);
 
 	if (IS_ERR(task))
@@ -4512,6 +4520,7 @@ int nfs4_proc_get_lease_time(struct nfs_client *clp,
 		status = task->tk_status;
 		rpc_put_task(task);
 	}
+	dprintk("<-- %s return %d\n", __func__, status);
 
 	return status;
 }
