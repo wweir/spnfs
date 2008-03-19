@@ -4611,10 +4611,151 @@ void nfs4_put_session(struct nfs4_session **session)
 	dprintk("<-- nfs4_put_session()\n");
 }
 
+/* Initialize the values to be used by the client in CREATE_SESSION */
+static void nfs4_init_channel_attrs(struct nfs_client *clp,
+				    struct nfs4_channel_attrs *fc_attrs,
+				    struct nfs4_channel_attrs *bc_attrs)
+{
+	/* XXX: We need to have good values here... 32K is a wild guess */
+	fc_attrs->headerpadsz = bc_attrs->headerpadsz = 0;
+	fc_attrs->max_rqst_sz = bc_attrs->max_rqst_sz = NFS_MAX_FILE_IO_SIZE;
+	fc_attrs->max_resp_sz = bc_attrs->max_resp_sz = NFS_MAX_FILE_IO_SIZE;
+	fc_attrs->max_resp_sz_cached = bc_attrs->max_resp_sz_cached =
+		NFS_MAX_FILE_IO_SIZE;
+	fc_attrs->max_ops = bc_attrs->max_ops = 0xFFFFFFFF;
+	fc_attrs->max_reqs = bc_attrs->max_reqs =
+				clp->cl_rpcclient->cl_xprt->max_reqs;
+	fc_attrs->rdma_attrs = bc_attrs->rdma_attrs = 0;
+}
+
+/* Check the values returned by the server for CREATE_SESSION. Since we made
+ * our needs known, if the server gives us more than we need, we don't bother
+ * with it.
+ */
+static void nfs4_adjust_channel_attrs(struct nfs4_channel_attrs *req_attrs,
+				      struct nfs4_channel_attrs *resp_attrs)
+{
+	dprintk("%s: before adjusting: max_rqst_sz=%u max_resp_sz=%u "
+		"max_resp_sz_cached=%u max_ops=%u max_reqs=%u\n",
+		__func__,
+		resp_attrs->max_rqst_sz, resp_attrs->max_resp_sz,
+		resp_attrs->max_resp_sz_cached, resp_attrs->max_ops,
+		resp_attrs->max_reqs);
+
+	if (req_attrs->max_rqst_sz < resp_attrs->max_rqst_sz)
+		resp_attrs->max_rqst_sz = req_attrs->max_rqst_sz;
+
+	if (req_attrs->max_resp_sz < resp_attrs->max_resp_sz)
+		resp_attrs->max_resp_sz = req_attrs->max_resp_sz;
+
+	if (req_attrs->max_resp_sz_cached < resp_attrs->max_resp_sz)
+		resp_attrs->max_resp_sz = req_attrs->max_resp_sz_cached;
+
+	if (req_attrs->max_ops < resp_attrs->max_ops)
+		resp_attrs->max_ops = req_attrs->max_ops;
+
+	if (req_attrs->max_reqs < resp_attrs->max_reqs)
+		resp_attrs->max_reqs = req_attrs->max_reqs;
+
+	dprintk("%s: after  adjusting: max_rqst_sz=%u max_resp_sz=%u "
+		"max_resp_sz_cached=%u max_ops=%u max_reqs=%u\n",
+		__func__,
+		resp_attrs->max_rqst_sz, resp_attrs->max_resp_sz,
+		resp_attrs->max_resp_sz_cached, resp_attrs->max_ops,
+		resp_attrs->max_reqs);
+
+	/* We ignore the rdma channel attributes */
+}
+
+static int _nfs4_proc_create_session(struct nfs_client *clp,
+				     struct nfs4_session *session,
+				     struct rpc_clnt *clnt)
+{
+	struct nfs41_create_session_args args = {
+		.client = clp,
+		.session = session,
+		.cb_program = NFS4_CALLBACK,
+	};
+
+	struct nfs41_create_session_res res = {
+		.client = clp,
+		.session = session,
+	};
+
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_CREATE_SESSION],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+	};
+	int status;
+
+	nfs4_init_channel_attrs(clp, &args.fc_attrs, &args.bc_attrs);
+	args.flags = (SESSION4_PERSIST);
+
+	status = rpc_call_sync(clnt, &msg, 0);
+
+	/* Set the negotiated values in the session's channel_attrs struct */
+
+	if (!status) {
+		nfs4_adjust_channel_attrs(&args.fc_attrs,
+					&session->fore_channel.chan_attrs);
+		nfs4_adjust_channel_attrs(&args.bc_attrs,
+					&session->back_channel.chan_attrs);
+	}
+
+	return status;
+}
+
+/*
+ * Issues a CREATE_SESSION operation to the server.
+ * It is the responsibility of the caller to verify the session is
+ * expired before calling this routine.
+ */
 int nfs4_proc_create_session(struct nfs_client *clp,
 			     struct nfs4_session *session)
 {
-	return -1;	/* stub */
+	int status;
+	u32 *ptr;
+	struct nfs_fsinfo fsinfo;
+
+	dprintk("--> %s clp=%p session=%p\n", __func__, clp, session);
+	BUG_ON(session == NULL);
+
+	status = _nfs4_proc_create_session(clp, session, clp->cl_rpcclient);
+	if (status)
+		goto out;
+
+	session->clnt = clp->cl_rpcclient;
+
+	/* Init the fore channel */
+	status = nfs4_init_slot_table(&session->fore_channel);
+	dprintk("fore channel initialization returned %d\n", status);
+	if (status)
+		goto out;
+
+	dprintk("%s client>seqid %d\n", __func__, clp->cl_seqid);
+	ptr = (int *)session->sess_id;
+	dprintk("sessionid is: %u:%u:%u:%u\n", ptr[0], ptr[1], ptr[2], ptr[3]);
+
+	/* Get the lease time */
+	status = nfs4_proc_get_lease_time(clp, session, &fsinfo);
+	if (status == 0) {
+		/* Update lease time and schedule renewal */
+		spin_lock(&clp->cl_lock);
+		clp->cl_lease_time = fsinfo.lease_time * HZ;
+		clp->cl_last_renewal = jiffies;
+		clear_bit(NFS4CLNT_LEASE_EXPIRED, &clp->cl_state);
+		spin_unlock(&clp->cl_lock);
+
+		/* Increment session ID for use by next CREATE_SESSION */
+		clp->cl_seqid++;
+
+		nfs41_set_session_valid(session);	/* Activate session */
+		nfs4_schedule_state_renewal(clp);
+	}
+out:
+	dprintk("<-- %s\n", __func__);
+	return status;
 }
 
 int nfs4_proc_destroy_session(struct nfs_server *sp)
