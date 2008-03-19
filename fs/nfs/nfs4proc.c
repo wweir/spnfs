@@ -4826,7 +4826,7 @@ int nfs4_proc_create_session(struct nfs_client *clp,
 
 	dprintk("%s client>seqid %d\n", __func__, clp->cl_seqid);
 	ptr = (int *)session->sess_id;
-	dprintk("sessionid is: %d:%d:%d:%d\n", ptr[0], ptr[1], ptr[2], ptr[3]);
+	dprintk("sessionid is: %u:%u:%u:%u\n", ptr[0], ptr[1], ptr[2], ptr[3]);
 
 	/* Get the lease time */
 	status = nfs4_proc_get_lease_time(clp, session, &fsinfo);
