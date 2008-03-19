@@ -15,6 +15,7 @@
 #include <linux/wait.h>
 
 #include "internal.h"
+#include "nfs4_fs.h"
 
 struct nfs_unlinkdata {
 	struct hlist_node list;
@@ -101,9 +102,24 @@ static void nfs_async_unlink_release(void *calldata)
 	nfs_free_unlinkdata(data);
 }
 
+#if defined(CONFIG_NFS_V4_1)
+int nfs_unlink_validate(struct rpc_task *task, void *calldata)
+{
+	struct nfs_unlinkdata *data = calldata;
+	struct nfs_server *server = NFS_SERVER(data->dir);
+
+	return nfs41_call_validate_seq_args(server, server->session,
+					    &data->args.seq_args,
+					    &data->res.seq_res,
+					    1, task);
+}
+#endif /* CONFIG_NFS_V4_1 */
 static const struct rpc_call_ops nfs_unlink_ops = {
 	.rpc_call_done = nfs_async_unlink_done,
 	.rpc_release = nfs_async_unlink_release,
+#if defined(CONFIG_NFS_V4_1)
+	.rpc_call_validate_args = nfs_unlink_validate,
+#endif
 };
 
 static int nfs_do_call_unlink(struct dentry *parent, struct inode *dir, struct nfs_unlinkdata *data)

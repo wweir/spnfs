@@ -62,16 +62,32 @@ const nfs4_stateid zero_stateid;
 
 static LIST_HEAD(nfs4_clientid_list);
 
-static int nfs4_init_client(struct nfs_client *clp, struct rpc_cred *cred)
+int nfs4_init_clientid(struct nfs_client *clp, struct rpc_cred *cred)
 {
-	int status = nfs4_proc_setclientid(clp, NFS4_CALLBACK,
+	int status = -ENOENT;
+	if (cred == NULL)
+		return status;
+	status = nfs4_proc_setclientid(clp, NFS4_CALLBACK,
 			nfs_callback_tcpport, cred);
 	if (status == 0)
 		status = nfs4_proc_setclientid_confirm(clp, cred);
 	if (status == 0)
 		nfs4_schedule_state_renewal(clp);
+	put_rpccred(cred);
 	return status;
 }
+
+u64 nfs40_clientid(struct nfs_client *clp)
+{
+	return clp->cl_clientid;
+}
+
+#if defined(CONFIG_NFS_V4_1)
+u64 nfs41_clientid(struct nfs_client *clp)
+{
+	return 0;
+}
+#endif
 
 struct rpc_cred *nfs4_get_renew_cred(struct nfs_client *clp)
 {
@@ -703,15 +719,27 @@ static void nfs_increment_seqid(int status, struct nfs_seqid *seqid)
 	seqid->sequence->counter++;
 }
 
-void nfs_increment_open_seqid(int status, struct nfs_seqid *seqid)
+void __nfs_increment_open_seqid(int status, struct nfs_seqid *seqid)
 {
 	if (status == -NFS4ERR_BAD_SEQID) {
 		struct nfs4_state_owner *sp = container_of(seqid->sequence,
 				struct nfs4_state_owner, so_seqid);
 		nfs4_drop_state_owner(sp);
 	}
+}
+void nfs_increment_open_seqid(int status, struct nfs_seqid *seqid)
+{
+	__nfs_increment_open_seqid(status, seqid);
+
 	nfs_increment_seqid(status, seqid);
 }
+
+#if defined(CONFIG_NFS_V4_1)
+void nfs41_increment_open_seqid(int status, struct nfs_seqid *seqid)
+{
+	__nfs_increment_open_seqid(status, seqid);
+}
+#endif
 
 /*
  * Increment the seqid if the LOCK/LOCKU succeeded, or
@@ -722,6 +750,16 @@ void nfs_increment_lock_seqid(int status, struct nfs_seqid *seqid)
 {
 	nfs_increment_seqid(status, seqid);
 }
+
+/*
+ * XXX: Server bug!! needs to set counter to 0, not increment
+ */
+#if defined(CONFIG_NFS_V4_1)
+void nfs41_increment_lock_seqid(int status, struct nfs_seqid *seqid)
+{
+	return;
+}
+#endif
 
 int nfs_wait_on_sequence(struct nfs_seqid *seqid, struct rpc_task *task)
 {
@@ -919,24 +957,26 @@ static int reclaimer(void *ptr)
 	lock_kernel();
 	down_write(&clp->cl_sem);
 	/* Are there any NFS mounts out there? */
+	/* FIXME
 	if (list_empty(&clp->cl_superblocks))
 		goto out;
+	*/
 restart_loop:
 	dprintk("%s: starting loop\n", __func__);
-	ops = &nfs4_network_partition_recovery_ops;
+	ops = nfs4_network_partition_recovery_ops[clp->cl_minorversion];
 	/* Are there any open files on this volume? */
 	cred = nfs4_get_renew_cred(clp);
 	if (cred != NULL) {
 		/* Yes there are: try to renew the old lease */
-		status = nfs4_proc_renew(clp, cred);
+		status = ops->renew_lease(clp, cred);
 		switch (status) {
-			case 0:
-			case -NFS4ERR_CB_PATH_DOWN:
-				put_rpccred(cred);
-				goto out;
-			case -NFS4ERR_STALE_CLIENTID:
-			case -NFS4ERR_LEASE_MOVED:
-				ops = &nfs4_reboot_recovery_ops;
+		case 0:
+		case -NFS4ERR_CB_PATH_DOWN:
+			put_rpccred(cred);
+			goto out;
+		case -NFS4ERR_STALE_CLIENTID:
+		case -NFS4ERR_LEASE_MOVED:
+			ops = nfs4_reboot_recovery_ops[clp->cl_minorversion];
 		}
 	} else {
 		/* "reboot" to ensure we clear all state on the server */
@@ -945,11 +985,7 @@ restart_loop:
 	}
 	/* We're going to have to re-establish a clientid */
 	nfs4_state_mark_reclaim(clp);
-	status = -ENOENT;
-	if (cred != NULL) {
-		status = nfs4_init_client(clp, cred);
-		put_rpccred(cred);
-	}
+	status = ops->establish_clid(clp, cred);
 	if (status)
 		goto out_error;
 	/* Mark all delegations for reclaim */
@@ -960,7 +996,8 @@ restart_loop:
 		status = nfs4_reclaim_open_state(ops, sp);
 		if (status < 0) {
 			if (status == -NFS4ERR_NO_GRACE) {
-				ops = &nfs4_network_partition_recovery_ops;
+				ops = nfs4_network_partition_recovery_ops[
+							clp->cl_minorversion];
 				status = nfs4_reclaim_open_state(ops, sp);
 			}
 			if (status == -NFS4ERR_STALE_CLIENTID)
