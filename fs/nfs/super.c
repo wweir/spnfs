@@ -1972,11 +1972,27 @@ static void nfs4_kill_super(struct super_block *sb)
 {
 	struct nfs_server *server = NFS_SB(sb);
 
+	dprintk("--> %s\n", __func__);
 	nfs_return_all_delegations(sb);
 	kill_anon_super(sb);
 
+#if defined(CONFIG_NFS_V4_1)
+	switch (server->nfs_client->cl_minorversion) {
+	case 1:
+		if (server->session) {
+			dprintk("%s Destroy session %p for nfs_server %p\n",
+				__func__, server->session, server);
+			nfs4_proc_destroy_session(server);
+		}
+		break;
+	default:
+		/* Fall-through */
+		break;
+	}
+#endif /* CONFIG_NFS_V4_1 */
 	nfs4_renewd_prepare_shutdown(server);
 	nfs_free_server(server);
+	dprintk("<-- %s\n", __func__);
 }
 
 /*
