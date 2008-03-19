@@ -162,6 +162,12 @@ struct nfs4_exception {
 struct nfs4_state_recovery_ops {
 	int (*recover_open)(struct nfs4_state_owner *, struct nfs4_state *);
 	int (*recover_lock)(struct nfs4_state *, struct file_lock *);
+	int (*renew_lease)(struct nfs_client *, struct rpc_cred *);
+	int (*establish_clid)(struct nfs_client *, struct rpc_cred *);
+};
+
+struct nfs4_state_maintenance_ops {
+	int (*sched_state_renewal)(struct nfs_client *, struct rpc_cred *);
 };
 
 extern struct dentry_operations nfs4_dentry_operations;
@@ -179,6 +185,12 @@ extern int nfs4_proc_setclientid(struct nfs_client *, u32, unsigned short, struc
 extern int nfs4_proc_setclientid_confirm(struct nfs_client *, struct rpc_cred *);
 extern int nfs4_proc_async_renew(struct nfs_client *, struct rpc_cred *);
 extern int nfs4_proc_renew(struct nfs_client *, struct rpc_cred *);
+extern int nfs4_wait_bit_killable(void *);
+extern int nfs4_init_clientid(struct nfs_client *, struct rpc_cred *);
+extern u64 nfs40_clientid(struct nfs_client *clp);
+#if defined(CONFIG_NFS_V4_1)
+extern u64 nfs41_clientid(struct nfs_client *clp);
+#endif /* CONFIG_NFS_V4_1 */
 extern int nfs4_do_close(struct path *path, struct nfs4_state *state, int wait);
 extern struct dentry *nfs4_atomic_open(struct inode *, struct dentry *, struct nameidata *);
 extern int nfs4_open_revalidate(struct inode *, struct dentry *, int, struct nameidata *);
@@ -186,8 +198,18 @@ extern int nfs4_server_capabilities(struct nfs_server *server, struct nfs_fh *fh
 extern int nfs4_proc_fs_locations(struct inode *dir, const struct qstr *name,
 		struct nfs4_fs_locations *fs_locations, struct page *page);
 
-extern struct nfs4_state_recovery_ops nfs4_reboot_recovery_ops;
-extern struct nfs4_state_recovery_ops nfs4_network_partition_recovery_ops;
+extern struct nfs4_state_recovery_ops *nfs4_reboot_recovery_ops[];
+extern struct nfs4_state_recovery_ops *nfs4_network_partition_recovery_ops[];
+#if defined(CONFIG_NFS_V4_1)
+extern int nfs41_call_validate_seq_args(struct nfs_server *server,
+	struct nfs4_session *session, void *args, void *res, int cache_this,
+	struct rpc_task *task);
+extern void nfs4_put_session(struct nfs4_session **session);
+extern struct nfs4_session *nfs4_alloc_session(void);
+extern int nfs4_proc_destroy_session(struct nfs_server *sp);
+#endif /* CONFIG_NFS_V4_1 */
+
+extern struct nfs4_state_maintenance_ops *nfs4_state_renewal_ops[];
 
 extern const u32 nfs4_fattr_bitmap[2];
 extern const u32 nfs4_statfs_bitmap[2];
@@ -221,6 +243,10 @@ extern struct nfs_seqid *nfs_alloc_seqid(struct nfs_seqid_counter *counter);
 extern int nfs_wait_on_sequence(struct nfs_seqid *seqid, struct rpc_task *task);
 extern void nfs_increment_open_seqid(int status, struct nfs_seqid *seqid);
 extern void nfs_increment_lock_seqid(int status, struct nfs_seqid *seqid);
+#if defined(CONFIG_NFS_V4_1)
+extern void nfs41_increment_open_seqid(int status, struct nfs_seqid *seqid);
+extern void nfs41_increment_lock_seqid(int status, struct nfs_seqid *seqid);
+#endif /* CONFIG_NFS_V4_1 */
 extern void nfs_free_seqid(struct nfs_seqid *seqid);
 
 extern const nfs4_stateid zero_stateid;
