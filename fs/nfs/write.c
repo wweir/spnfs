@@ -25,6 +25,7 @@
 #include "delegation.h"
 #include "internal.h"
 #include "iostat.h"
+#include "nfs4_fs.h"
 
 #define NFSDBG_FACILITY		NFSDBG_PAGECACHE
 
@@ -1013,7 +1014,24 @@ out:
 		nfs_writepage_release(req);
 }
 
+#if defined(CONFIG_NFS_V4_1)
+int nfs_write_validate(struct rpc_task *task, void *calldata)
+{
+	struct nfs_write_data *data = calldata;
+	struct nfs_server *server = NFS_SERVER(data->inode);
+	struct nfs4_session *session = server->session;
+
+	return nfs41_call_validate_seq_args(server, session,
+					    &data->args.seq_args,
+					    &data->res.seq_res,
+					    1, task);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 static const struct rpc_call_ops nfs_write_partial_ops = {
+#if defined(CONFIG_NFS_V4_1)
+	.rpc_call_validate_args = nfs_write_validate,
+#endif
 	.rpc_call_done = nfs_writeback_done_partial,
 	.rpc_release = nfs_writedata_release,
 };
@@ -1072,6 +1090,9 @@ remove_request:
 }
 
 static const struct rpc_call_ops nfs_write_full_ops = {
+#if defined(CONFIG_NFS_V4_1)
+	.rpc_call_validate_args = nfs_write_validate,
+#endif
 	.rpc_call_done = nfs_writeback_done_full,
 	.rpc_release = nfs_writedata_release,
 };
@@ -1304,6 +1325,9 @@ static void nfs_commit_done(struct rpc_task *task, void *calldata)
 }
 
 static const struct rpc_call_ops nfs_commit_ops = {
+#if defined(CONFIG_NFS_V4_1)
+	.rpc_call_validate_args = nfs_write_validate,
+#endif
 	.rpc_call_done = nfs_commit_done,
 	.rpc_release = nfs_commit_release,
 };
