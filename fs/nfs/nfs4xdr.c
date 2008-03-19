@@ -1650,14 +1650,21 @@ static int encode_sequence(struct xdr_stream *xdr,
 {
 	__be32 *p;
 
+	WARN_ON(args->sa_slotid < 0);
+
 	RESERVE_SPACE(4);
 	WRITE32(OP_SEQUENCE);
 
 	/*
 	 * Sessionid + seqid + slotid + max slotid + cache_this
 	 */
-	dprintk("%s: sessionid=%d slotid=%d max_slotid=%d cache_this=%d\n",
-		__func__, args->sa_seqid, args->sa_slotid, args->sa_max_slotid,
+	dprintk("%s: sessionid=%u:%u:%u:u seqid=%d slotid=%d "
+		"max_slotid=%d cache_this=%d\n",
+		__func__, ((u32 *)args->sa_sessionid.data)[0],
+		((u32 *)args->sa_sessionid.data)[1],
+		((u32 *)args->sa_sessionid.data)[2],
+		((u32 *)args->sa_sessionid.data)[3],
+		args->sa_seqid, args->sa_slotid, args->sa_max_slotid,
 		args->sa_cache_this);
 	RESERVE_SPACE(NFS4_MAX_SESSIONID_LEN + 16);
 	WRITEMEM(args->sa_sessionid.data, NFS4_MAX_SESSIONID_LEN);
