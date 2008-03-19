@@ -22,6 +22,7 @@
 
 #include <asm/system.h>
 
+#include "nfs4_fs.h"
 #include "internal.h"
 #include "iostat.h"
 
@@ -177,6 +178,7 @@ static void nfs_read_rpcsetup(struct nfs_page *req, struct nfs_read_data *data,
 		.flags = RPC_TASK_ASYNC | swap_flags,
 	};
 
+	BUG_ON(data->args.server == NULL);
 	data->req	  = req;
 	data->inode	  = inode;
 	data->cred	  = msg.rpc_cred;
@@ -253,6 +255,7 @@ static int nfs_pagein_multi(struct inode *inode, struct list_head *head, unsigne
 		data = nfs_readdata_alloc(1);
 		if (!data)
 			goto out_bad;
+		data->args.server = NFS_SERVER(inode);
 		INIT_LIST_HEAD(&data->pages);
 		list_add(&data->pages, &list);
 		requests++;
@@ -300,6 +303,7 @@ static int nfs_pagein_one(struct inode *inode, struct list_head *head, unsigned 
 	if (!data)
 		goto out_bad;
 
+	data->args.server = NFS_SERVER(inode);
 	INIT_LIST_HEAD(&data->pages);
 	pages = data->pagevec;
 	while (!list_empty(head)) {
@@ -390,7 +394,24 @@ static void nfs_readpage_result_partial(struct rpc_task *task, void *calldata)
 	}
 }
 
+#if defined(CONFIG_NFS_V4_1)
+int nfs_read_validate(struct rpc_task *task, void *calldata)
+{
+	struct nfs_read_data *data = calldata;
+	struct nfs_server *server = data->args.server;
+	struct nfs4_session *session = server->session;
+
+	return nfs41_call_validate_seq_args(server, session,
+					    &data->args.seq_args,
+					    &data->res.seq_res,
+					    0, task);
+}
+#endif /* CONFIG_NFS_V4_1 */
+
 static const struct rpc_call_ops nfs_read_partial_ops = {
+#if defined(CONFIG_NFS_V4_1)
+	.rpc_call_validate_args = nfs_read_validate,
+#endif
 	.rpc_call_done = nfs_readpage_result_partial,
 	.rpc_release = nfs_readdata_release,
 };
@@ -448,6 +469,9 @@ static void nfs_readpage_result_full(struct rpc_task *task, void *calldata)
 }
 
 static const struct rpc_call_ops nfs_read_full_ops = {
+#if defined(CONFIG_NFS_V4_1)
+	.rpc_call_validate_args = nfs_read_validate,
+#endif
 	.rpc_call_done = nfs_readpage_result_full,
 	.rpc_release = nfs_readdata_release,
 };

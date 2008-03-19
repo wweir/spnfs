@@ -1064,11 +1064,13 @@ struct nfs_rpc_ops {
 	int	(*file_release) (struct inode *, struct file *);
 	int	(*lock)(struct file *, int, struct file_lock *);
 	void	(*clear_acl_cache)(struct inode *);
-	int 	(*validate_sequence_args)(struct nfs_server *,
+#if defined(CONFIG_NFS_V4_1)
+	int	(*validate_sequence_args)(struct nfs4_session *,
 						void *args,
 						void *res,
 						int,
 						struct rpc_task *);
+#endif /* CONFIG_NFS_V4_1 */
 	void 	(*increment_open_seqid)(int status, struct nfs_seqid *seqid);
 	void 	(*increment_lock_seqid)(int status, struct nfs_seqid *seqid);
 	u64	(*nfs4_clientid)(struct nfs_client *);
