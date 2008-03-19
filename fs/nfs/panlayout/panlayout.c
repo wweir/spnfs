@@ -187,6 +187,41 @@ panlayout_commit(struct pnfs_layout_type *pnfslay,
 void
 panlayout_read_done(struct panlayout_io_state *state)
 {
+	int status = state->status;
+	int eof = state->eof;
+	struct nfs_read_data *rdata;
+
+	dprintk("%s: Begin status=%d eof=%d\n", __func__, status, eof);
+	rdata = state->rpcdata;
+	rdata->task.tk_status = status;
+	if (status >= 0) {
+		rdata->res.count = status;
+		rdata->res.eof = eof;
+	}
+	panlayout_iodone(state);
+	/* must not use state after this point */
+
+	pnfs_client_ops->nfs_readlist_complete(rdata);
+}
+
+static inline u64
+end_offset(u64 start, u64 len)
+{
+	u64 end;
+
+	end = start + len;
+	return end >= start ? end: NFS4_LENGTH_EOF;
+}
+
+/* last octet in a range */
+static inline u64
+last_byte_offset(u64 start, u64 len)
+{
+	u64 end;
+
+	BUG_ON(!len);
+	end = start + len;
+	return end > start ? end - 1: NFS4_LENGTH_EOF;
 }
 
 /*
@@ -201,14 +236,76 @@ panlayout_read_pagelist(struct pnfs_layout_type *pnfs_layout_type,
 			size_t count,
 			struct nfs_read_data *rdata)
 {
-	int status = -EIO;
-	dprintk("%s: Return %d\n", __func__, status);
+	struct inode *inode = PNFS_INODE(pnfs_layout_type);
+	struct pnfs_layout_segment *lseg = rdata->lseg;
+	struct panlayout_io_state *state = NULL;
+	ssize_t status = 0;
+	loff_t eof;
+	u64 lseg_end_offset;
+
+	dprintk("%s: Begin inode %p offset %llu count %d\n",
+		__func__, inode, offset, (int)count);
+
+	eof = i_size_read(inode);
+	if (unlikely(offset + count > eof)) {
+		if (offset >= eof) {
+			status = 0;
+			rdata->res.count = 0;
+			rdata->res.eof = 1;
+			goto out;
+		}
+		count = eof - offset;
+	}
+
+	BUG_ON(offset < lseg->range.offset);
+	lseg_end_offset = end_offset(lseg->range.offset, lseg->range.length);
+	BUG_ON(offset >= lseg_end_offset);
+
+	if (offset + count > lseg_end_offset)
+		count = lseg_end_offset - offset;
+
+	state = panlayout_alloc_io_state();
+	if (unlikely(!state)) {
+		status = -ENOMEM;
+		goto out;
+	}
+
+	state->lseg = lseg;
+	state->rpcdata = rdata;
+	state->eof = offset + count >= eof;
+
+	status = panfs_shim_read_pagelist(state, pages, pgbase,
+					  nr_pages, offset, count, 0);
+ out:
+	dprintk("%s: Return status %Zd\n", __func__, status);
 	return status;
 }
 
 void
 panlayout_write_done(struct panlayout_io_state *state)
 {
+	struct nfs_write_data *wdata;
+
+	dprintk("%s: Begin\n", __func__);
+	wdata = state->rpcdata;
+	wdata->task.tk_status = state->status;
+	if (state->status >= 0) {
+		struct panlayout *panlay = PNFS_LD_DATA(wdata->lseg->layout);
+
+		wdata->res.count = state->status;
+		wdata->verf.committed = state->committed;
+		atomic64_add(state->delta_space_used,
+			     &panlay->delta_space_used);
+		dprintk("%s: Return status %d committed %d space_used %lld\n",
+			__func__, wdata->task.tk_status,
+			wdata->verf.committed, state->delta_space_used);
+	} else
+		dprintk("%s: Return status %d\n",
+			__func__, wdata->task.tk_status);
+	panlayout_iodone(state);
+	/* must not use state after this point */
+
+	pnfs_client_ops->nfs_writelist_complete(wdata);
 }
 
 /*
@@ -224,8 +321,34 @@ panlayout_write_pagelist(struct pnfs_layout_type *pnfs_layout_type,
 			 int stable,
 			 struct nfs_write_data *wdata)
 {
-	int status = -EIO;
-	dprintk("%s: Return %d\n", __func__, status);
+	struct inode *inode = PNFS_INODE(pnfs_layout_type);
+	struct pnfs_layout_segment *lseg;
+	struct panlayout_io_state *state = NULL;
+	ssize_t status = 0;
+	u64 lseg_end_offset;
+
+	dprintk("%s: Begin inode %p offset %llu count %d\n",
+		__func__, inode, offset, (int)count);
+
+	lseg = wdata->lseg;
+	BUG_ON(offset < lseg->range.offset);
+	lseg_end_offset = end_offset(lseg->range.offset, lseg->range.length);
+	BUG_ON(offset + count > lseg_end_offset);
+
+	state = panlayout_alloc_io_state();
+	if (unlikely(!state)) {
+		status = -ENOMEM;
+		goto out;
+	}
+
+	state->lseg = lseg;
+	state->rpcdata = wdata;
+
+	status = panfs_shim_write_pagelist(state, pages, pgbase,
+					   nr_pages, offset, count, 0,
+					   stable);
+ out:
+	dprintk("%s: Return status %Zd\n", __func__, status);
 	return status;
 }
 
