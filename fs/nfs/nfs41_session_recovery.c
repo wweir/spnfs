@@ -149,7 +149,7 @@ int nfs41_recover_session(struct nfs_client *clp, struct nfs4_session *session)
 	if (ret) {
 		dprintk("%s: session_recovery already started\n", __func__);
 		ret = 0;
-		goto err;
+		goto out;
 	}
 
 	ret = -ENOMEM;
