@@ -62,6 +62,10 @@ panlayout_alloc_layout(struct pnfs_mount_type *mountid, struct inode *inode)
 
 	pnfslay = kzalloc(sizeof(struct pnfs_layout_type) +
 			  sizeof(struct panlayout), GFP_KERNEL);
+	if (pnfslay) {
+		struct panlayout *panlay = PNFS_LD_DATA(pnfslay);
+		panlayout_atomic64_init(&panlay->delta_space_used);
+	}
 	dprintk("%s: Return %p\n", __func__, pnfslay);
 	return pnfslay;
 }
@@ -294,8 +298,8 @@ panlayout_write_done(struct panlayout_io_state *state)
 
 		wdata->res.count = state->status;
 		wdata->verf.committed = state->committed;
-		atomic64_add(state->delta_space_used,
-			     &panlay->delta_space_used);
+		panlayout_atomic64_add(state->delta_space_used,
+				       &panlay->delta_space_used);
 		dprintk("%s: Return status %d committed %d space_used %lld\n",
 			__func__, wdata->task.tk_status,
 			wdata->verf.committed, state->delta_space_used);
@@ -365,7 +369,7 @@ panlayout_setup_layoutcommit(struct pnfs_layout_type *pnfslay,
 
 	panlay = PNFS_LD_DATA(pnfslay);
 
-	delta = atomic64_xchg(&panlay->delta_space_used, 0);
+	delta = panlayout_atomic64_xchg(&panlay->delta_space_used, 0);
 
 	if (!delta)
 		goto out;
