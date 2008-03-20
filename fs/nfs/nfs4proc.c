@@ -2020,9 +2020,12 @@ static int _nfs4_lookup_root(struct nfs_server *server, struct nfs_fh *fhandle,
 	nfs_fattr_init(info->fattr);
 
 	NFS4_VALIDATE_STATE(server);
+	status = nfs4_recover_expired_lease(server);
+	if (status != 0)
+		goto out;
 	status = nfs4_call_sync(server, server->client, &msg,
 				&args, &res, 0);
-
+out:
 	dprintk("<-- %s status= %d\n", __func__, status);
 	return status;
 }
