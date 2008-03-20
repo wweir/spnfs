@@ -297,7 +297,6 @@ static int filelayout_read_pagelist(
 	}
 
 	/* Perform an asynchronous read */
-	BUG_ON(data->pnfsflags & PNFS_ISSYNC);
 	nfs_initiate_read(data, data->pnfs_client, &filelayout_read_call_ops);
 
 	/* In the case of aync reads, the offset will be reset in the
@@ -543,7 +542,6 @@ static int filelayout_write_pagelist(
 	/* Perform an asynchronous write The offset will be reset in the
 	 * call_ops->rpc_call_done() routine
 	 */
-	BUG_ON(data->pnfsflags & PNFS_ISSYNC);
 	nfs_initiate_write(data, data->pnfs_client,
 			&filelayout_write_call_ops, sync);
 
