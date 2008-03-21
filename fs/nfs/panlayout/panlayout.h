@@ -93,7 +93,7 @@ static inline s64 panlayout_atomic64_xchg(struct panlayout_atomic64 *p, s64 val)
 }
 #else  /* BITS_PER_LONG == 64 */
 struct panlayout_atomic64 {
-	spin_lock_t lock;
+	spinlock_t lock;
 	s64 val;
 };
 
