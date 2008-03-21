@@ -282,7 +282,8 @@ panlayout_read_pagelist(struct pnfs_layout_type *pnfs_layout_type,
 					  nr_pages, offset, count, 0);
  out:
 	dprintk("%s: Return status %Zd\n", __func__, status);
-	return status;
+	rdata->pnfs_error = status;
+	return 0;
 }
 
 void
@@ -353,7 +354,8 @@ panlayout_write_pagelist(struct pnfs_layout_type *pnfs_layout_type,
 					   stable);
  out:
 	dprintk("%s: Return status %Zd\n", __func__, status);
-	return status;
+	wdata->pnfs_error = status;
+	return 0;
 }
 
 int
