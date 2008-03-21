@@ -63,11 +63,86 @@ struct panlayout_segment {
 	u8 pnfs_osd_layout[];
 };
 
+#if BITS_PER_LONG == 64
+struct panlayout_atomic64 {
+	atomic64_t val;
+};
+
+static inline void panlayout_atomic64_init(struct panlayout_atomic64 *p)
+{
+}
+
+static inline s64 panlayout_atomic64_read(struct panlayout_atomic64 *p)
+{
+	return atomic64_read(&p->val);
+}
+
+static inline void panlayout_atomic64_set(struct panlayout_atomic64 *p, s64 val)
+{
+	atomic64_set(&p->val, val);
+}
+
+static inline void panlayout_atomic64_add(s64 val, struct panlayout_atomic64 *p)
+{
+	atomic64_add(val, &p->val);
+}
+
+static inline s64 panlayout_atomic64_xchg(struct panlayout_atomic64 *p, s64 val)
+{
+	return atomic64_xchg(&p->val, val);
+}
+#else  /* BITS_PER_LONG == 64 */
+struct panlayout_atomic64 {
+	spinlock_t lock;
+	s64 val;
+};
+
+static inline void panlayout_atomic64_init(struct panlayout_atomic64 *p)
+{
+	spin_lock_init(&p->lock);
+}
+
+static inline s64 panlayout_atomic64_read(struct panlayout_atomic64 *p)
+{
+	s64 val;
+
+	spin_lock(&p->lock);
+	val = p->val;
+	spin_unlock(&p->lock);
+	return val;
+}
+
+static inline void panlayout_atomic64_set(struct panlayout_atomic64 *p, s64 val)
+{
+	spin_lock(&p->lock);
+	p->val = val;
+	spin_unlock(&p->lock);
+}
+
+static inline void panlayout_atomic64_add(s64 val, struct panlayout_atomic64 *p)
+{
+	spin_lock(&p->lock);
+	p->val += val;
+	spin_unlock(&p->lock);
+}
+
+static inline s64 panlayout_atomic64_xchg(struct panlayout_atomic64 *p, s64 val)
+{
+	s64 old;
+
+	spin_lock(&p->lock);
+	old = p->val;
+	p->val = val;
+	spin_unlock(&p->lock);
+	return old;
+}
+#endif /* BITS_PER_LONG == 64 */
+
 /*
  * per-inode layout
  */
 struct panlayout {
-	atomic64_t delta_space_used;       /* space consumed by write ops */
+	struct panlayout_atomic64 delta_space_used;  /* consumed by write ops */
 };
 
 /*
