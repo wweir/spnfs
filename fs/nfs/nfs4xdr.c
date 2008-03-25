@@ -91,7 +91,7 @@ static int nfs4_stat_to_errno(int);
 #define encode_getfh_maxsz      (op_encode_hdr_maxsz)
 #define decode_getfh_maxsz      (op_decode_hdr_maxsz + 1 + \
 				((3+NFS4_FHSIZE) >> 2))
-#define nfs4_fattr_bitmap_maxsz 3
+#define nfs4_fattr_bitmap_maxsz 4
 #define encode_getattr_maxsz    (op_encode_hdr_maxsz + nfs4_fattr_bitmap_maxsz)
 #define nfs4_name_maxsz		(1 + ((3 + NFS4_MAXNAMLEN) >> 2))
 #define nfs4_path_maxsz		(1 + ((3 + NFS4_MAXPATHLEN) >> 2))
@@ -113,7 +113,12 @@ static int nfs4_stat_to_errno(int);
 #define encode_restorefh_maxsz  (op_encode_hdr_maxsz)
 #define decode_restorefh_maxsz  (op_decode_hdr_maxsz)
 #define encode_fsinfo_maxsz	(encode_getattr_maxsz)
+#if !defined(CONFIG_PNFS)
 #define decode_fsinfo_maxsz	(op_decode_hdr_maxsz + 11)
+#else /* CONFIG_PNFS */
+/* The size 15 assumes only a single layoutdriver is returned. */
+#define decode_fsinfo_maxsz	(op_decode_hdr_maxsz + 15)
+#endif /* CONFIG_PNFS */
 #define encode_renew_maxsz	(op_encode_hdr_maxsz + 3)
 #define decode_renew_maxsz	(op_decode_hdr_maxsz)
 #define encode_setclientid_maxsz \
@@ -1079,6 +1084,32 @@ static int encode_getattr_two(struct xdr_stream *xdr, uint32_t bm0, uint32_t bm1
         return 0;
 }
 
+static int encode_getattr_three(struct xdr_stream *xdr,
+				uint32_t bm0, uint32_t bm1, uint32_t bm2)
+{
+	__be32 *p;
+
+	RESERVE_SPACE(4);
+	WRITE32(OP_GETATTR);
+	if (bm2) {
+		RESERVE_SPACE(16);
+		WRITE32(3);
+		WRITE32(bm0);
+		WRITE32(bm1);
+		WRITE32(bm2);
+	} else if (bm1) {
+		RESERVE_SPACE(12);
+		WRITE32(2);
+		WRITE32(bm0);
+		WRITE32(bm1);
+	} else {
+		RESERVE_SPACE(8);
+		WRITE32(1);
+		WRITE32(bm0);
+	}
+	return 0;
+}
+
 static int encode_getfattr(struct xdr_stream *xdr, const u32* bitmask)
 {
 	return encode_getattr_two(xdr,
@@ -1088,8 +1119,10 @@ static int encode_getfattr(struct xdr_stream *xdr, const u32* bitmask)
 
 static int encode_fsinfo(struct xdr_stream *xdr, const u32* bitmask)
 {
-	return encode_getattr_two(xdr, bitmask[0] & nfs4_fsinfo_bitmap[0],
-			bitmask[1] & nfs4_fsinfo_bitmap[1]);
+	return encode_getattr_three(xdr,
+			bitmask[0] & nfs4_fsinfo_bitmap[0],
+			bitmask[1] & nfs4_fsinfo_bitmap[1],
+			bitmask[2] & nfs4_fsinfo_bitmap[2]);
 }
 
 #ifdef CONFIG_PNFS
@@ -3737,12 +3770,15 @@ static int decode_attr_bitmap(struct xdr_stream *xdr, uint32_t *bitmap)
 	READ_BUF(4);
 	READ32(bmlen);
 
-	bitmap[0] = bitmap[1] = 0;
+	bitmap[0] = bitmap[1] = bitmap[2] = 0;
 	READ_BUF((bmlen << 2));
 	if (bmlen > 0) {
 		READ32(bitmap[0]);
-		if (bmlen > 1)
+		if (bmlen > 1) {
 			READ32(bitmap[1]);
+			if (bmlen > 2)
+				READ32(bitmap[2]);
+		}
 	}
 	return 0;
 }
@@ -3763,8 +3799,9 @@ static int decode_attr_supported(struct xdr_stream *xdr, uint32_t *bitmap, uint3
 		decode_attr_bitmap(xdr, bitmask);
 		bitmap[0] &= ~FATTR4_WORD0_SUPPORTED_ATTRS;
 	} else
-		bitmask[0] = bitmask[1] = 0;
-	dprintk("%s: bitmask=%08x:%08x\n", __func__, bitmask[0], bitmask[1]);
+		bitmask[0] = bitmask[1] = bitmask[2] = 0;
+	dprintk("%s: bitmask=%08x:%08x:%08x\n", __func__,
+				bitmask[0], bitmask[1], bitmask[2]);
 	return 0;
 }
 
@@ -4493,6 +4530,24 @@ static int decode_attr_pnfstype(struct xdr_stream *xdr, uint32_t *bitmap,
 }
 
 /*
+ * The prefered block size for layout directed io
+ */
+static int decode_attr_layout_blksize(struct xdr_stream *xdr, uint32_t *bitmap,
+				      uint32_t *res)
+{
+	__be32 *p;
+
+	dprintk("%s: bitmap is %x\n", __func__, bitmap[2]);
+	*res = 0;
+	if (likely(bitmap[2] & FATTR4_WORD2_LAYOUT_BLKSIZE)) {
+		READ_BUF(4);
+		READ32(*res);
+		bitmap[2] &= ~FATTR4_WORD2_LAYOUT_BLKSIZE;
+	}
+	return 0;
+}
+
+/*
  * Decode LAYOUTCOMMIT reply
  */
 static int decode_pnfs_layoutcommit(struct xdr_stream *xdr,
@@ -4746,7 +4801,7 @@ xdr_error:
 static int decode_fsinfo(struct xdr_stream *xdr, struct nfs_fsinfo *fsinfo)
 {
 	__be32 *savep;
-	uint32_t attrlen, bitmap[2];
+	uint32_t attrlen, bitmap[3];
 	int status;
 
 	if ((status = decode_op_hdr(xdr, OP_GETATTR)) != 0)
@@ -4770,6 +4825,9 @@ static int decode_fsinfo(struct xdr_stream *xdr, struct nfs_fsinfo *fsinfo)
 	fsinfo->wtpref = fsinfo->wtmax;
 #ifdef CONFIG_PNFS
 	status = decode_attr_pnfstype(xdr, bitmap, &fsinfo->layoutclass);
+	if (status)
+		goto xdr_error;
+	status = decode_attr_layout_blksize(xdr, bitmap, &fsinfo->blksize);
 	if (status)
 		goto xdr_error;
 #endif /* CONFIG_PNFS */
