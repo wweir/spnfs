@@ -125,6 +125,7 @@ struct pnfs_block_layout {
 };
 
 #define BLK_ID(lt)	((struct block_mount_id *)(PNFS_MOUNTID(lt)->mountid))
+#define BLK_LO(lseg)	((struct pnfs_block_layout *)lseg->ld_data)
 
 uint32_t *blk_overflow(uint32_t *p, uint32_t *end, size_t nbytes);
 
