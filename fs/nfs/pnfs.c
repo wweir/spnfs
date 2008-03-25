@@ -1441,8 +1441,9 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 							how,
 							wdata);
 
+	BUG_ON(status < 0);
 	if (status)
-		put_lseg(lseg);
+		wdata->pnfsflags &= ~PNFS_NO_RPC;
 out:
 	dprintk("%s: End Status %d\n", __func__, status);
 	return status;
@@ -1516,8 +1517,9 @@ pnfs_readpages(struct nfs_read_data *rdata)
 							(loff_t)args->offset,
 							args->count,
 							rdata);
+	BUG_ON(status < 0);
 	if (status)
-		put_lseg(lseg);
+		rdata->pnfsflags &= ~PNFS_NO_RPC;
  out:
 	dprintk("%s: End Status %d\n", __func__, status);
 	return status;
