@@ -87,6 +87,7 @@ struct pnfs_layoutcommit_res {
 };
 
 struct pnfs_layoutcommit_data {
+	struct list_head ld_data; /* STUB */
 	struct rpc_task task;
 	struct inode *inode;
 	struct rpc_cred *cred;
