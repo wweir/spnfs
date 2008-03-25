@@ -89,7 +89,6 @@ nfs4_renew_state(struct work_struct *work)
 		spin_unlock(&clp->cl_lock);
 		/* Queue an asynchronous RENEW. */
 		ops->sched_state_renewal(clp, cred);
-		put_rpccred(cred);
 		timeout = (2 * lease) / 3;
 		spin_lock(&clp->cl_lock);
 	} else
