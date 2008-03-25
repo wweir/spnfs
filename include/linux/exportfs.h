@@ -35,6 +35,48 @@ enum fid_type {
 	FILEID_INO32_GEN_PARENT = 2,
 };
 
+#if defined(CONFIG_PNFSD)
+
+/* XDR stream arguments and results.  Exported file system uses this
+ * struct to encode information and return how many bytes were encoded.
+ */
+struct pnfs_xdr_info {
+	u32 *p;			/* in */
+	u32 *end;		/* in */
+	u32 maxcount;		/* in */
+	u32 bytes_written;	/* out */
+};
+
+/* Used by get_device_info to encode a device (da_addr_body in spec)
+ * Args:
+ * xdr - xdr stream
+ * device - pointer to device to be encoded
+*/
+typedef int (*pnfs_encodedev_t)(struct pnfs_xdr_info *xdr, void *device);
+
+/* Arguments for get_device_info */
+struct pnfs_devinfo_arg {
+	u32 type;
+	u32 devid;
+	struct pnfs_xdr_info xdr;
+	pnfs_encodedev_t func;
+};
+
+/* Used by get_device_iter to retrieve all available devices.
+ * Args:
+ * gld_type - layout type
+ * gld_cookie/verf - index and verifier of current list item
+ * gld_devid - output device id
+ */
+struct pnfs_deviter_arg {
+	u32 type;	/* request */
+	u64 cookie;	/* request/response */
+	u64 verf;	/* request/response */
+	u32 devid;	/* response */
+	u32 eof;	/* response */
+};
+#endif /* CONFIG_PNFSD */
+
 struct fid {
 	union {
 		struct {
@@ -116,12 +158,19 @@ struct export_operations {
 	void (*get_verifier) (struct super_block *sb, u32 *p);
 		/* pNFS: Returns the supported pnfs_layouttype4. */
 	int (*layout_type)(void);
-		/* pNFS: encodes opaque device list */
-	int (*devaddr_encode)(u32 *p, u32 *end, void *devaddr);
-		/* pNFS: free's opaque device list */
-	void (*devaddr_free)(void *devaddr);
-		/* pNFS: returns the opaque device list */
-	int (*get_devicelist) (struct super_block *sb, void *buf);
+	/* Retrieve and encode a device onto the xdr stream.
+	 * Args:
+	 * sb - superblock
+	 * arg - layout type, device id, maxcount
+	 * arg.xdr - xdr stream for encoding
+	 * arg.func - Optional function called by file system to encode
+	 * device on xdr stream.
+	 */
+	int (*get_device_info) (struct super_block *sb,
+				struct pnfs_devinfo_arg *arg);
+	/* Retrieve all available devices via an iterator */
+	int (*get_device_iter) (struct super_block *sb,
+				struct pnfs_deviter_arg *arg);
 		/* pNFS: encodes opaque layout
 		 * Arg: resp - xdr buffer pointer
 		        layout - file system defined
@@ -138,8 +187,6 @@ struct export_operations {
 		 * Arg: buf - struct nfsd4_pnfs_layoutget
 		 */
 	int (*layout_get) (struct inode *inode, void *buf);
-		/* pNFS: returns the opaque device */
-	int (*get_deviceinfo) (struct super_block *sb, void *p);
 		/* pNFS: commit changes to layout */
 	int (*layout_commit) (struct inode *inode, void *p);
 		/* pNFS: returns the layout */

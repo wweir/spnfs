@@ -1239,7 +1239,7 @@ nfsd4_decode_release_lockowner(struct nfsd4_compoundargs *argp, struct nfsd4_rel
 }
 
 #if defined(CONFIG_PNFSD)
-/* GETDEVICELIST: minorversion1-01.txt
+/* GETDEVICELIST: minorversion1-13.txt
 u32            			pnfs_layouttype4                layout_type;
 u32             		count4                          maxcount;
 u64             		nfs_cookie4                     cookie;
@@ -1260,7 +1260,7 @@ nfsd4_decode_getdevlist(struct nfsd4_compoundargs *argp,
 	DECODE_TAIL;
 }
 
-/* GETDEVICEINFO: minorversion1-01.txt
+/* GETDEVICEINFO: minorversion1-13.txt
 u32             pnfs_deviceid4                  device_id;
 u32             pnfs_layouttype4                layout_type;
 u32             count4                          maxcount;
@@ -1273,9 +1273,9 @@ nfsd4_decode_getdevinfo(struct nfsd4_compoundargs *argp,
 	DECODE_HEAD;
 
 	READ_BUF(12);
-	READ32(gdev->gd_dev_id);
+	READ32(gdev->gd_devid);
 	READ32(gdev->gd_type);
-	READ32(gdev->gd_maxcnt);
+	READ32(gdev->gd_maxcount);
 
 	DECODE_TAIL;
 }
@@ -3194,114 +3194,244 @@ nfsd4_encode_write(struct nfsd4_compoundres *resp, __be32 nfserr, struct nfsd4_w
 }
 
 #if defined(CONFIG_PNFSD)
-static int
-nfsd4_encode_devlist_item(struct nfsd4_compoundres *resp,
-			  struct nfsd4_pnfs_getdevlist *gdevl)
+
+/* Uses the export interface to iterate through the available devices
+ * and encodes them on the response stream.
+ */
+static  __be32
+nfsd4_encode_devlist_iterator(struct nfsd4_compoundres *resp,
+			      struct nfsd4_pnfs_getdevlist *gdevl,
+			      unsigned int *dev_count,
+			      unsigned int *bytes_written)
 {
-	int len = 0;
+	struct super_block *sb = gdevl->gd_fhp->fh_dentry->d_inode->i_sb;
+	struct pnfs_deviter_arg iter_arg;
+	struct pnfs_devinfo_arg info_arg;
+	int nfserr;
+
 	ENCODE_HEAD;
 
-	RESERVE_SPACE(4);
+	dprintk("%s: Begin\n", __func__);
 
-	WRITE32(gdevl->gd_type); /* layout type */
+	/* set initial iterator args */
+	iter_arg.type = gdevl->gd_type;
+	iter_arg.cookie = gdevl->gd_cookie;
+	iter_arg.verf = gdevl->gd_verf;
+	iter_arg.eof = 0;
 
-	ADJUST_ARGS();
-	dprintk("%s: device type %d\n", __FUNCTION__, gdevl->gd_type);
+	/* TODO: need to update the number of available bytes on each iteration
+	 * e.g., maxcount -= xdr.bytes_written
+	 * Also, should the file layout xdr function check for maxcount
+	 * or should we just see if they exceeded maxcount in this function
+	 * on return.of getdeviceinfo?
+	 */
+	while (1) {
+		/* Call iterator to get next device id.
+		 * On return the cookie and verf should be ready to go
+		 * for the next iteration.
+		 */
+		dprintk("%s: pre get_device_iter type %u, ck %llu, verf %llu\n",
+			__func__,
+			iter_arg.type,
+			iter_arg.cookie,
+			iter_arg.verf);
+		nfserr = sb->s_export_op->get_device_iter(sb, &iter_arg);
+		dprintk("%s: post get_device_iter err: %d, eof: %u\n",
+			__func__,
+			nfserr,
+			iter_arg.eof);
 
-	if (gdevl->gd_ops->devaddr_encode == NULL &&
-	    gdevl->gd_type == LAYOUT_NFSV4_FILES) {
-		len = filelayout_encode_devaddr(p, resp->end,
-				gdevl->gd_devlist_len, gdevl->gd_devlist);
-// FIXME	filelayout_free_devaddr(dlist->dev_addr);
-	} else {
-#if 0 // FIXME???
-		len = gdevl->gd_ops->devaddr_encode(p, resp->end,
-						     dlist->dev_addr);
-		gdevl->gd_ops->devaddr_free(dlist->dev_addr);
-#endif
-	}
-// FIXME	kfree(dlist->dev_addr);
+		if (nfserr) {
+			nfserr = nfserrno(nfserr);
+			goto out_err;
+		}
 
-	if (len > 0) {
-		p += XDR_QUADLEN(len);
+		/* Are we all out of devices? */
+		if (iter_arg.eof)
+			goto out;
+
+		/* Encode device id and layout type */
+		RESERVE_SPACE(8);
+		WRITE32(iter_arg.devid);
+		WRITE32(iter_arg.type);
 		ADJUST_ARGS();
-	} else
-		BUG_ON(len <= 0);
-	return len;
+		*bytes_written += 8;
+
+		/* Set the file layout encoding function.  Once other layout
+		 * types are added to the kernel they can be set here
+		 */
+		if (gdevl->gd_type == LAYOUT_NFSV4_FILES)
+			info_arg.func = filelayout_encode_devinfo;
+
+		/* Set dev info arguments */
+		info_arg.type = gdevl->gd_type;
+		info_arg.devid = iter_arg.devid;
+
+		/* set xdr info */
+		info_arg.xdr.p = resp->p;
+		info_arg.xdr.end = resp->end;
+		info_arg.xdr.maxcount = gdevl->gd_maxcount;
+
+		dprintk("%s: pre get_device_info type %u, mxcnt %u,devid %u\n",
+			__func__,
+			info_arg.type,
+			info_arg.xdr.maxcount,
+			info_arg.devid);
+		nfserr = sb->s_export_op->get_device_info(sb, &info_arg);
+		dprintk("%s: post get_device_info err %d bytes_wr %u\n",
+			__func__,
+			nfserr,
+			info_arg.xdr.bytes_written);
+		if (nfserr)
+			goto out_err;
+
+		/* tally the number of total bytes written so far */
+		*bytes_written += info_arg.xdr.bytes_written;
+		(*dev_count)++;
+	}
+
+out:
+	/* Update cookie/verf/eof to indicate if there are remaining devices */
+	gdevl->gd_eof = iter_arg.eof;
+	gdevl->gd_cookie = iter_arg.cookie;
+	gdevl->gd_verf = iter_arg.verf;
+
+	dprintk("%s: Encoded %u devices and %u bytes\n",
+		__func__,
+		*dev_count,
+		*bytes_written);
+	return 0;
+
+out_err:
+	return nfserr;
 }
 
-/* GETDEVICELIST: minorversion1-01.txt
-u64			nfs_cookie4                     cookie;
-NFS4_VERIFIER_SIZE      verifier4                       cookieverf;
-u32 + len structs	pnfs_devlist_item4              device_addrs<>;
-
-nfserr is set in nfsd4_getdevlist()
-	- when gdevl->gd_devslist_len == 0
-	- when gdevl->gd_ops->layout_encode == NULL
+/* Encodes the response of get device list.
 */
-static void
-nfsd4_encode_getdevlist(struct nfsd4_compoundres *resp, int nfserr,
+static  __be32
+nfsd4_encode_getdevlist(struct nfsd4_compoundres *resp,
+			int nfserr,
 			struct nfsd4_pnfs_getdevlist *gdevl)
 {
-	int len;
+	unsigned int dev_count = 0, bytes_written = 0, lead_count;
+	u32 *p_in = resp->p;
 
 	ENCODE_HEAD;
 
-	dprintk("%s: err %d gdevl %p\n", __FUNCTION__, nfserr, gdevl);
-	if (!nfserr) {
-		RESERVE_SPACE(20 + sizeof(nfs4_verifier));
-		WRITE64(gdevl->gd_cookie);
-		WRITEMEM(&gdevl->gd_verf, sizeof(nfs4_verifier));
+	dprintk("%s: err %d\n", __func__, nfserr);
+	if (nfserr)
+		return nfserr;
 
-		/* num of devlist_item4 */
-		WRITE32(1);
+	/* Ensure we have room for cookie, verifier, and devlist len,
+	 * which we will backfill in after we encode as many devices as possible
+	 */
+	lead_count = 8 + 4 + sizeof(nfs4_verifier);
+	RESERVE_SPACE(lead_count);
+	/* skip past these values */
+	p += XDR_QUADLEN(lead_count);
+	ADJUST_ARGS();
 
-		WRITE32(gdevl->gd_devlist[0].dev_id);
+	/* Iterate over as many devices as we have room for and encode them
+	 * on the xdr stream.
+	 */
+	nfserr = nfsd4_encode_devlist_iterator(resp, gdevl, &dev_count,
+						&bytes_written);
+	if (nfserr)
+		return nfserr;
 
-		ADJUST_ARGS();
-		len = nfsd4_encode_devlist_item(resp, gdevl);
+	if (dev_count <= 0)
+		return nfserr_noent;
 
-		RESERVE_SPACE(4);
-		WRITE32(gdevl->gd_eof);
-		ADJUST_ARGS();
-		kfree(gdevl->gd_devlist);
-	}
+	/* Backfill in cookie, verf and number of devices encoded */
+	p = p_in;
+	WRITE64(gdevl->gd_cookie);
+	WRITEMEM(&gdevl->gd_verf, sizeof(nfs4_verifier));
+	WRITE32(dev_count);
+
+	/* Skip over devices */
+	p += XDR_QUADLEN(bytes_written);
+	ADJUST_ARGS();
+
+	/* are we at the end of devices? */
+	RESERVE_SPACE(4);
+	WRITE32(gdevl->gd_eof);
+	ADJUST_ARGS();
+
+	dprintk("%s: done.\n", __func__);
+
+	return nfs_ok;
 }
 
-/* GETDEVICEINFO: minorversion1-01.txt
-
-u32             pnfs_layouttype4 type;
-u32 + len       opaque           device_addr<>;
-
-*/
-static void
-nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp, int nfserr,
+/* For a given device id, have the file system retrieve and encode the
+ * associated device.  For file layout, the encoding function is
+ * passed down to the file system.  The file system then has the option
+ * of using this encoding function or one of its own.
+ */
+static __be32
+nfsd4_encode_getdevinfo(struct nfsd4_compoundres *resp,
+			int nfserr,
 			struct nfsd4_pnfs_getdevinfo *gdev)
 {
-	int len;
+	struct pnfs_devinfo_arg args;
+	struct super_block *sb;
+	int maxcount;
+
 	ENCODE_HEAD;
 
-	printk("%s: err %d\n", __FUNCTION__, nfserr);
-	if (!nfserr) {
-		RESERVE_SPACE(28);
-		WRITE32(gdev->gd_type);
-		ADJUST_ARGS();
+	dprintk("%s: err %d\n", __func__, nfserr);
+	if (nfserr)
+		return nfserr;
 
-		if (gdev->gd_ops->devaddr_encode == NULL &&
-					gdev->gd_type == LAYOUT_NFSV4_FILES) {
-			len = filelayout_encode_devinfo(p, resp->end, 1,
-							gdev->gd_devaddr);
-			filelayout_free_devaddr(gdev->gd_devaddr);
-		} else {
-			len = gdev->gd_ops->devaddr_encode(p, resp->end, gdev->gd_devaddr);
-			gdev->gd_ops->devaddr_free(gdev->gd_devaddr);
-		}
-		if (len > 0) {
-			p += XDR_QUADLEN(len);
-			ADJUST_ARGS();
-		} else
-			BUG_ON(len <= 0);
+	sb = gdev->gd_fhp->fh_dentry->d_inode->i_sb;
+
+	/* Set the file layout encoding function.  Once other layout
+	 * types are added to the kernel they can be set here
+	 */
+	if (gdev->gd_type == LAYOUT_NFSV4_FILES)
+		args.func = filelayout_encode_devinfo;
+
+	RESERVE_SPACE(4);
+	WRITE32(gdev->gd_type);
+	ADJUST_ARGS();
+
+	maxcount = PAGE_SIZE;
+	if (maxcount > gdev->gd_maxcount)
+		maxcount = gdev->gd_maxcount;
+
+	/* Ensure have room for type field */
+	maxcount -= 4;
+	if (maxcount < 0) {
+		printk(KERN_ERR "%s: buffer too small\n", __func__);
+		return  nfserr_toosmall;
 	}
+
+	/* Set layout type and id of device to encode */
+	args.type = gdev->gd_type;
+	args.devid = gdev->gd_devid;
+
+	/* Set xdr info so file system can encode device */
+	args.xdr.p   = resp->p;
+	args.xdr.end = resp->end;
+	args.xdr.maxcount = maxcount;
+
+	/* Call file system to retrieve and encode device */
+	nfserr = sb->s_export_op->get_device_info(sb, &args);
+	if (nfserr) {
+		printk(KERN_ERR "%s: export ERROR %d\n", __func__, nfserr);
+		return nfserrno(nfserr);
+	}
+
+	/* The file system should never write 0 bytes without
+	 * returning an error
+	 */
+	BUG_ON(args.xdr.bytes_written <= 0);
+
+	/* Update the xdr stream with the number of bytes written
+	 * by the file system
+	 */
+	p += XDR_QUADLEN(args.xdr.bytes_written);
+	ADJUST_ARGS();
+	return nfs_ok;
 }
 
 /* LAYOUTGET: minorversion1-08.txt
@@ -3477,10 +3607,14 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 		break;
 #if defined(CONFIG_PNFSD)
 	case OP_GETDEVICELIST:
-		nfsd4_encode_getdevlist(resp, op->status, &op->u.pnfs_getdevlist);
+		op->status = nfsd4_encode_getdevlist(resp,
+						     op->status,
+						     &op->u.pnfs_getdevlist);
 		break;
 	case OP_GETDEVICEINFO:
-		nfsd4_encode_getdevinfo(resp, op->status, &op->u.pnfs_getdevinfo);
+		op->status = nfsd4_encode_getdevinfo(resp,
+						     op->status,
+						     &op->u.pnfs_getdevinfo);
 		break;
 	case OP_LAYOUTGET:
 		op->status = nfsd4_encode_layoutget(resp,
