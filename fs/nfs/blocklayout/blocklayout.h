@@ -40,7 +40,8 @@
 extern struct class shost_class; /* exported from drivers/scsi/hosts.c */
 extern int dm_dev_create(struct dm_ioctl *param); /* from dm-ioctl.c */
 extern int dm_dev_remove(struct dm_ioctl *param); /* from dm-ioctl.c */
-
+extern int dm_do_resume(struct dm_ioctl *param);
+extern int dm_table_load(struct dm_ioctl *param, size_t param_size);
 
 struct block_mount_id {
 	struct super_block		*bm_sb;     /* back pointer */
