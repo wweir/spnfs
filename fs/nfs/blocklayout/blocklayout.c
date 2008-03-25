@@ -45,6 +45,14 @@ MODULE_DESCRIPTION("The NFSv4.1 pNFS Block layout driver");
 /* Callback operations to the pNFS client */
 struct pnfs_client_operations *pnfs_callback_ops;
 
+/* Right now, these are basically just a bit that is passed from
+ * nfs_write_begin to nfs_write_end, which I've done like so to avoid
+ * having to keep malloc/free'ing fsdata.
+ * XXX In particular, currently assumes only one mountpoint is in use.
+ */
+static struct pnfs_fsdata *bl_use_pnfs;
+static struct pnfs_fsdata *bl_use_mds;
+
 static void print_page(struct page *page)
 {
 	dprintk("PRINTPAGE page %p\n", page);
@@ -168,6 +176,146 @@ dont_like_caller(struct nfs_page *req)
 		/* Called by _one */
 		return 0;
 	}
+}
+
+/* Copy data from old to new, remove old from list and add new in its place. */
+static void
+clone_extent(struct pnfs_block_extent *old, struct pnfs_block_extent *new)
+{
+	memcpy(new, old, sizeof(*new));
+	INIT_LIST_HEAD(&new->be_node);
+	kref_init(&new->be_refcnt);
+	list_replace(&old->be_node, &new->be_node);
+	put_extent(old);
+}
+
+/*
+ *      |-------------old-----------------|
+ *      |----len----|
+ *
+ * 		becomes
+ *
+ *      |----new----|-----------old-------|
+ *
+*/
+static void
+split_extent_helper(struct pnfs_block_layout *bl,
+		    struct pnfs_block_extent *old, sector_t len,
+		    struct pnfs_block_extent *new)
+{
+	struct pnfs_block_extent *next;
+
+	INIT_LIST_HEAD(&new->be_node);
+	kref_init(&new->be_refcnt);
+	new->be_bitmap = 0;
+	new->be_f_offset = old->be_f_offset;
+	new->be_length = len;
+	new->be_v_offset = old->be_v_offset;
+	new->be_state = old->be_state;
+	old->be_f_offset += len;
+	old->be_length -= len;
+	old->be_v_offset += len;
+	/* Because list is sorted by offset, new will be in old's place */
+	list_replace(&old->be_node, &new->be_node);
+	/* However, old is not necessarily next.  A cow READ extent may
+	 * intervene.
+	 */
+	next = list_prepare_entry(new, &bl->bl_extents, be_node);
+	list_for_each_entry_continue(next, &bl->bl_extents, be_node) {
+		if (next->be_f_offset > old->be_f_offset)
+			break;
+	}
+	list_add_tail(&old->be_node, &next->be_node);
+	bl->bl_n_ext++;
+}
+
+/*
+ * Finds the extent containing isect, and if it is INVAL, splits it out
+ * so isect is in a NEEDS_INIT extent.
+ */
+static struct pnfs_block_extent *
+split_inval_extent(struct pnfs_layout_segment *lseg,
+		   struct pnfs_block_extent *be,
+		   sector_t isect, sector_t len)
+{
+	struct pnfs_block_layout *bl = BLK_LO(lseg);
+	struct pnfs_block_extent *rv = NULL, *inval = NULL, *e1, *e2, *e3;
+	struct nfs_server *nfss = PNFS_NFS_SERVER(lseg->layout);
+
+	dprintk("%s isect=%Lu\n", __func__, (u64)isect);
+	put_extent(be);
+
+	/* Preallocate prior to taking spinlock */
+	e1 = e2 = e3 = NULL;
+	e1 = kmalloc(sizeof(*e1), GFP_KERNEL);
+	e2 = kmalloc(sizeof(*e2), GFP_KERNEL);
+	e3 = kmalloc(sizeof(*e3), GFP_KERNEL);
+	if (!e1 || !e2 || !e3) {
+		kfree(e1);
+		kfree(e2);
+		kfree(e3);
+		return NULL;
+	}
+
+	spin_lock(&bl->bl_ext_lock);
+	/* Find the INVAL extent to split */
+	list_for_each_entry(be, &bl->bl_extents, be_node) {
+		if (isect < be->be_f_offset)
+			break;
+		if (isect < be->be_f_offset + be->be_length) {
+			if (be->be_state == PNFS_BLOCK_INVALID_DATA) {
+				inval = be;
+				break;
+			} else if (be->be_state == PNFS_BLOCK_READWRITE_DATA ||
+				   be->be_state == PNFS_BLOCK_NEEDS_INIT)
+				rv = be;
+		}
+	}
+	if (!inval) {
+		/* Hopefully, this is due to someone else doing the split */
+		dprintk("%s Could not find INVAL to split\n", __func__);
+		kfree(e1);
+		kfree(e2);
+		kfree(e3);
+		goto out;
+	}
+	/* Shift to block boundaries */
+	if (nfss->pnfs_blksize) {
+		u32 mask = (nfss->pnfs_blksize >> 9) - 1;
+		isect &= ~mask;
+		len = (len + mask) & ~mask;
+		/* We can only hold 32 pages in a NEEDS_INIT extent */
+		len = min(len, (sector_t) (32 << (PAGE_CACHE_SHIFT - 9)));
+	}
+
+	/* Split inval */
+	clone_extent(inval, e2);
+	rv = e2;
+	inval = NULL;   /* not needed, but helps prevent errors */
+	if (e2->be_f_offset != isect)
+		split_extent_helper(bl, e2, isect - e2->be_f_offset, e1);
+	else
+		kfree(e1);
+	if (e2->be_length > len) {
+		split_extent_helper(bl, e2, len, e3);
+		rv = e3;
+	} else {
+		kfree(e3);
+		if (e2->be_length < len) {
+			/* This can't happen now, while len == blksize, but
+			 * if we choose to use larger lengths, must take
+			 * care of this.
+			 */
+			dprintk("%s BUG - len too large\n", __func__);
+		}
+	}
+	rv->be_state = PNFS_BLOCK_NEEDS_INIT;
+	rv->be_bitmap = (1 << (len >> (PAGE_CACHE_SHIFT - 9))) - 1;
+ out:
+	spin_unlock(&bl->bl_ext_lock);
+	if (rv)
+		kref_get(&rv->be_refcnt);
+	return rv;
 }
 
 static int
@@ -454,6 +602,16 @@ bl_initialize_mountpoint(struct super_block *sb, struct nfs_fh *fh)
 
 	dprintk("%s enter\n", __func__);
 
+	if (!bl_use_pnfs) {
+		bl_use_pnfs = kzalloc(sizeof(struct pnfs_fsdata), GFP_KERNEL);
+		if (!bl_use_pnfs)
+			goto out_error;
+	}
+	if (!bl_use_mds) {
+		bl_use_mds = kzalloc(sizeof(struct pnfs_fsdata), GFP_KERNEL);
+		if (!bl_use_mds)
+			goto out_error;
+	}
 	b_mt_id = kzalloc(sizeof(struct block_mount_id), GFP_KERNEL);
 	if (!b_mt_id)
 		goto out_error;
@@ -508,6 +666,9 @@ bl_initialize_mountpoint(struct super_block *sb, struct nfs_fh *fh)
 	return mtype;
 
  out_error:
+	kfree(bl_use_pnfs);
+	kfree(bl_use_mds);
+	bl_use_pnfs = bl_use_mds = NULL;
 	free_blk_mountid(b_mt_id);
 	kfree(mtype);
 	mtype = NULL;
@@ -520,6 +681,9 @@ bl_uninitialize_mountpoint(struct pnfs_mount_type *mtype)
 	struct block_mount_id *b_mt_id = NULL;
 
 	dprintk("%s enter\n", __func__);
+	kfree(bl_use_pnfs);
+	kfree(bl_use_mds);
+	bl_use_pnfs = bl_use_mds = NULL;
 	if (!mtype)
 		return 0;
 	b_mt_id = (struct block_mount_id *)mtype->mountid;
@@ -527,6 +691,182 @@ bl_uninitialize_mountpoint(struct pnfs_mount_type *mtype)
 	kfree(mtype);
 	dprintk("%s RETURNS\n", __func__);
 	return 0;
+}
+
+/* STUB - mark intersection of layout and page as bad, so is not
+ * used again.
+ */
+static void mark_bad_read(void)
+{
+	return;
+}
+
+/* Copied from buffer.c */
+static void __end_buffer_read_notouch(struct buffer_head *bh, int uptodate)
+{
+	if (uptodate) {
+		set_buffer_uptodate(bh);
+	} else {
+		/* This happens, due to failed READA attempts. */
+		clear_buffer_uptodate(bh);
+	}
+	unlock_buffer(bh);
+}
+
+/* Copied from buffer.c */
+static void end_buffer_read_nobh(struct buffer_head *bh, int uptodate)
+{
+	__end_buffer_read_notouch(bh, uptodate);
+}
+
+/*
+ * map_block:  map a requested I/0 block (isect) into an offset in the LVM
+ * meta block_device
+ */
+static void
+map_block(sector_t isect, struct pnfs_block_extent *be,
+	  struct buffer_head *res_bh, unsigned int bitsize)
+{
+	dprintk("%s enter be=%p\n", __func__, be);
+
+	set_buffer_mapped(res_bh);
+	res_bh->b_bdev = be->be_mdev;
+	res_bh->b_blocknr = (isect - be->be_f_offset + be->be_v_offset) >>
+				bitsize;
+	res_bh->b_size = 1 << (bitsize + 9);
+
+	dprintk("%s isect %ld, res_bh->b_blocknr %ld, using bsize %Zd\n",
+				__func__, (long)isect,
+				(long)res_bh->b_blocknr,
+				res_bh->b_size);
+	return;
+}
+
+/* This is loosely based on nobh_write_begin */
+static int
+bl_write_begin(struct pnfs_layout_segment *lseg, struct page *page, loff_t pos,
+	       unsigned count, struct pnfs_fsdata **fsdata)
+{
+	struct buffer_head *bh;
+	unsigned from, to;
+	int inval, ret = 0;
+	struct pnfs_block_extent *be = NULL, *cow_read = NULL;
+	sector_t isect;
+
+	dprintk("%s enter, %u@%Ld\n", __func__, count, pos);
+	print_page(page);
+	/* The following code assumes blocksize == PAGE_CACHE_SIZE */
+	if (PNFS_INODE(lseg->layout)->i_blkbits != PAGE_CACHE_SHIFT) {
+		dprintk("%s Can't handle blocksize\n", __func__);
+		*fsdata = bl_use_mds;
+		return 0;
+	}
+	from = pos & (PAGE_CACHE_SIZE - 1);
+	to = from + count;
+	*fsdata = bl_use_pnfs;
+
+	if (PageMappedToDisk(page)) {
+		/* Basically, this is a flag that says we have
+		 * successfully called write_begin already on this page.
+		 */
+		return 0;
+	}
+
+	bh = alloc_page_buffers(page, PAGE_CACHE_SIZE, 0);
+	if (!bh) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+
+	isect = (sector_t)page->index << (PAGE_CACHE_SHIFT - 9);
+	be = find_get_extent(lseg, isect, &cow_read);
+	if (!be) {
+		*fsdata = bl_use_mds;
+		goto cleanup;
+	}
+	inval = is_hole(be, isect);
+	dprintk("%s inval=%i, from=%u, to=%u\n", __func__, inval, from, to);
+	if (inval) {
+		if (be->be_state == PNFS_BLOCK_NONE_DATA) {
+			dprintk("%s PANIC - got NONE_DATA extent %p\n",
+				__func__, be);
+			*fsdata = bl_use_mds;
+			goto cleanup;
+		}
+		map_block(isect, be, bh, PAGE_CACHE_SHIFT - 9);
+		/* FRED - I don't understand this, not sure is needed */
+		unmap_underlying_metadata(bh->b_bdev, bh->b_blocknr);
+	}
+	if (PageUptodate(page)) {
+		/* Do nothing */
+	} else if (inval & !cow_read) {
+		char *kaddr = kmap_atomic(page, KM_USER0);
+		if (0 < from) {
+			dprintk("%s memset(0 -> %u)\n", __func__, from);
+			memset(kaddr, 0, from);
+		}
+		if (PAGE_CACHE_SIZE > to) {
+			dprintk("%s memset(%u -> %lu)\n", __func__,
+				to, PAGE_CACHE_SIZE);
+			memset(kaddr + to, 0, PAGE_CACHE_SIZE - to);
+		}
+		flush_dcache_page(page);
+		kunmap_atomic(kaddr, KM_USER0);
+	} else if (0 < from || PAGE_CACHE_SIZE > to) {
+		struct pnfs_block_extent *read_extent;
+
+		read_extent = (inval && cow_read) ? cow_read : be;
+		map_block(isect, read_extent, bh, PAGE_CACHE_SHIFT - 9);
+		lock_buffer(bh);
+		bh->b_end_io = end_buffer_read_nobh;
+		submit_bh(READ, bh);
+		dprintk("%s: Waiting for buffer read\n", __func__);
+		/* XXX Don't really want to hold layout lock here */
+		wait_on_buffer(bh);
+		if (!buffer_uptodate(bh)) {
+			*fsdata = bl_use_mds;
+			ret = -EIO;
+		}
+		if (ret)
+			goto cleanup;
+	}
+	if (be->be_state == PNFS_BLOCK_INVALID_DATA) {
+		/* NOTE be changes, normally new be_state will be NEEDS_INIT */
+		be = split_inval_extent(lseg, be, isect, PAGE_CACHE_SIZE >> 9);
+		if (!be) {
+			dprintk("%s split failed\n", __func__);
+			*fsdata = bl_use_mds;
+			goto cleanup;
+		}
+		/* STUB - need to mark adjacent pages in large block */
+	}
+	if (be->be_state == PNFS_BLOCK_NEEDS_INIT) {
+		uint32_t mask = 1 << ((isect - be->be_f_offset) >>
+				      (PAGE_CACHE_SHIFT - 9));
+		be->be_bitmap &= ~mask;
+	}
+	SetPageMappedToDisk(page);
+	ret = 0; /* Not technically needed */
+
+cleanup:
+	dprintk("%s cleanup, ret=%i\n", __func__, ret);
+	free_buffer_head(bh);
+	put_extent(be);
+	put_extent(cow_read);
+	if (ret) {
+		/* Need to mark layout with bad read...should now
+		 * just use nfs4 for reads and writes.
+		 */
+		mark_bad_read();
+		/* Revert back to plain NFS and just continue on with
+		 * write.  This assumes there is no request attached, which
+		 * should be true if we get here.
+		 */
+		BUG_ON(PagePrivate(page));
+		*fsdata = bl_use_mds;
+		ret = 0;
+	}
+	return ret;
 }
 
 static ssize_t
@@ -555,10 +895,22 @@ bl_pg_test(struct nfs_pageio_descriptor *pgio, struct nfs_page *prev,
 	return 1;
 }
 
+static int
+bl_do_flush(struct pnfs_layout_segment *lseg, struct nfs_page *req,
+	    struct pnfs_fsdata *fsdata)
+{
+	dprintk("%s enter\n", __func__);
+	/* This checks if old req will likely use same io method as soon
+	 * to be created request, and returns False if they are the same.
+	 */
+	return (!lseg != !test_bit(PG_USE_PNFS, &req->wb_flags));
+}
+
 static struct layoutdriver_io_operations blocklayout_io_operations = {
 	.commit				= bl_commit,
 	.read_pagelist			= bl_read_pagelist,
 	.write_pagelist			= bl_write_pagelist,
+	.write_begin			= bl_write_begin,
 	.alloc_layout			= bl_alloc_layout,
 	.free_layout			= bl_free_layout,
 	.alloc_lseg			= bl_alloc_lseg,
@@ -574,6 +926,7 @@ static struct layoutdriver_policy_operations blocklayout_policy_operations = {
 	.get_read_threshold		= bl_get_io_threshold,
 	.get_write_threshold		= bl_get_io_threshold,
 	.pg_test			= bl_pg_test,
+	.do_flush			= bl_do_flush,
 };
 
 static struct pnfs_layoutdriver_type blocklayout_type = {
