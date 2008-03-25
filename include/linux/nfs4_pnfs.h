@@ -142,6 +142,9 @@ struct layoutdriver_io_operations {
 	int (*write_begin) (struct pnfs_layout_segment *lseg, struct page *page,
 			    loff_t pos, unsigned count,
 			    struct pnfs_fsdata **fsdata);
+	int (*write_end)(struct inode *inode, struct page *page, loff_t pos,
+			 unsigned count, unsigned copied,
+			 struct pnfs_fsdata *fsdata);
 	/* Hook into nfs_create_request, for setting wb_private */
 	void (*new_request)(struct pnfs_layout_segment *lseg,
 			    struct nfs_page *req, loff_t pos, unsigned count,
