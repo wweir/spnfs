@@ -226,8 +226,8 @@ static int nfs_read_rpcsetup(struct nfs_page *req, struct nfs_read_data *data,
 
 #ifdef CONFIG_PNFS
 	ret = pnfs_try_to_read_data(data, call_ops);
-	if (ret <= 0)
-		return ret;
+	if (ret == 0)
+		return data->pnfs_error;
 #endif /* CONFIG_PNFS*/
 
 	nfs_initiate_read(data, NFS_CLIENT(inode), call_ops);

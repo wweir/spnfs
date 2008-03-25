@@ -806,8 +806,8 @@ static int nfs_write_rpcsetup(struct nfs_page *req,
 
 #ifdef CONFIG_PNFS
 	ret = pnfs_try_to_write_data(data, call_ops, how);
-	if (ret <= 0)
-		return ret;
+	if (ret == 0)
+		return data->pnfs_error;
 #endif /* CONFIG_PNFS */
 
 	nfs_initiate_write(data, NFS_CLIENT(inode), call_ops, how);

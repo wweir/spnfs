@@ -1047,6 +1047,7 @@ struct nfs_read_data {
 	const struct rpc_call_ops *call_ops;
 	struct rpc_clnt		*pnfs_client;	/* Holds pNFS device across async calls */
 	int			pnfsflags;
+	int			pnfs_error;
 	__u64			orig_offset;
 	struct nfs_client	*ds_nfs_client;
 #endif /* CONFIG_PNFS */
@@ -1080,6 +1081,7 @@ struct nfs_write_data {
 	struct rpc_clnt		*pnfs_client;	/* Holds pNFS device across
 						   async calls */
 	int			pnfsflags;
+	int			pnfs_error;
 	__u64			orig_offset;
 	int			how;		/* for FLUSH_STABLE */
 	struct nfs_client	*ds_nfs_client;
