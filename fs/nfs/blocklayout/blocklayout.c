@@ -43,6 +43,17 @@ MODULE_DESCRIPTION("The NFSv4.1 pNFS Block layout driver");
 /* Callback operations to the pNFS client */
 struct pnfs_client_operations *pnfs_callback_ops;
 
+static void print_bl_extent(struct pnfs_block_extent *be)
+{
+	dprintk("PRINT EXTENT extent %p\n", be);
+	if (be) {
+		dprintk("        be_f_offset %Lu\n", (u64)be->be_f_offset);
+		dprintk("        be_length   %Lu\n", (u64)be->be_length);
+		dprintk("        be_v_offset %Lu\n", (u64)be->be_v_offset);
+		dprintk("        be_state    %d\n", be->be_state);
+	}
+}
+
 static void
 destroy_extent(struct kref *kref)
 {
@@ -61,6 +72,56 @@ put_extent(struct pnfs_block_extent *be)
 			atomic_read(&be->be_refcnt.refcount));
 		kref_put(&be->be_refcnt, destroy_extent);
 	}
+}
+
+/* Returns extent, or NULL.  If a second READ extent exists, it is returned
+ * in cow_read, if given.
+ *
+ * We assume about the extent list:
+ * 1. Extents are ordered by file offset, if two extents have same offset,
+ *    we don't care about ordering.
+ * 2. For any given isect, there are at most two extents that match.
+ * 3. If two extents match, exactly one will have state==READ_DATA
+ */
+static struct pnfs_block_extent *
+find_get_extent(struct pnfs_layout_segment *lseg, sector_t isect,
+	    struct pnfs_block_extent **cow_read)
+{
+	struct pnfs_block_layout *bl = BLK_LO(lseg);
+	struct pnfs_block_extent *be, *cow, *out;
+
+	dprintk("%s enter with isect %Lu\n", __func__, (u64)isect);
+	cow = out = NULL;
+	spin_lock(&bl->bl_ext_lock);
+	list_for_each_entry(be, &bl->bl_extents, be_node) {
+		if (isect < be->be_f_offset)
+			break;
+		if (isect < be->be_f_offset + be->be_length) {
+			/* We have found an extent, now decide if it should
+			 * be returned in cow_read or not.
+			 */
+			dprintk("%s Get %p (%i)\n", __func__, be,
+				atomic_read(&be->be_refcnt.refcount));
+			kref_get(&be->be_refcnt);
+			if (!out)
+				out = be;
+			else {
+				if (out->be_state == PNFS_BLOCK_READ_DATA) {
+					cow = out;
+					out = be;
+				} else
+					cow = be;
+				break;
+			}
+		}
+	}
+	spin_unlock(&bl->bl_ext_lock);
+	if (cow_read)
+		*cow_read = cow;
+	else
+		put_extent(cow);
+	print_bl_extent(out);
+	return out;
 }
 
 static int
