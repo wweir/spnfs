@@ -869,6 +869,26 @@ cleanup:
 	return ret;
 }
 
+static void
+bl_new_request(struct pnfs_layout_segment *lseg, struct nfs_page *req,
+	       loff_t pos, unsigned count, struct pnfs_fsdata *fsdata)
+{
+	dprintk("%s enter %u@%Lu\n", __func__, count, pos);
+	/* Note at this stage the req points to the page, but the
+	 * page does not point to the req.
+	 */
+	if (!lseg)
+		return;
+	if (fsdata) {
+		/* A write request */
+		int use_pnfs = (fsdata == bl_use_pnfs);
+		if (use_pnfs)
+			set_bit(PG_USE_PNFS, &req->wb_flags);
+	} else {
+		/* STUB - what whould we do for read requests? */
+	}
+}
+
 static ssize_t
 bl_get_stripesize(struct pnfs_layout_type *layoutid)
 {
@@ -911,6 +931,7 @@ static struct layoutdriver_io_operations blocklayout_io_operations = {
 	.read_pagelist			= bl_read_pagelist,
 	.write_pagelist			= bl_write_pagelist,
 	.write_begin			= bl_write_begin,
+	.new_request			= bl_new_request,
 	.alloc_layout			= bl_alloc_layout,
 	.free_layout			= bl_free_layout,
 	.alloc_lseg			= bl_alloc_lseg,
