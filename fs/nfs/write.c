@@ -869,8 +869,8 @@ static int nfs_write_rpcsetup(struct nfs_page *req,
 	nfs_fattr_init(&data->fattr);
 
 	ret = pnfs_try_to_write_data(data, call_ops, how);
-	if (ret <= 0)
-		return ret;
+	if (ret == 0)
+		return data->pnfs_error;
 
 	return nfs_initiate_write(data, NFS_CLIENT(inode), call_ops, how);
 }
