@@ -419,7 +419,7 @@ static void nfs_inode_remove_request(struct nfs_page *req)
 }
 
 static void
-nfs_redirty_request(struct nfs_page *req)
+nfs_mark_request_dirty(struct nfs_page *req)
 {
 	__set_page_dirty_nobuffers(req->wb_page);
 }
@@ -473,7 +473,7 @@ int nfs_reschedule_unstable_write(struct nfs_page *req)
 		return 1;
 	}
 	if (test_and_clear_bit(PG_NEED_RESCHED, &req->wb_flags)) {
-		nfs_redirty_request(req);
+		nfs_mark_request_dirty(req);
 		return 1;
 	}
 	return 0;
@@ -879,9 +879,9 @@ static int nfs_write_rpcsetup(struct nfs_page *req,
  * call this on each, which will prepare them to be retried on next
  * writeback using standard nfs.
  */
-static void nfs_retry_request(struct nfs_page *req)
+static void nfs_redirty_request(struct nfs_page *req)
 {
-	nfs_redirty_request(req);
+	nfs_mark_request_dirty(req);
 	nfs_end_page_writeback(req->wb_page);
 	nfs_clear_page_tag_locked(req);
 }
@@ -943,7 +943,7 @@ out_bad:
 		list_del(&data->pages);
 		nfs_writedata_release(data);
 	}
-	nfs_retry_request(req);
+	nfs_redirty_request(req);
 	return status;
 }
 
@@ -986,7 +986,7 @@ int nfs_flush_one(struct inode *inode, struct list_head *head,
 	while (!list_empty(head)) {
 		req = nfs_list_entry(head->next);
 		nfs_list_remove_request(req);
-		nfs_retry_request(req);
+		nfs_redirty_request(req);
 	}
 	return status;
 }
@@ -1390,7 +1390,7 @@ static void nfs_commit_done(struct rpc_task *task, void *calldata)
 		}
 		/* We have a mismatch. Write the page again */
 		dprintk(" mismatch\n");
-		nfs_redirty_request(req);
+		nfs_mark_request_dirty(req);
 	next:
 		nfs_clear_page_tag_locked(req);
 	}
