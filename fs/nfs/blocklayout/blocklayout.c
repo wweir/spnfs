@@ -32,9 +32,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-#include <linux/nfs_fs.h>
-#include <linux/pnfs_xdr.h> /* Needed by nfs4_pnfs.h */
-#include <linux/nfs4_pnfs.h>
+#include "blocklayout.h"
 
 #define NFSDBG_FACILITY         NFSDBG_PNFS_LD
 
@@ -135,10 +133,19 @@ bl_cleanup_layoutcommit(struct pnfs_layout_type *layoutid,
 	dprintk("%s enter\n", __func__);
 }
 
+/*
+ * This is just a STUB to check the scsi scanning code
+ */
 static struct pnfs_mount_type *
 bl_initialize_mountpoint(struct super_block *sb, struct nfs_fh *fh)
 {
+	LIST_HEAD(scsi_disklist);
+
 	dprintk("%s enter\n", __func__);
+
+	nfs4_blk_create_scsi_disk_list(&scsi_disklist);
+	nfs4_blk_destroy_disk_list(&scsi_disklist);
+
 	return NULL;
 }
 
