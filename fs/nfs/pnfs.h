@@ -75,6 +75,13 @@ unsigned int pnfs_page_length(struct page *page, struct inode *inode)
 	return 0;
 }
 
+#define PNFS_EXISTS_LDIO_OP(opname) (nfss->pnfs_curr_ld && \
+				     nfss->pnfs_curr_ld->ld_io_ops && \
+				     nfss->pnfs_curr_ld->ld_io_ops->opname)
+#define PNFS_EXISTS_LDPOLICY_OP(opname) (nfss->pnfs_curr_ld && \
+				     nfss->pnfs_curr_ld->ld_policy_ops && \
+				     nfss->pnfs_curr_ld->ld_policy_ops->opname)
+
 #endif /* CONFIG_PNFS */
 
 #endif /* FS_NFS_PNFS_H */
