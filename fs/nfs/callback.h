@@ -136,6 +136,10 @@ extern void nfs_callback_down(void);
 #define NFS41_BC_MIN_CALLBACKS 1
 #define NFS41_BC_MAX_CALLBACKS 1
 
+#if defined(CONFIG_PNFS)
+extern unsigned pnfs_cb_layoutrecall(struct cb_pnfs_layoutrecallargs *args,
+				     void *dummy);
+#endif /* CONFIG_PNFS */
 extern unsigned nfs4_callback_sequence(struct cb_sequenceargs *args,
 				       struct cb_sequenceres *res);
 #endif /* CONFIG_NFS_V4_1 */
