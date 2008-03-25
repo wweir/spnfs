@@ -1659,6 +1659,14 @@ config PNFS
 
 	  If unsure, say N.
 
+config PNFS_BLOCK
+	tristate "Provide a pNFS block client (EXPERIMENTAL)"
+	depends on PNFS
+	help
+	  Say Y here if you want your pNfs client to support the block protocol
+
+	  If unsure, say N.
+
 config NFS_DIRECTIO
 	bool "Allow direct I/O on NFS files"
 	depends on NFS_FS
