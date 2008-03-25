@@ -22,9 +22,7 @@
 
 #include <asm/uaccess.h>
 #include <linux/module.h>
-#if defined(CONFIG_PNFS)
 #include "pnfs.h"
-#endif
 
 #include "delegation.h"
 #include "internal.h"
@@ -1287,7 +1285,7 @@ int nfs_commit_rpcsetup(struct list_head *head,
 		return ret;
 #endif /* CONFIG_PNFS */
 	nfs_initiate_commit(data, NFS_CLIENT(inode), how);
-	return ret;
+	return 0;
 }
 
 /*

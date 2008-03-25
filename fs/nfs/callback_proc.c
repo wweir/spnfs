@@ -16,9 +16,9 @@
 #include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/writeback.h>
+#endif
 
 #include "pnfs.h"
-#endif
 
 #define NFSDBG_FACILITY NFSDBG_CALLBACK
  

@@ -35,7 +35,7 @@ enum fid_type {
 	FILEID_INO32_GEN_PARENT = 2,
 };
 
-#if defined(CONFIG_PNFS)
+#if defined(CONFIG_PNFSD)
 
 typedef struct {
 	uint64_t	pnfs_fsid;	/* fsid */
@@ -116,7 +116,7 @@ struct pnfs_layoutget_arg {
 	u32			return_on_close;/* response */
 };
 
-#endif
+#endif /* CONFIG_PNFSD */
 
 struct fid {
 	union {
