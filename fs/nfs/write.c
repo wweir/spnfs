@@ -884,6 +884,9 @@ static int nfs_write_rpcsetup(struct nfs_page *req,
  */
 static void nfs_redirty_request(struct nfs_page *req)
 {
+#ifdef CONFIG_PNFS
+	clear_bit(PG_USE_PNFS, &req->wb_flags);
+#endif
 	nfs_mark_request_dirty(req);
 	nfs_end_page_writeback(req->wb_page);
 	nfs_clear_page_tag_locked(req);
