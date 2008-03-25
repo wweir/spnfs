@@ -953,6 +953,11 @@ nfsd4_getdevlist(struct svc_rqst *rqstp,
 	struct svc_fh *current_fh = &cstate->current_fh;
 	int status;
 
+	dprintk("%s: type %u maxcnt %u cookie %llu verf %llu\n",
+		__func__, gdlp->gd_type, gdlp->gd_maxcount,
+		gdlp->gd_cookie, gdlp->gd_verf);
+
+
 	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
 	if (status) {
 		printk("pNFS %s: verify filehandle failed\n", __FUNCTION__);
@@ -973,23 +978,14 @@ nfsd4_getdevlist(struct svc_rqst *rqstp,
 
 	/* Do nothing if underlying file system does not support
 	 * getdevicelist */
-	status = nfs_ok;
-	if (!sb->s_export_op->get_devicelist)
+	if (!sb->s_export_op->get_device_iter ||
+	    !sb->s_export_op->get_device_info) {
+		status = nfserr_notsupp;
 		goto out;
+	}
 
-	/* set the layouttype for encoding the devaddr */
-	gdlp->gd_ops = sb->s_export_op;
-
-	/* device list is allocated by underlying file system, and free'd
-	 * via export_ops callback. */
-	status = sb->s_export_op->get_devicelist(sb, (void *)gdlp);
-
-	dprintk("%s: status %d type %d maxcount %d len %d\n",
-		__FUNCTION__, status, gdlp->gd_type, gdlp->gd_maxcount,
-		gdlp->gd_devlist_len);
-
-	if (gdlp->gd_devlist_len < 0)
-		status = nfserr_inval;
+	/* Set up arguments so device can be retrieved at encode time */
+	gdlp->gd_fhp = &cstate->current_fh;
 out:
 	return status;
 }
@@ -1205,8 +1201,9 @@ nfsd4_getdevinfo(struct svc_rqst *rqstp,
 	struct svc_fh *current_fh = &cstate->current_fh;
 	int status;
 
-	printk("%s: type %d dev_id %d\n",
-		__FUNCTION__, gdp->gd_type, gdp->gd_dev_id);
+	dprintk("%s: type %u dev_id %u maxcnt %u\n",
+	       __func__, gdp->gd_type, gdp->gd_devid,
+	       gdp->gd_maxcount);
 
 	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
 	if (status) {
@@ -1226,19 +1223,13 @@ nfsd4_getdevinfo(struct svc_rqst *rqstp,
 	if (status)
 		goto out;
 
-	/* Do nothing if underlying file system does not support
-	 * getdeviceinfo */
-	status = nfs_ok;
-	if (!sb->s_export_op->get_deviceinfo)
+	if (!sb->s_export_op->get_device_info) {
+		status = nfserr_notsupp;
 		goto out;
+	}
 
-	/* set the ops for encoding the devaddr */
-	gdp->gd_ops = sb->s_export_op;
-
-	status = sb->s_export_op->get_deviceinfo(sb, (void *)gdp);
-
-	dprintk("%s: status %d type %d dev_id %d\n",
-		__FUNCTION__, status, gdp->gd_type, gdp->gd_dev_id);
+	/* Set up arguments so device can be retrieved at encode time */
+	gdp->gd_fhp = &cstate->current_fh;
 out:
 	return status;
 }
