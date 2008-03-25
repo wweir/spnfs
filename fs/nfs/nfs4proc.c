@@ -49,10 +49,8 @@
 #include <linux/namei.h>
 #include <linux/mount.h>
 #include <linux/module.h>
-#ifdef CONFIG_PNFS
 #include <linux/pnfs_xdr.h>
 #include <linux/nfs4_pnfs.h>
-#endif /* CONFIG_PNFS */
 
 #include "nfs4_fs.h"
 #include "delegation.h"
@@ -61,9 +59,7 @@
 #include "callback.h"
 #include <linux/nfs41_session_recovery.h>
 #endif /* CONFIG_NFS_V4_1 */
-#ifdef CONFIG_PNFS
 #include "pnfs.h"
-#endif /* CONFIG_PNFS */
 
 #define NFSDBG_FACILITY		NFSDBG_PROC
 
