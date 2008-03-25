@@ -57,7 +57,7 @@
 #include "nfs4_fs.h"
 #include "internal.h"
 
-#define NFSDBG_FACILITY         NFSDBG_FILELAYOUT
+#define NFSDBG_FACILITY         NFSDBG_PNFS_LD
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Dean Hildebrand <dhildebz@eecs.umich.edu>");

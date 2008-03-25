@@ -56,7 +56,7 @@
 #include "internal.h"
 #include "nfs4_fs.h"
 
-#define NFSDBG_FACILITY		NFSDBG_FILELAYOUT
+#define NFSDBG_FACILITY		NFSDBG_PNFS_LD
 
 struct nfs4_pnfs_dev_item *nfs4_pnfs_device_item_get(
 					struct filelayout_mount_type *mt,
