@@ -87,6 +87,7 @@ nfs_create_request(struct nfs_open_context *ctx, struct inode *inode,
 	req->wb_bytes   = count;
 	req->wb_context = get_nfs_open_context(ctx);
 	kref_init(&req->wb_kref);
+	pnfs_modify_new_request(inode, req, fsdata);
 	return req;
 }
 
