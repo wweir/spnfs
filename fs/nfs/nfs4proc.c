@@ -5037,10 +5037,21 @@ static int pnfs_proc_layoutcommit(struct pnfs_layoutcommit_data *data)
 	return -1;
 }
 
-static int nfs4_proc_pnfs_layoutreturn(struct nfs4_pnfs_layoutreturn *layout)
+static int pnfs4_proc_layoutreturn(struct nfs4_pnfs_layoutreturn *layout)
 {
-	/* XXX Need to implement */
-	return -1;
+	struct inode *ino = layout->args->inode;
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_PNFS_LAYOUTRETURN],
+		.rpc_argp = layout->args,
+		.rpc_resp = layout->res,
+	};
+	int status;
+
+	status = nfs4_call_sync(NFS_SERVER(ino), NFS_CLIENT(ino), &msg,
+				layout->args, layout->res, 0);
+	dprintk("NFS reply layoutreturn: %d\n", status);
+
+	return status;
 }
 
 /*
@@ -5333,7 +5344,7 @@ const struct nfs_rpc_ops pnfs_v41_clientops = {
 	.clear_acl_cache = nfs4_zap_acl_attr,
 	.pnfs_layoutget      = nfs4_proc_pnfs_layoutget,
 	.pnfs_layoutcommit       = pnfs_proc_layoutcommit,
-	.pnfs_layoutreturn       = nfs4_proc_pnfs_layoutreturn,
+	.pnfs_layoutreturn       = pnfs4_proc_layoutreturn,
 	.validate_sequence_args = nfs41_validate_seq_args,
 	.increment_open_seqid = nfs41_increment_open_seqid,
 	.increment_lock_seqid = nfs41_increment_lock_seqid,
