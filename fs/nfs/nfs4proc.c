@@ -3040,6 +3040,9 @@ static void nfs4_renew_done(struct rpc_task *task, void *data)
 	if (time_before(clp->cl_last_renewal,timestamp))
 		clp->cl_last_renewal = timestamp;
 	spin_unlock(&clp->cl_lock);
+	dprintk("%s calling put_rpccred on rpc_cred %p\n", __func__,
+				task->tk_msg.rpc_cred);
+	put_rpccred(task->tk_msg.rpc_cred);
 }
 
 static const struct rpc_call_ops nfs4_renew_ops = {
@@ -4793,13 +4796,130 @@ int nfs4_proc_destroy_session(struct nfs_server *sp)
 
 static int nfs4_proc_sequence(struct nfs_client *clp, struct rpc_cred *cred)
 {
-	return -1;	/* stub */
+	struct nfs41_sequence_args args;
+	struct nfs41_sequence_res res;
+	struct nfs_server *server;
+
+	struct rpc_message msg = {
+		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_SEQUENCE],
+		.rpc_argp	= &args,
+		.rpc_resp	= &res,
+		.rpc_cred	= cred,
+	};
+	int status;
+
+	/*
+	 * We need to renew the lease on the server. For this, we use any
+	 * session we have on the server to send the SEQUENCE op
+	 */
+	BUG_ON(list_empty(&clp->cl_superblocks));
+
+	server = list_entry(clp->cl_superblocks.next, struct nfs_server,
+				client_link);
+
+	if (nfs41_test_session_expired(server->session))
+		return -NFS4ERR_STALE_CLIENTID;
+
+	/*
+	 * Why do we need this??
+	 */
+	args.sa_cache_this = 0;
+
+	status = _nfs4_call_sync(server, server->session->clnt,
+				 &msg, &args, &res, 0);
+	return status;
 }
+
+void nfs41_sequence_call_done(struct rpc_task *task, void *data)
+{
+	struct nfs_server *server = (struct nfs_server *)data;
+	struct nfs_client *clp = server->nfs_client;
+	struct nfs4_session *session = server->session;
+
+	nfs4_sequence_done(server, task->tk_msg.rpc_resp, task->tk_status);
+
+	if (task->tk_status < 0) {
+		switch (task->tk_status) {
+		case -NFS4ERR_STALE_CLIENTID:
+		case -NFS4ERR_EXPIRED:
+		case -NFS4ERR_CB_PATH_DOWN:
+			nfs4_schedule_state_recovery(clp);
+		case -NFS4ERR_BADSLOT:
+		case -NFS4ERR_BADSESSION:
+		case -NFS4ERR_CONN_NOT_BOUND_TO_SESSION:
+		case -NFS4ERR_BACK_CHAN_BUSY:
+		case -NFS4ERR_SEQ_MISORDERED:
+		case -NFS4ERR_SEQUENCE_POS:
+		case -NFS4ERR_REQ_TOO_BIG:
+		case -NFS4ERR_REP_TOO_BIG:
+		case -NFS4ERR_REP_TOO_BIG_TO_CACHE:
+		case -NFS4ERR_RETRY_UNCACHED_REP:
+		case -NFS4ERR_TOO_MANY_OPS:
+		case -NFS4ERR_OP_NOT_IN_SESSION:
+			nfs41_recover_session(clp, session);
+		}
+	}
+	dprintk("%s rpc_cred %p\n", __func__, task->tk_msg.rpc_cred);
+
+	put_rpccred(task->tk_msg.rpc_cred);
+	kfree(task->tk_msg.rpc_argp);
+	kfree(task->tk_msg.rpc_resp);
+
+	dprintk("<-- %s\n", __func__);
+}
+
+static int nfs41_sequence_validate(struct rpc_task *task, void *data)
+{
+	struct nfs_server *server;
+	struct nfs41_sequence_args *args;
+	struct nfs41_sequence_res *res;
+
+	server = (struct nfs_server *)data;
+	args = task->tk_msg.rpc_argp;
+	res = task->tk_msg.rpc_resp;
+
+	return nfs4_setup_sequence(server->nfs_client, server->session, args,
+				  res, 0, task);
+}
+
+static const struct rpc_call_ops nfs41_sequence_ops = {
+	.rpc_call_done = nfs41_sequence_call_done,
+	.rpc_call_validate_args = nfs41_sequence_validate,
+};
 
 static int nfs41_proc_async_sequence(struct nfs_client *clp,
 				     struct rpc_cred *cred)
 {
-	return -1;	/* stub */
+	struct nfs41_sequence_args *args;
+	struct nfs41_sequence_res *res;
+	struct nfs_server *server;
+	struct rpc_message msg = {
+		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_SEQUENCE],
+		.rpc_cred	= cred,
+	};
+
+	args = kzalloc(sizeof(*args), GFP_KERNEL);
+	if (!args)
+		return -ENOMEM;
+	res = kzalloc(sizeof(*res), GFP_KERNEL);
+	if (!res) {
+		kfree(args);
+		return -ENOMEM;
+	}
+	msg.rpc_argp = args;
+	msg.rpc_resp = res;
+
+	/*
+	 * We need to renew the lease on the server. For this, we use any
+	 * session we have on the server to send the SEQUENCE op
+	 */
+	BUG_ON(list_empty(&clp->cl_superblocks));
+
+	server = list_entry(clp->cl_superblocks.next, struct nfs_server,
+					 client_link);
+
+	return rpc_call_async(server->session->clnt, &msg, RPC_TASK_SOFT,
+				&nfs41_sequence_ops, (void *)server);
 }
 #endif /* CONFIG_NFS_V4_1 */
 
