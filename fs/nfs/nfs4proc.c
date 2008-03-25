@@ -5292,7 +5292,6 @@ const struct nfs_rpc_ops pnfs_v41_clientops = {
 	.file_open      = nfs_open,
 	.file_release   = nfs_release,
 	.lock		= nfs4_proc_lock,
-	.rsize		= pnfs_rsize,
 	.wsize		= pnfs_wsize,
 	.rpages		= pnfs_rpages,
 	.wpages		= pnfs_wpages,

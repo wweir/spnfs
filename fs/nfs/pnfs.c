@@ -639,6 +639,44 @@ out:
 	return stripe_size;
 }
 
+/*
+ * rsize is already set by caller to MDS rsize.
+ */
+void
+pnfs_set_ds_size(struct inode *inode,
+		 struct nfs_open_context *ctx,
+		 struct list_head *pages,
+		 loff_t offset,
+		 size_t *rsize)
+{
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	struct page *page;
+	size_t count = 0;
+	int status = 0;
+
+	dprintk("--> %s inode %p ctx %p pages %p offset %lu\n",
+		__func__, inode, ctx, pages, (unsigned long)offset);
+
+	if (!pnfs_enabled_sb(nfss))
+		return;
+
+	/* Calculate the total read-ahead count */
+	list_for_each_entry(page, pages, lru)
+		count += pnfs_page_length(page, inode);
+
+	dprintk("%s count %ld\n", __func__,(long int)count);
+
+
+	status = virtual_update_layout(inode, ctx, count,
+						offset, IOMODE_READ);
+	dprintk("%s *rsize %Zd virt update returned %d\n",
+					__func__, *rsize, status);
+
+	if (status == 0 && count > 0 && !below_threshold(inode, count, 0))
+		*rsize = NFS_SERVER(inode)->ds_rsize;
+}
+
+
 /* This is utilized in the paging system to determine if
  * it should use the NFSv4 or pNFS read path.
  * If count < 0, we do not check the I/O size.
@@ -1282,16 +1320,6 @@ struct pnfs_client_operations pnfs_ops = {
 	.nfs_writelist_complete = pnfs_writeback_done,
 	.nfs_commit_complete = pnfs_commit_done,
 };
-
-int
-pnfs_rsize(struct inode *inode, unsigned int count, struct nfs_read_data *rdata)
-{
-	if (count >= 0 && below_threshold(inode, count, 0))
-		return NFS_SERVER(inode)->rsize;
-
-	rdata->pnfsflags |= PNFS_USE_DS;
-	return NFS_SERVER(inode)->ds_rsize;
-}
 
 int
 pnfs_wsize(struct inode *inode, unsigned int count, struct nfs_write_data *wdata)
