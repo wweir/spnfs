@@ -20,6 +20,7 @@
 #include <linux/nfs_mount.h>
 
 #include "internal.h"
+#include "pnfs.h"
 
 static struct kmem_cache *nfs_page_cachep;
 
@@ -168,6 +169,9 @@ static void nfs_free_request(struct kref *kref)
 	/* Release struct file or cached credential */
 	nfs_clear_request(req);
 	put_nfs_open_context(req->wb_context);
+#ifdef CONFIG_PNFS
+	pnfs_free_request_data(req);
+#endif /* CONFIG_PNFS */
 	nfs_page_free(req);
 }
 
