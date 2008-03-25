@@ -1231,16 +1231,6 @@ pnfs_use_write(struct inode *inode, ssize_t count)
 	return 1; /* use pNFS I/O */
 }
 
-/* Retrieve layout driver type id */
-static int
-pnfs_get_type(struct inode *inode)
-{
-	struct nfs_server *nfss = NFS_SERVER(inode);
-	if (!pnfs_enabled_sb(nfss))
-		return 0;
-	return nfss->pnfs_curr_ld->id;
-}
-
 /* Return I/O buffer size for a layout driver
  * This value will determine what size reads and writes
  * will be gathered into and sent to the data servers.
@@ -1283,10 +1273,19 @@ pnfs_set_ds_iosize(struct nfs_server *server)
 	}
 }
 
+/* Should the full nfs rpc cleanup code be used after io */
+static int pnfs_use_rpc_code(struct pnfs_layoutdriver_type *ld)
+{
+	if (ld->ld_policy_ops->use_rpc_code)
+		return ld->ld_policy_ops->use_rpc_code();
+	else
+		return 0;
+}
+
 /* Post-write completion function
  * Invoked by all layout drivers when write_pagelist is done.
  *
- * NOTE: callers must set data->pnfsflags PNFS_NO_RPC
+ * NOTE: callers set data->pnfsflags PNFS_NO_RPC
  * so that the NFS cleanup routines perform only the page cache
  * cleanup.
  */
@@ -1297,9 +1296,9 @@ pnfs_writeback_done(struct nfs_write_data *data)
 
 	/* update last write offset and need layout commit
 	 * for non-files layout types (files layout calls
-	 * pnfs_writeback_done_update for this
+	 * pnfs4_write_done for this)
 	 */
-	if (pnfs_get_type(data->inode) != LAYOUT_NFSV4_FILES &&
+	if ((data->pnfsflags & PNFS_NO_RPC) &&
 	    data->task.tk_status >= 0 && data->res.count > 0) {
 		struct nfs_inode *nfsi = NFS_I(data->inode);
 
@@ -1429,7 +1428,7 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 		__func__,
 		how,
 		numpages);
-	if (pnfs_get_type(inode) != LAYOUT_NFSV4_FILES)
+	if (!pnfs_use_rpc_code(nfss->pnfs_curr_ld))
 		wdata->pnfsflags |= PNFS_NO_RPC;
 	wdata->lseg = lseg;
 	status = nfss->pnfs_curr_ld->ld_io_ops->write_pagelist(
@@ -1506,7 +1505,7 @@ pnfs_readpages(struct nfs_read_data *rdata)
 
 	dprintk("%s: Calling layout driver read with %d pages\n",
 		__func__, numpages);
-	if (pnfs_get_type(inode) != LAYOUT_NFSV4_FILES)
+	if (!pnfs_use_rpc_code(nfss->pnfs_curr_ld))
 		rdata->pnfsflags |= PNFS_NO_RPC;
 	rdata->lseg = lseg;
 	status = nfss->pnfs_curr_ld->ld_io_ops->read_pagelist(
