@@ -4482,7 +4482,7 @@ static int decode_attr_pnfstype(struct xdr_stream *xdr, uint32_t *bitmap,
 {
 	int status = 0;
 
-	dprintk("bitmap is %x\n", bitmap[1]);
+	dprintk("%s: bitmap is %x\n", __func__, bitmap[1]);
 	if (unlikely(bitmap[1] & (FATTR4_WORD1_FS_LAYOUT_TYPES - 1U)))
 		return -EIO;
 	if (likely(bitmap[1] & FATTR4_WORD1_FS_LAYOUT_TYPES)) {
