@@ -253,20 +253,20 @@ pnfs_register_layoutdriver(struct pnfs_layoutdriver_type *ld_type)
 	struct layoutdriver_io_operations *io_ops = ld_type->ld_io_ops;
 
 	if (!pnfs_initialized) {
-		printk(KERN_ERR "%s Registration failure. "
-		       "pNFS not initialized.\n", __func__);
+		printk(KERN_ERR "%s Registration failure."
+		       "  pNFS not initialized.\n", __func__);
 		return NULL;
 	}
 
 	if (!io_ops || !io_ops->alloc_layout || !io_ops->free_layout) {
 		printk(KERN_ERR "%s Layout driver must provide "
-		       "alloc_layout and free_layout.\n", __FUNCTION__);
+		       "alloc_layout and free_layout.\n", __func__);
 		return NULL;
 	}
 
 	if (!io_ops->alloc_lseg || !io_ops->free_lseg) {
 		printk(KERN_ERR "%s Layout driver must provide "
-		       "alloc_lseg and free_lseg.\n", __FUNCTION__);
+		       "alloc_lseg and free_lseg.\n", __func__);
 		return NULL;
 	}
 
@@ -346,7 +346,7 @@ put_unlock_current_layout(struct nfs_inode *nfsi,
 		struct layoutdriver_io_operations *io_ops =
 			PNFS_LD_IO_OPS(lo);
 
-		dprintk("%s: freeing layout %p\n", __FUNCTION__, lo);
+		dprintk("%s: freeing layout %p\n", __func__, lo);
 		io_ops->free_layout(lo);
 
 		nfsi->current_layout = NULL;
@@ -525,14 +525,14 @@ pnfs_free_layout(struct pnfs_layout_type *lo,
 		if (!free_matching_lseg(lseg, range))
 			continue;
 		dprintk("%s: freeing lseg %p iomode %d "
-			"offset %llu length %lld\n", __FUNCTION__,
+			"offset %llu length %lld\n", __func__,
 			lseg, lseg->range.iomode, lseg->range.offset,
 			lseg->range.length);
 		list_del(&lseg->fi_list);
 		put_lseg(lseg);
 	}
 
-	dprintk("%s:Return\n", __FUNCTION__);
+	dprintk("%s:Return\n", __func__);
 }
 
 static int
@@ -624,7 +624,7 @@ pnfs_insert_layout(struct pnfs_layout_type *lo,
 	struct pnfs_layout_segment *lp;
 	int found = 0;
 
-	dprintk("%s:Begin\n", __FUNCTION__);
+	dprintk("%s:Begin\n", __func__);
 
 	BUG_ON_UNLOCKED_LO(lo);
 	list_for_each_entry (lp, &lo->segs, fi_list) {
@@ -634,7 +634,7 @@ pnfs_insert_layout(struct pnfs_layout_type *lo,
 		dprintk("%s: inserted lseg %p "
 			"iomode %d offset %llu length %llu before "
 			"lp %p iomode %d offset %llu length %llu\n",
-			__FUNCTION__, lseg, lseg->range.iomode,
+			__func__, lseg, lseg->range.iomode,
 			lseg->range.offset, lseg->range.length,
 			lp, lp->range.iomode, lp->range.offset,
 			lp->range.length);
@@ -645,11 +645,11 @@ pnfs_insert_layout(struct pnfs_layout_type *lo,
 		list_add_tail(&lseg->fi_list, &lo->segs);
 		dprintk("%s: inserted lseg %p "
 			"iomode %d offset %llu length %llu at tail\n",
-			__FUNCTION__, lseg, lseg->range.iomode,
+			__func__, lseg, lseg->range.iomode,
 			lseg->range.offset, lseg->range.length);
 	}
 
-	dprintk("%s:Return\n", __FUNCTION__);
+	dprintk("%s:Return\n", __func__);
 }
 
 /* DH: Inject layout blob into the I/O module.  This must happen before
@@ -669,7 +669,7 @@ pnfs_inject_layout(struct pnfs_layout_type *lo,
 		if (!lseg)
 			lseg = ERR_PTR(-ENOMEM);
 		printk(KERN_ERR "%s: Could not allocate layout: error %ld\n",
-		       __FUNCTION__, PTR_ERR(lseg));
+		       __func__, PTR_ERR(lseg));
 		return lseg;
 	}
 
@@ -725,7 +725,7 @@ get_lock_alloc_layout(struct inode *ino,
 	struct pnfs_layout_type *lo;
 	int res;
 
-	dprintk("%s Begin\n", __FUNCTION__);
+	dprintk("%s Begin\n", __func__);
 
 	while ((lo = get_lock_current_layout(nfsi)) == NULL) {
 		/* Compete against other threads on who's doing the allocation,
@@ -766,9 +766,9 @@ get_lock_alloc_layout(struct inode *ino,
 
 #ifdef NFS_DEBUG
 	if (!IS_ERR(lo))
-		dprintk("%s Return %p\n", __FUNCTION__, lo);
+		dprintk("%s Return %p\n", __func__, lo);
 	else
-		dprintk("%s Return error %ld\n", __FUNCTION__, PTR_ERR(lo));
+		dprintk("%s Return error %ld\n", __func__, PTR_ERR(lo));
 #endif
 	return lo;
 }
@@ -792,7 +792,7 @@ pnfs_has_layout(struct pnfs_layout_type *lo,
 {
 	struct pnfs_layout_segment *lseg, *ret = NULL;
 
-	dprintk("%s:Begin\n", __FUNCTION__);
+	dprintk("%s:Begin\n", __func__);
 
 	BUG_ON_UNLOCKED_LO(lo);
 	list_for_each_entry (lseg, &lo->segs, fi_list) {
@@ -803,7 +803,7 @@ pnfs_has_layout(struct pnfs_layout_type *lo,
 			kref_get(&ret->kref);
 	}
 
-	dprintk("%s:Return %p\n", __FUNCTION__, ret);
+	dprintk("%s:Return %p\n", __func__, ret);
 	return ret;
 }
 
@@ -1504,7 +1504,8 @@ pnfs_readpages(struct nfs_read_data *rdata)
 	if (temp != 0)
 		numpages++;
 
-	dprintk("%s: Calling layout driver read with %d pages\n", __func__, numpages);
+	dprintk("%s: Calling layout driver read with %d pages\n",
+		__func__, numpages);
 	if (pnfs_get_type(inode) != LAYOUT_NFSV4_FILES)
 		rdata->pnfsflags |= PNFS_NO_RPC;
 	rdata->lseg = lseg;
