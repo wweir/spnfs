@@ -823,6 +823,12 @@ filelayout_get_io_threshold(struct pnfs_layout_type *layoutid,
 	return -1;
 }
 
+static int
+filelayout_use_rpc_code(void)
+{
+	return 1;
+}
+
 struct layoutdriver_io_operations filelayout_io_operations = {
 	.commit                  = filelayout_commit,
 	.read_pagelist           = filelayout_read_pagelist,
@@ -844,6 +850,7 @@ struct layoutdriver_policy_operations filelayout_policy_operations = {
 	.layoutget_on_open     = filelayout_layoutget_on_open,
 	.get_read_threshold    = filelayout_get_io_threshold,
 	.get_write_threshold   = filelayout_get_io_threshold,
+	.use_rpc_code          = filelayout_use_rpc_code,
 };
 
 struct pnfs_layoutdriver_type filelayout_type = {
