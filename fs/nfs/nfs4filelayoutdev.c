@@ -464,13 +464,13 @@ decode_and_add_ds(uint32_t **pp, struct filelayout_mount_type *mt)
 	int tmp[6];
 	uint32_t *p = *pp;
 
-	dprintk("%s enter\n", __FUNCTION__);
+	dprintk("%s enter\n", __func__);
 	/* check and skip r_netid */
 	READ32(len);
 	/* "tcp" */
 	if (len != 3) {
 		printk("%s: ERROR: non TCP r_netid len %d\n",
-			__FUNCTION__, len);
+			__func__, len);
 		goto out_err;
 	}
 	/* Read the bytes into a temporary buffer */
@@ -480,7 +480,7 @@ decode_and_add_ds(uint32_t **pp, struct filelayout_mount_type *mt)
 	READ32(len);
 	if (len > 29) {
 		printk("%s: ERROR: Device ip/port too long (%d)\n",
-							__FUNCTION__, len);
+							__func__, len);
 		goto out_err;
 	}
 	COPYMEM(r_addr, len);
@@ -507,10 +507,10 @@ decode_and_add_ds(uint32_t **pp, struct filelayout_mount_type *mt)
 
 	/* adding ds to stripe */
 	atomic_inc(&ds->ds_count);
-	dprintk("%s: addr:port string = %s\n", __FUNCTION__, r_addr);
+	dprintk("%s: addr:port string = %s\n", __func__, r_addr);
 	return ds;
 out_err:
-	dprintk("%s returned NULL\n", __FUNCTION__);
+	dprintk("%s returned NULL\n", __func__);
 	return NULL;
 }
 
@@ -606,7 +606,7 @@ decode_and_add_device(struct filelayout_mount_type *mt, struct pnfs_device *dev)
 	file_dev = decode_device(mt, dev);
 	if (!file_dev) {
 		printk(KERN_WARNING "%s Could not decode device\n",
-					__FUNCTION__);
+					__func__);
 		device_destroy(file_dev, mt->hlist);
 		return NULL;
 	}
@@ -729,7 +729,7 @@ nfs4_pnfs_dserver_get(struct pnfs_layout_segment *lseg,
 
 	dprintk("%s: offset=%Lu, count=%Zu, si=%u, dsi=%u, "
 		"stripe_count=%u, stripe_unit=%u first_stripe_index %d\n",
-		__FUNCTION__,
+		__func__,
 		offset, count, stripe_idx, end_idx, di->stripe_count,
 		layout->stripe_unit, layout->first_stripe_index);
 

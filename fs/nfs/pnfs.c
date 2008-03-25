@@ -170,14 +170,15 @@ find_pnfs(u32 id, struct pnfs_module **module) {
 void
 pnfs_need_layoutcommit(struct nfs_inode *nfsi, struct nfs_open_context *ctx)
 {
-	dprintk("%s: current_layout=%p layoutcommit_ctx=%p ctx=%p\n", __FUNCTION__,
+	dprintk("%s: current_layout=%p layoutcommit_ctx=%p ctx=%p\n", __func__,
 		nfsi->current_layout, nfsi->layoutcommit_ctx, ctx);
 	spin_lock(&pnfs_spinlock);
 	if (nfsi->current_layout && !nfsi->layoutcommit_ctx) {
 		nfsi->layoutcommit_ctx = get_nfs_open_context(ctx);
 		nfsi->change_attr++;
 		spin_unlock(&pnfs_spinlock);
-		dprintk("%s: Set layoutcommit_ctx=%p\n", __FUNCTION__, nfsi->layoutcommit_ctx);
+		dprintk("%s: Set layoutcommit_ctx=%p\n", __func__,
+			nfsi->layoutcommit_ctx);
 		return;
 	}
 	spin_unlock(&pnfs_spinlock);
@@ -199,7 +200,7 @@ pnfs_update_last_write(struct nfs_inode *nfsi, loff_t offset, size_t extent)
 	if (end_pos > nfsi->pnfs_write_end_pos)
 		nfsi->pnfs_write_end_pos = end_pos;
 	dprintk("%s: Wrote %lu@%lu bpos %lu, epos: %lu\n",
-		__FUNCTION__,
+		__func__,
 		(unsigned long) extent,
 		(unsigned long) offset ,
 		(unsigned long) nfsi->pnfs_write_begin_pos,
@@ -229,13 +230,13 @@ set_pnfs_layoutdriver(struct super_block *sb, struct nfs_fh *fh, u32 id)
 	struct nfs_server *server = NFS_SB(sb);
 
 	if (id > 0 && find_pnfs(id, &mod)) {
-		dprintk("%s: Setting pNFS module\n", __FUNCTION__);
+		dprintk("%s: Setting pNFS module\n", __func__);
 		server->pnfs_curr_ld = mod->pnfs_ld_type;
 		mt = server->pnfs_curr_ld->ld_io_ops->initialize_mountpoint(
 			sb, fh);
 		if (!mt) {
 			printk(KERN_ERR "%s: Error initializing mount point "
-			       "for layout driver %u. ", __FUNCTION__, id);
+			       "for layout driver %u. ", __func__, id);
 			goto out_err;
 		}
 		/* Layout driver succeeded in initializing mountpoint */
@@ -245,7 +246,7 @@ set_pnfs_layoutdriver(struct super_block *sb, struct nfs_fh *fh, u32 id)
 		return;
 	}
 
-	dprintk("%s: No pNFS module found for %u. ", __FUNCTION__, id);
+	dprintk("%s: No pNFS module found for %u. ", __func__, id);
 out_err:
 	dprintk("Using NFSv4 I/O\n");
 	server->pnfs_curr_ld = NULL;
@@ -261,26 +262,27 @@ pnfs_register_layoutdriver(struct pnfs_layoutdriver_type *ld_type)
 	struct layoutdriver_io_operations *io_ops = ld_type->ld_io_ops;
 
 	if (!pnfs_initialized) {
-		printk(KERN_ERR "%s Registration failure.  pNFS not initialized.\n", __FUNCTION__);
+		printk(KERN_ERR "%s Registration failure."
+		       "  pNFS not initialized.\n", __func__);
 		return NULL;
 	}
 
 	if (!io_ops || !io_ops->alloc_layout || !io_ops->free_layout) {
 		printk(KERN_ERR "%s Layout driver must provide "
-		       "alloc_layout and free_layout.\n", __FUNCTION__);
+		       "alloc_layout and free_layout.\n", __func__);
 		return NULL;
 	}
 
 	if (!io_ops->alloc_lseg || !io_ops->free_lseg) {
 		printk(KERN_ERR "%s Layout driver must provide "
-		       "alloc_lseg and free_lseg.\n", __FUNCTION__);
+		       "alloc_lseg and free_lseg.\n", __func__);
 		return NULL;
 	}
 
 	pnfs_mod = kmalloc(sizeof(struct pnfs_module), GFP_KERNEL);
 	if (pnfs_mod != NULL) {
 		dprintk("%s Registering id:%u name:%s\n",
-			__FUNCTION__,
+			__func__,
 			ld_type->id,
 			ld_type->name);
 		pnfs_mod->pnfs_ld_type = ld_type;
@@ -301,7 +303,7 @@ pnfs_unregister_layoutdriver(struct pnfs_layoutdriver_type *ld_type)
 	struct pnfs_module *pnfs_mod;
 
 	if (find_pnfs(ld_type->id, &pnfs_mod)) {
-		dprintk("%s Deregistering id:%u\n", __FUNCTION__, ld_type->id);
+		dprintk("%s Deregistering id:%u\n", __func__, ld_type->id);
 		spin_lock(&pnfs_spinlock);
 		list_del(&pnfs_mod->pnfs_tblid);
 		spin_unlock(&pnfs_spinlock);
@@ -353,7 +355,7 @@ put_unlock_current_layout(struct nfs_inode *nfsi,
 		struct layoutdriver_io_operations *io_ops =
 			PNFS_LD_IO_OPS(lo);
 
-		dprintk("%s: freeing layout %p\n", __FUNCTION__, lo);
+		dprintk("%s: freeing layout %p\n", __func__, lo);
 		io_ops->free_layout(lo);
 
 		nfsi->current_layout = NULL;
@@ -532,14 +534,14 @@ pnfs_free_layout(struct pnfs_layout_type *lo,
 		if (!free_matching_lseg(lseg, range))
 			continue;
 		dprintk("%s: freeing lseg %p iomode %d "
-			"offset %llu length %lld\n", __FUNCTION__,
+			"offset %llu length %lld\n", __func__,
 			lseg, lseg->range.iomode, lseg->range.offset,
 			lseg->range.length);
 		list_del(&lseg->fi_list);
 		put_lseg(lseg);
 	}
 
-	dprintk("%s:Return\n", __FUNCTION__);
+	dprintk("%s:Return\n", __func__);
 }
 
 static int
@@ -631,7 +633,7 @@ pnfs_insert_layout(struct pnfs_layout_type *lo,
 	struct pnfs_layout_segment *lp;
 	int found = 0;
 
-	dprintk("%s:Begin\n", __FUNCTION__);
+	dprintk("%s:Begin\n", __func__);
 
 	BUG_ON_UNLOCKED_LO(lo);
 	list_for_each_entry (lp, &lo->segs, fi_list) {
@@ -641,7 +643,7 @@ pnfs_insert_layout(struct pnfs_layout_type *lo,
 		dprintk("%s: inserted lseg %p "
 			"iomode %d offset %llu length %llu before "
 			"lp %p iomode %d offset %llu length %llu\n",
-			__FUNCTION__, lseg, lseg->range.iomode,
+			__func__, lseg, lseg->range.iomode,
 			lseg->range.offset, lseg->range.length,
 			lp, lp->range.iomode, lp->range.offset,
 			lp->range.length);
@@ -652,11 +654,11 @@ pnfs_insert_layout(struct pnfs_layout_type *lo,
 		list_add_tail(&lseg->fi_list, &lo->segs);
 		dprintk("%s: inserted lseg %p "
 			"iomode %d offset %llu length %llu at tail\n",
-			__FUNCTION__, lseg, lseg->range.iomode,
+			__func__, lseg, lseg->range.iomode,
 			lseg->range.offset, lseg->range.length);
 	}
 
-	dprintk("%s:Return\n", __FUNCTION__);
+	dprintk("%s:Return\n", __func__);
 }
 
 /* DH: Inject layout blob into the I/O module.  This must happen before
@@ -669,14 +671,14 @@ pnfs_inject_layout(struct pnfs_layout_type *lo,
 {
 	struct pnfs_layout_segment *lseg;
 
-	dprintk("%s Begin\n", __FUNCTION__);
+	dprintk("%s Begin\n", __func__);
 	/* FIXME - BUG - this is called while holding nfsi->lo_lock spinlock */
 	lseg = PNFS_LD_IO_OPS(lo)->alloc_lseg(lo, lgr);
 	if (!lseg || IS_ERR(lseg)) {
 		if (!lseg)
 			lseg = ERR_PTR(-ENOMEM);
 		printk(KERN_ERR "%s: Could not allocate layout: error %ld\n",
-		       __FUNCTION__, PTR_ERR(lseg));
+		       __func__, PTR_ERR(lseg));
 		return lseg;
 	}
 
@@ -685,7 +687,7 @@ pnfs_inject_layout(struct pnfs_layout_type *lo,
 		kref_get(&lseg->kref);
 	lseg->range = lgr->lseg;
 	pnfs_insert_layout(lo, lseg);
-	dprintk("%s Return %p\n", __FUNCTION__, lseg);
+	dprintk("%s Return %p\n", __func__, lseg);
 	return lseg;
 }
 
@@ -698,7 +700,7 @@ alloc_init_layout(struct inode *ino, struct layoutdriver_io_operations *io_ops)
 	if (!lo) {
 		printk(KERN_ERR
 			"%s: out of memory: io_ops->alloc_layout failed\n",
-			__FUNCTION__);
+			__func__);
 		return NULL;
 	}
 
@@ -732,7 +734,7 @@ get_lock_alloc_layout(struct inode *ino,
 	struct pnfs_layout_type *lo;
 	int res;
 
-	dprintk("%s Begin\n", __FUNCTION__);
+	dprintk("%s Begin\n", __func__);
 
 	while ((lo = get_lock_current_layout(nfsi)) == NULL) {
 		/* Compete against other threads on who's doing the allocation,
@@ -773,9 +775,9 @@ get_lock_alloc_layout(struct inode *ino,
 
 #ifdef NFS_DEBUG
 	if (!IS_ERR(lo))
-		dprintk("%s Return %p\n", __FUNCTION__, lo);
+		dprintk("%s Return %p\n", __func__, lo);
 	else
-		dprintk("%s Return error %ld\n", __FUNCTION__, PTR_ERR(lo));
+		dprintk("%s Return error %ld\n", __func__, PTR_ERR(lo));
 #endif
 	return lo;
 }
@@ -799,7 +801,7 @@ pnfs_has_layout(struct pnfs_layout_type *lo,
 {
 	struct pnfs_layout_segment *lseg, *ret = NULL;
 
-	dprintk("%s:Begin\n", __FUNCTION__);
+	dprintk("%s:Begin\n", __func__);
 
 	BUG_ON_UNLOCKED_LO(lo);
 	list_for_each_entry (lseg, &lo->segs, fi_list) {
@@ -810,7 +812,7 @@ pnfs_has_layout(struct pnfs_layout_type *lo,
 			kref_get(&ret->kref);
 	}
 
-	dprintk("%s:Return %p\n", __FUNCTION__, ret);
+	dprintk("%s:Return %p\n", __func__, ret);
 	return ret;
 }
 
@@ -1300,7 +1302,7 @@ pnfs_set_ds_iosize(struct nfs_server *server)
 static void
 pnfs_writeback_done(struct nfs_write_data *data)
 {
-	dprintk("%s: Begin (status %d)\n", __FUNCTION__, data->task.tk_status);
+	dprintk("%s: Begin (status %d)\n", __func__, data->task.tk_status);
 
 	/* update last write offset and need layout commit
 	 * for non-files layout types (files layout calls
@@ -1411,7 +1413,7 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 	struct pnfs_layout_segment *lseg;
 
 	dprintk("%s: Writing ino:%lu %u@%llu\n",
-		__FUNCTION__,
+		__func__,
 		inode->i_ino,
 		args->count,
 		args->offset);
@@ -1433,7 +1435,7 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 	numpages = nfs_page_array_len(args->pgbase, args->count);
 
 	dprintk("%s: Calling layout driver (how %d) write with %d pages\n",
-		__FUNCTION__,
+		__func__,
 		how,
 		numpages);
 	if (pnfs_get_type(inode) != LAYOUT_NFSV4_FILES)
@@ -1452,7 +1454,7 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 	if (status)
 		put_lseg(lseg);
 out:
-	dprintk("%s: End Status %d\n", __FUNCTION__, status);
+	dprintk("%s: End Status %d\n", __func__, status);
 	return status;
 }
 
@@ -1462,7 +1464,7 @@ out:
 static void
 pnfs_read_done(struct nfs_read_data *data)
 {
-	dprintk("%s: Begin (status %d)\n", __FUNCTION__, data->task.tk_status);
+	dprintk("%s: Begin (status %d)\n", __func__, data->task.tk_status);
 
 	put_lseg(data->lseg);
 	data->call_ops->rpc_call_done(&data->task, data);
@@ -1485,7 +1487,7 @@ pnfs_readpages(struct nfs_read_data *rdata)
 	struct pnfs_layout_segment *lseg;
 
 	dprintk("%s: Reading ino:%lu %u@%llu\n",
-		__FUNCTION__,
+		__func__,
 		inode->i_ino,
 		args->count,
 		args->offset);
@@ -1499,7 +1501,7 @@ pnfs_readpages(struct nfs_read_data *rdata)
 				    &lseg);
 	if (status) {
 		dprintk("%s: ERROR %d from pnfs_update_layout\n",
-			__FUNCTION__, status);
+			__func__, status);
 		status = 1;
 		goto out;
 	}
@@ -1511,7 +1513,8 @@ pnfs_readpages(struct nfs_read_data *rdata)
 	if (temp != 0)
 		numpages++;
 
-	dprintk("%s: Calling layout driver read with %d pages\n", __FUNCTION__, numpages);
+	dprintk("%s: Calling layout driver read with %d pages\n",
+		__func__, numpages);
 	if (pnfs_get_type(inode) != LAYOUT_NFSV4_FILES)
 		rdata->pnfsflags |= PNFS_NO_RPC;
 	rdata->lseg = lseg;
@@ -1526,7 +1529,7 @@ pnfs_readpages(struct nfs_read_data *rdata)
 	if (status)
 		put_lseg(lseg);
  out:
-	dprintk("%s: End Status %d\n", __FUNCTION__, status);
+	dprintk("%s: End Status %d\n", __func__, status);
 	return status;
 }
 
@@ -1536,14 +1539,14 @@ int pnfs_try_to_read_data(struct nfs_read_data *data,
 	struct inode *ino = data->inode;
 	struct nfs_server *nfss = NFS_SERVER(ino);
 
-	dprintk("%s:Begin\n", __FUNCTION__);
+	dprintk("%s:Begin\n", __func__);
 	/* Only create an rpc request if utilizing NFSv4 I/O */
 	if (!pnfs_use_read(ino, data->args.count) ||
 	    !nfss->pnfs_curr_ld->ld_io_ops->read_pagelist) {
-		dprintk("%s:End not using pnfs\n", __FUNCTION__);
+		dprintk("%s:End not using pnfs\n", __func__);
 		return 1;
 	} else {
-		dprintk("%s Utilizing pNFS I/O\n", __FUNCTION__);
+		dprintk("%s Utilizing pNFS I/O\n", __func__);
 		data->call_ops = call_ops;
 		return pnfs_readpages(data);
 	}
@@ -1555,14 +1558,14 @@ int pnfs_try_to_write_data(struct nfs_write_data *data,
 	struct inode *ino = data->inode;
 	struct nfs_server *nfss = NFS_SERVER(ino);
 
-	dprintk("%s:Begin\n", __FUNCTION__);
+	dprintk("%s:Begin\n", __func__);
 	/* Only create an rpc request if utilizing NFSv4 I/O */
 	if (!pnfs_use_write(ino, data->args.count) ||
 	    !nfss->pnfs_curr_ld->ld_io_ops->write_pagelist) {
-		dprintk("%s:End. not using pnfs\n", __FUNCTION__);
+		dprintk("%s:End. not using pnfs\n", __func__);
 		return 1;
 	} else {
-		dprintk("%s Utilizing pNFS I/O\n", __FUNCTION__);
+		dprintk("%s Utilizing pNFS I/O\n", __func__);
 		data->call_ops = call_ops;
 		data->how = how;
 		return pnfs_writepages(data, how);
@@ -1589,7 +1592,7 @@ int pnfs_try_to_commit(struct nfs_write_data *data)
 static void
 pnfs_commit_done(struct nfs_write_data *data)
 {
-	dprintk("%s: Begin (status %d)\n", __FUNCTION__, data->task.tk_status);
+	dprintk("%s: Begin (status %d)\n", __func__, data->task.tk_status);
 
 	put_lseg(data->lseg);
 	data->call_ops->rpc_call_done(&data->task, data);
@@ -1606,7 +1609,7 @@ pnfs_commit(struct nfs_write_data *data, int sync)
 	struct nfs_page *first, *last, *p;
 	int npages;
 
-	dprintk("%s: Begin\n", __FUNCTION__);
+	dprintk("%s: Begin\n", __func__);
 
 	/* If the layout driver doesn't define its own commit function
 	 * use standard NFSv4 commit
@@ -1651,12 +1654,12 @@ pnfs_commit(struct nfs_write_data *data, int sync)
 		return 1;
 	}
 
-	dprintk("%s: Calling layout driver commit\n", __FUNCTION__);
+	dprintk("%s: Calling layout driver commit\n", __func__);
 	data->lseg = lseg;
 	result = nfss->pnfs_curr_ld->ld_io_ops->commit(nfsi->current_layout,
 						       sync, data);
 
-	dprintk("%s end (err:%d)\n", __FUNCTION__, result);
+	dprintk("%s end (err:%d)\n", __func__, result);
 	return result;
 }
 
@@ -1669,7 +1672,7 @@ pnfs_layoutcommit_done(
 	struct nfs_server *nfss = NFS_SERVER(data->inode);
 	struct nfs_inode *nfsi = NFS_I(data->inode);
 
-	dprintk("%s: (status %d)\n", __FUNCTION__, status);
+	dprintk("%s: (status %d)\n", __func__, status);
 
 	/* TODO: For now, set an error in the open context (just like
 	 * if a commit failed) We may want to do more, much more, like
@@ -1678,7 +1681,7 @@ pnfs_layoutcommit_done(
 	 */
 	if (status < 0) {
 		printk(KERN_ERR "%s, Layoutcommit Failed! = %d\n",
-		       __FUNCTION__, status);
+		       __func__, status);
 		data->ctx->error = status;
 	}
 
@@ -1742,7 +1745,7 @@ pnfs_layoutcommit_setup(struct pnfs_layoutcommit_data *data, int sync)
 	struct nfs_server *nfss = NFS_SERVER(data->inode);
 	int result = 0;
 
-	dprintk("%s Begin (sync:%d)\n", __FUNCTION__, sync);
+	dprintk("%s Begin (sync:%d)\n", __func__, sync);
 	data->args.fh = NFS_FH(data->inode);
 	data->args.layout_type = nfss->pnfs_curr_ld->id;
 
@@ -1801,7 +1804,7 @@ pnfs_layoutcommit_setup(struct pnfs_layoutcommit_data *data, int sync)
 		data->args.layout_type,
 		data->args.new_layout_size);
 out:
-	dprintk("%s End Status %d\n", __FUNCTION__, result);
+	dprintk("%s End Status %d\n", __func__, result);
 	return result;
 }
 
@@ -1814,7 +1817,7 @@ pnfs_layoutcommit_inode(struct inode *inode, int sync)
 	struct nfs_inode *nfsi = NFS_I(inode);
 	int status = 0;
 
-	dprintk("%s Begin (sync:%d)\n", __FUNCTION__, sync);
+	dprintk("%s Begin (sync:%d)\n", __func__, sync);
 
 	data = pnfs_layoutcommit_alloc();
 	if (!data)
@@ -1853,7 +1856,7 @@ pnfs_layoutcommit_inode(struct inode *inode, int sync)
 		pnfs_execute_layoutcommit(data);
 	}
 out:
-	dprintk("%s end (err:%d)\n", __FUNCTION__, status);
+	dprintk("%s end (err:%d)\n", __func__, status);
 	return status;
 out_unlock:
 	spin_unlock(&pnfs_spinlock);

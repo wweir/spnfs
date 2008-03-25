@@ -118,7 +118,7 @@ filelayout_initialize_mountpoint(struct super_block *sb, struct nfs_fh *fh)
 
 	kfree(dlist);
 	dprintk("%s device list has been initialized successfully\n",
-		__FUNCTION__);
+		__func__);
 	return mt;
 
 cleanup_mt: ;
@@ -133,7 +133,7 @@ cleanup_dlist: ;
 
 error_ret: ;
 	printk(KERN_WARNING "%s device list could not be initialized\n",
-				__FUNCTION__);
+				__func__);
 
 	return NULL;
 }
@@ -531,7 +531,7 @@ ssize_t filelayout_write_pagelist(
 	data->ds_nfs_client = ds->ds_clp;
 	data->args.fh = dserver->fh;
 
-	dprintk("%s using DS %x:%hu\n", __FUNCTION__,
+	dprintk("%s using DS %x:%hu\n", __func__,
 		htonl(ds->ds_ip_addr), ntohs(ds->ds_port));
 
 	/* Get the file offset on the dserver. Set the write offset to
@@ -582,7 +582,7 @@ filelayout_set_layout(struct nfs4_filelayout *flo,
 	uint32_t *p = (uint32_t *)lgr->layout.buf;
 	uint32_t nfl_util;
 
-	dprintk("%s set_layout_map Begin\n", __FUNCTION__);
+	dprintk("%s set_layout_map Begin\n", __func__);
 
 	COPYMEM(&fl->dev_id, NFS4_PNFS_DEVICEID4_SIZE);
 	READ32(nfl_util);
@@ -704,10 +704,10 @@ filelayout_commit(struct pnfs_layout_type *layoutid, int sync,
 	nfslay = LSEG_LD_DATA(data->lseg);
 
 	dprintk("%s data %p pnfs_client %p nfslay %p\n",
-			__FUNCTION__, data, data->pnfs_client, nfslay);
+			__func__, data, data->pnfs_client, nfslay);
 
 	if (nfslay->commit_through_mds) {
-		dprintk("%s data %p commit through mds\n", __FUNCTION__, data);
+		dprintk("%s data %p commit through mds\n", __func__, data);
 		return 1;
 	}
 
@@ -856,7 +856,7 @@ struct pnfs_layoutdriver_type filelayout_type = {
 static int __init nfs4filelayout_init(void)
 {
 	printk(KERN_INFO "%s: NFSv4 File Layout Driver Registering...\n",
-	       __FUNCTION__);
+	       __func__);
 
 	/* Need to register file_operations struct with global list to indicate
 	* that NFS4 file layout is a possible pNFS I/O module
@@ -869,7 +869,7 @@ static int __init nfs4filelayout_init(void)
 static void __exit nfs4filelayout_exit(void)
 {
 	printk(KERN_INFO "%s: NFSv4 File Layout Driver Unregistering...\n",
-	       __FUNCTION__);
+	       __func__);
 
 	/* Unregister NFS4 file layout driver with pNFS client*/
 	pnfs_unregister_layoutdriver(&filelayout_type);
