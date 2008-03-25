@@ -55,7 +55,7 @@
 #include "nfs4filelayout.h"
 #include "nfs4_fs.h"
 
-#define NFSDBG_FACILITY		NFSDBG_FILELAYOUT
+#define NFSDBG_FACILITY		NFSDBG_PNFS_LD
 
 extern int nfs4_set_client(struct nfs_server *, const char *, const struct sockaddr_in *, const char *r, rpc_authflavor_t, int, int, int);
 extern int nfs4_init_session(struct nfs_client *, struct nfs4_session **, struct rpc_clnt *);
