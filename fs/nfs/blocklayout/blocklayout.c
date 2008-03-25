@@ -166,6 +166,23 @@ static int is_hole(struct pnfs_block_extent *be, sector_t isect)
 	}
 }
 
+/* Given the be associated with isect, determine if page data can be
+ * written to disk.
+ */
+static int is_writable(struct pnfs_block_extent *be, sector_t isect)
+{
+	if (be->be_state == PNFS_BLOCK_READWRITE_DATA)
+		return 1;
+	else if (be->be_state != PNFS_BLOCK_NEEDS_INIT)
+		return 0;
+	else {
+		uint32_t mask;
+		mask = 1 << ((isect - be->be_f_offset) >>
+			     (PAGE_CACHE_SHIFT - 9));
+		return !(be->be_bitmap & mask);
+	}
+}
+
 static int
 dont_like_caller(struct nfs_page *req)
 {
@@ -432,6 +449,27 @@ bl_read_pagelist(struct pnfs_layout_type *layoutid,
 	return 1;
 }
 
+static void bl_writelist_done(struct nfs_write_data *wdata, int status)
+{
+	/* STUB - need to think through what to put into rdata */
+	wdata->task.tk_status = status;
+	wdata->res.count = (status ? 0 : wdata->args.count);
+	if (!status) {
+		/* We don't need to call COMMIT */
+		wdata->verf.committed = NFS_FILE_SYNC;
+	}
+	pnfs_callback_ops->nfs_writelist_complete(wdata);
+}
+
+static void my_end_write_bio(struct bio *bio, int err)
+{
+	struct nfs_write_data *data = (struct nfs_write_data *)bio->bi_private;
+
+	dprintk("%s called with err=%i\n", __func__, err);
+	bl_writelist_done(data, err);
+	bio_put(bio);
+}
+
 /* FRED - this should return just 0 (to indicate done for now)
  * or 1 (to indicate try normal nfs).  It can indicate bytes
  * written in wdata->res.count.  It can indicate error status in
@@ -447,8 +485,72 @@ bl_write_pagelist(struct pnfs_layout_type *layoutid,
 		int sync,
 		struct nfs_write_data *wdata)
 {
-	dprintk("%s enter - just using nfs\n", __func__);
-	return 1;
+	int i;
+	struct bio *bio;
+	struct pnfs_block_extent *be;
+	sector_t isect;
+
+	dprintk("%s enter, %Zu@%Ld\n", __func__, count, offset);
+	if (!test_bit(PG_USE_PNFS, &wdata->req->wb_flags)) {
+		dprintk("PG_USE_PNFS not set\n");
+		return 1;
+	}
+	if (dont_like_caller(wdata->req)) {
+		dprintk("%s dont_like_caller failed\n", __func__);
+		return 1;
+	}
+	/* At this point, wdata->pages is a (sequential) list of nfs_pages.
+	 * We want to write each, and if there is an error remove it from
+	 * list and call
+	 * nfs_retry_request(req) to have it redone using nfs.
+	 * QUEST? Do as block or per req?  Think have to do per block
+	 * as part of end_bio
+	 */
+	if (offset & 0x1ff) {
+		/* This shouldn't be needed, just being paranoid */
+		int diff;
+		dprintk("%s offset %Ld not aligned\n",
+			__func__, offset);
+		diff = offset & 0x1ff;
+		offset &= ~0x1ff;
+		count += diff;
+	}
+	isect = (sector_t) (offset >> 9);
+	be = find_get_extent(wdata->lseg, offset, NULL);
+	if (!be || (count > (be->be_length << 9))) {
+		/* STUB Assume fits within single extent, otherwise bails */
+		dprintk("%s Doesn't fit within single extent\n", __func__);
+		put_extent(be);
+		return 1;
+	}
+	if (!is_writable(be, isect)) {
+		dprintk("%s PANIC trying to use nonwritable extent %p\n",
+			__func__, be);
+		put_extent(be);
+		return 1;
+	}
+	bio = bio_alloc(GFP_NOIO, nr_pages);
+	bio->bi_sector = isect - be->be_f_offset + be->be_v_offset;
+	bio->bi_bdev = be->be_mdev;
+	bio->bi_end_io = my_end_write_bio;
+	bio->bi_private = wdata;
+	for (i = 0; i < nr_pages; i++) {
+		int added;
+		print_page(pages[i]);
+		added = bio_add_page(bio, pages[i], PAGE_SIZE, 0);
+		if (added < PAGE_SIZE) {
+			dprintk("%s ABORT - bio_add_page(%lu)=%i\n",
+				__func__, PAGE_SIZE, added);
+			bio_put(bio);
+			put_extent(be);
+			return 1;
+		}
+	}
+	dprintk("%s submitting write bio %u@%Lu\n", __func__,
+		bio->bi_size, (u64)bio->bi_sector);
+	submit_bio(WRITE, bio);
+	put_extent(be);
+	return 0;
 }
 
 static void
@@ -528,10 +630,19 @@ bl_alloc_lseg(struct pnfs_layout_type *layoutid,
 }
 
 static int
-bl_setup_layoutcommit(struct pnfs_layout_type *layoutid,
+bl_setup_layoutcommit(struct pnfs_layout_type *lo,
 		struct pnfs_layoutcommit_arg *arg)
 {
+	struct nfs_server *nfss = PNFS_NFS_SERVER(lo);
+
 	dprintk("%s enter\n", __func__);
+	/* Need to ensure commit is block-size aligned */
+	if (nfss->pnfs_blksize) {
+		u32 mask = nfss->pnfs_blksize - 1;
+		arg->lseg.offset &= ~mask;
+		arg->lseg.length += mask;
+		arg->lseg.length &= ~mask;
+	}
 	return 0;
 }
 
@@ -930,7 +1041,8 @@ bl_pg_test(struct nfs_pageio_descriptor *pgio, struct nfs_page *prev,
 	   struct nfs_page *req)
 {
 	dprintk("%s enter\n", __func__);
-	return 1;
+	return (test_bit(PG_USE_PNFS, &prev->wb_flags) ==
+		test_bit(PG_USE_PNFS, &req->wb_flags));
 }
 
 /* This checks if old req will likely use same io method as soon
