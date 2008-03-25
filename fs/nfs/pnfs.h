@@ -65,6 +65,8 @@ int _pnfs_write_begin(struct inode *inode, struct nfs_server *nfss,
 		      unsigned flags, struct pnfs_fsdata **fsdata);
 int _pnfs_do_flush(struct inode *inode, struct nfs_server *nfss,
 		   struct nfs_page *req, struct pnfs_fsdata *fsdata);
+void _pnfs_modify_new_request(struct nfs_server *nfss, struct inode *inode,
+			      struct nfs_page *req, struct pnfs_fsdata *fsdata);
 
 #define PNFS_EXISTS_LDIO_OP(opname) (nfss->pnfs_curr_ld && \
 				     nfss->pnfs_curr_ld->ld_io_ops && \
@@ -146,6 +148,15 @@ static inline void pnfs_write_end_cleanup(void *fsdata)
 	pnfs_free_fsdata(fsdata);
 }
 
+static inline void pnfs_modify_new_request(struct inode *inode,
+					   struct nfs_page *req,
+					   void *fsdata)
+{
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	if (PNFS_EXISTS_LDIO_OP(new_request))
+		_pnfs_modify_new_request(nfss, inode, req, fsdata);
+}
+
 #else  /* CONFIG_PNFS */
 
 static inline int pnfs_try_to_read_data(struct nfs_read_data *data,
@@ -179,6 +190,12 @@ static inline int pnfs_write_begin(struct file *filp, struct page *page,
 }
 
 static inline void pnfs_write_end_cleanup(void *fsdata)
+{
+}
+
+static inline void pnfs_modify_new_request(struct inode *inode,
+					   struct nfs_page *req,
+					   void *fsdata)
 {
 }
 
