@@ -699,7 +699,7 @@ int nfs_flush_incompatible(struct file *file, struct page *page)
 		if (req == NULL)
 			return 0;
 		do_flush = req->wb_page != page || req->wb_context != ctx
-			|| !nfs_dirty_request(req);
+			|| !nfs_dirty_request(req) || pnfs_do_flush(req, NULL);
 		nfs_release_request(req);
 		if (!do_flush)
 			return 0;
