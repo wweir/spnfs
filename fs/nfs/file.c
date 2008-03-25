@@ -371,10 +371,14 @@ static int nfs_write_end(struct file *file, struct address_space *mapping,
 	unsigned offset = pos & (PAGE_CACHE_SIZE - 1);
 	int status;
 
+	status = pnfs_write_end(file, page, pos, len, copied, fsdata);
+	if (status)
+		goto out;
 	lock_kernel();
 	status = nfs_updatepage(file, page, offset, copied, fsdata);
 	unlock_kernel();
 
+ out:
 	unlock_page(page);
 	page_cache_release(page);
 	pnfs_write_end_cleanup(fsdata);

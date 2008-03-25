@@ -657,7 +657,7 @@ static struct nfs_page * nfs_update_request(struct nfs_open_context* ctx,
 	rqend = req->wb_offset + req->wb_bytes;
 	if (req->wb_context != ctx
 	    || req->wb_page != page
-	    || !nfs_dirty_request(req)
+	    || !nfs_dirty_request(req) || pnfs_do_flush(req, fsdata)
 	    || offset > rqend || end < req->wb_offset) {
 		nfs_clear_page_tag_locked(req);
 		return ERR_PTR(-EBUSY);
