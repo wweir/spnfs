@@ -89,17 +89,22 @@ bl_write_pagelist(struct pnfs_layout_type *layoutid,
 }
 
 static void
-bl_free_layout(struct pnfs_layout_type *layoutid)
+bl_free_layout(struct pnfs_layout_type *lt)
 {
 	dprintk("%s enter\n", __func__);
+	kfree(lt);
 	return;
 }
 
+/* XXX Ignoring ld_data for the moment */
 static struct pnfs_layout_type *
 bl_alloc_layout(struct pnfs_mount_type *mtype, struct inode *inode)
 {
+	struct pnfs_layout_type		*lt;
+
 	dprintk("%s enter\n", __func__);
-	return NULL;
+	lt = kzalloc(sizeof(*lt) + 0, GFP_KERNEL);
+	return lt;
 }
 
 static void
