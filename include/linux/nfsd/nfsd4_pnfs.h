@@ -40,36 +40,24 @@
 
 #include <linux/nfs.h>
 #include <linux/nfs_xdr.h>
+#include <linux/exportfs.h>
 
 /* pNFS structs */
 
-/* This structure gets filled in by the underlying pNFS file system
- * and encoded in nfsd4_encode_devlist_item with help from
- * the gd_ops->layout_encode() callback */
-struct nfsd4_pnfs_devlist {
-	u32			dev_id;
-	void	 		*dev_addr;	/* encoded by callback */
-};
-
 struct nfsd4_pnfs_getdevlist {
-	u32			gd_type;	/* request */
-	u32			gd_maxcount;	/* request */
-	u64			gd_cookie;	/* request - response */
-	/* nfs4_verifier */
-	u64			gd_verf;	/* request - response */
-	struct export_operations *gd_ops;
-	u32			gd_devlist_len;	/* response */
-	struct nfsd4_pnfs_devlist *gd_devlist;	/*response */
-	u32			gd_eof;
+	u32             gd_type;	/* request */
+	u32		gd_maxcount;	/* request */
+	u64		gd_cookie;	/* request - response */
+	u64		gd_verf;	/* request - response */
+	struct svc_fh 	*gd_fhp;	/* response */
+	u32		gd_eof;		/* response */
 };
 
 struct nfsd4_pnfs_getdevinfo {
-	u32			gd_type;	/* request - response */
-	u32			gd_dev_id;	/* request */
-	u32			gd_maxcnt;	/* request */
-	struct export_operations *gd_ops;
-	u32			gd_devlist_len;	/* response */
-	void			*gd_devaddr;	/*response */
+	u32		gd_type;	/* request */
+	u32		gd_devid;	/* request */
+	u32		gd_maxcount;	/* request */
+	struct svc_fh	*gd_fhp;	/* response */
 };
 
 struct nfsd4_layout_seg {
