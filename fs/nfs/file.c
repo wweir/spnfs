@@ -372,7 +372,7 @@ static int nfs_write_end(struct file *file, struct address_space *mapping,
 	int status;
 
 	lock_kernel();
-	status = nfs_updatepage(file, page, offset, copied);
+	status = nfs_updatepage(file, page, offset, copied, fsdata);
 	unlock_kernel();
 
 	unlock_page(page);
