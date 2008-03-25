@@ -20,9 +20,7 @@
 #include <linux/nfs_mount.h>
 
 #include "internal.h"
-#ifdef CONFIG_PNFS
 #include "pnfs.h"
-#endif /* CONFIG_PNFS */
 
 static struct kmem_cache *nfs_page_cachep;
 
