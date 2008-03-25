@@ -604,7 +604,7 @@ extern void * nfs_root_data(void);
 #define NFSDBG_CLIENT		0x0200
 #define NFSDBG_MOUNT		0x0400
 #define NFSDBG_PNFS		0x0800
-#define NFSDBG_FILELAYOUT	0x1000
+#define NFSDBG_PNFS_LD		0x1000
 #define NFSDBG_IO		0x2000
 #define NFSDBG_ALL		0xFFFF
 
