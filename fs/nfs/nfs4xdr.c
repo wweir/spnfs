@@ -278,6 +278,8 @@ static int nfs4_stat_to_errno(int);
 				   NFS4_PNFS_DEV_MAXSIZE)
 #define encode_pnfs_layoutget_sz (op_encode_hdr_maxsz + 13)
 #define decode_pnfs_layoutget_maxsz (op_decode_hdr_maxsz + 8)
+#define encode_pnfs_layoutreturn_sz	(8 + op_encode_hdr_maxsz)
+#define decode_pnfs_layoutreturn_maxsz	(op_decode_hdr_maxsz)
 #endif /* CONFIG_PNFS */
 
 #define NFS40_enc_compound_sz	(1024)  /* XXX: large enough? */
@@ -740,6 +742,14 @@ static int nfs4_stat_to_errno(int);
 				     decode_sequence_maxsz + \
 				     decode_putfh_maxsz +        \
 				     decode_pnfs_layoutget_maxsz)
+#define NFS41_enc_pnfs_layoutreturn_sz	(compound_encode_hdr_maxsz + \
+					encode_sequence_maxsz + \
+					encode_putfh_maxsz + \
+					encode_pnfs_layoutreturn_sz)
+#define NFS41_dec_pnfs_layoutreturn_sz	(compound_decode_hdr_maxsz + \
+					decode_sequence_maxsz + \
+					decode_putfh_maxsz + \
+					decode_pnfs_layoutreturn_maxsz)
 #endif /* CONFIG_PNFS */
 
 static struct {
@@ -1780,6 +1790,28 @@ static int encode_pnfs_layoutget(struct xdr_stream *xdr,
 		args->maxcount);
 	return 0;
 }
+/*
+ * Encode request to return a pNFS layout.  Sent to the MDS
+ */
+static int encode_pnfs_layoutreturn(struct xdr_stream *xdr,
+				const struct nfs4_pnfs_layoutreturn_arg *args)
+{
+	uint32_t *p;
+
+	RESERVE_SPACE(20);
+	WRITE32(OP_LAYOUTRETURN);
+	WRITE32(args->reclaim);
+	WRITE32(args->layout_type);
+	WRITE32(args->lseg.iomode);
+	WRITE32(args->return_type);
+	if (args->return_type == RETURN_FILE) {
+		RESERVE_SPACE(16);
+		WRITE64(args->lseg.offset);
+		WRITE64(args->lseg.length);
+	}
+	return 0;
+}
+
 #endif /* CONFIG_PNFS */
 /*
  * END OF "GENERIC" ENCODE ROUTINES.
@@ -3293,6 +3325,29 @@ static int nfs41_xdr_enc_pnfs_layoutget(struct rpc_rqst *req, uint32_t *p,
 		goto out;
 	status = encode_pnfs_layoutget(&xdr, args);
  out:
+	return status;
+}
+
+/*
+ * Encode LAYOUTRETURN request
+ */
+static int nfs41_xdr_enc_pnfs_layoutreturn(struct rpc_rqst *req, uint32_t *p,
+					struct nfs4_pnfs_layoutreturn_arg *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 3,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr, 1);
+	encode_sequence(&xdr, &args->seq_args);
+	status = encode_putfh(&xdr, NFS_FH(args->inode));
+	if (status)
+		goto out;
+	status = encode_pnfs_layoutreturn(&xdr, args);
+out:
 	return status;
 }
 
@@ -5362,7 +5417,15 @@ static int decode_pnfs_layoutget(struct xdr_stream *xdr, struct rpc_rqst *req,
 	COPYMEM(res->layout.buf, res->layout.len);
 	return 0;
 }
-#endif /* CONFIG_PNFS */
+/*
+ * Decode LAYOUTRETURN reply
+ */
+static int decode_pnfs_layoutreturn(struct xdr_stream *xdr)
+{
+	return decode_op_hdr(xdr, OP_LAYOUTRETURN);
+}
+
+ #endif /* CONFIG_PNFS */
 
 /*
  * END OF "GENERIC" DECODE ROUTINES.
@@ -7285,6 +7348,31 @@ out:
 
 }
 
+/*
+ * Decode LAYOUTRETURN response
+ */
+static int nfs41_xdr_dec_pnfs_layoutreturn(struct rpc_rqst *rqstp, uint32_t *p,
+					struct nfs4_pnfs_layoutreturn_res *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_sequence(&xdr, &res->seq_res);
+	if (status)
+		goto out;
+	status = decode_putfh(&xdr);
+	if (status)
+		goto out;
+	status = decode_pnfs_layoutreturn(&xdr);
+out:
+	return status;
+}
+
 #endif /* CONFIG_PNFS */
 
 __be32 *nfs4_decode_dirent(__be32 *p, struct nfs_entry *entry, int plus)
@@ -7503,6 +7591,7 @@ struct rpc_procinfo	nfs41_procedures[] = {
   PROC(PNFS_GETDEVICELIST, enc_pnfs_getdevicelist, dec_pnfs_getdevicelist, 1),
   PROC(PNFS_GETDEVICEINFO, enc_pnfs_getdeviceinfo, dec_pnfs_getdeviceinfo, 1),
   PROC(PNFS_LAYOUTGET,	enc_pnfs_layoutget,	dec_pnfs_layoutget, 1),
+  PROC(PNFS_LAYOUTRETURN, enc_pnfs_layoutreturn,  dec_pnfs_layoutreturn, 1),
 #endif /* CONFIG_PNFS */
 };
 #endif /* CONFIG_NFS_V4_1 */
