@@ -35,8 +35,12 @@
 #include <linux/nfs_fs.h>
 #include <linux/pnfs_xdr.h> /* Needed by nfs4_pnfs.h */
 #include <linux/nfs4_pnfs.h>
+#include <linux/dm-ioctl.h> /* Needed for struct dm_ioctl*/
 
 extern struct class shost_class; /* exported from drivers/scsi/hosts.c */
+extern int dm_dev_create(struct dm_ioctl *param); /* from dm-ioctl.c */
+extern int dm_dev_remove(struct dm_ioctl *param); /* from dm-ioctl.c */
+
 
 struct block_mount_id {
 	struct super_block		*bm_sb;     /* back pointer */
