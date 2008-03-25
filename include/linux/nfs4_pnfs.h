@@ -188,6 +188,9 @@ struct layoutdriver_policy_operations {
 	/* Should the pNFS client commit and return the layout upon a setattr
 	 */
 	int (*layoutret_on_setattr) (struct pnfs_mount_type *);
+
+	/* Should the full nfs rpc cleanup code be used after io */
+	int (*use_rpc_code) (void);
 };
 
 struct pnfs_device {
