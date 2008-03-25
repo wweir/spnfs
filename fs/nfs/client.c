@@ -49,10 +49,8 @@
 #include "delegation.h"
 #include "iostat.h"
 #include "internal.h"
-#ifdef CONFIG_PNFS
 #include <linux/pnfs_xdr.h>
 #include "pnfs.h"
-#endif
 
 #define NFSDBG_FACILITY		NFSDBG_CLIENT
 
