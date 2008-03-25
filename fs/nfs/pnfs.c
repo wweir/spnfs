@@ -76,8 +76,10 @@ static inline struct pnfs_layoutcommit_data *pnfs_layoutcommit_alloc(void)
 {
 	struct pnfs_layoutcommit_data *p =
 			mempool_alloc(pnfs_layoutcommit_mempool, GFP_NOFS);
-	if (p)
+	if (p) {
 		memset(p, 0, sizeof(*p));
+		INIT_LIST_HEAD(&p->ld_data);
+	}
 
 	return p;
 }
@@ -1759,7 +1761,8 @@ pnfs_layoutcommit_done(
 		nfss->pnfs_curr_ld->ld_io_ops->cleanup_layoutcommit(
 							nfsi->current_layout,
 							&data->args,
-							&data->res);
+							&data->res,
+							&data->ld_data);
 
 	/* release the open_context acquired in pnfs_writeback_done */
 	put_nfs_open_context(data->ctx);
@@ -1866,7 +1869,7 @@ pnfs_layoutcommit_setup(struct pnfs_layoutcommit_data *data, int sync)
 	if (nfss->pnfs_curr_ld->ld_io_ops->setup_layoutcommit) {
 		result = nfss->pnfs_curr_ld->ld_io_ops->setup_layoutcommit(
 				nfsi->current_layout,
-				&data->args);
+				&data->args, &data->ld_data);
 		if (result)
 			goto out;
 	}
