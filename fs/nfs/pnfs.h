@@ -55,10 +55,16 @@ void pnfs_pageio_init_write(struct nfs_pageio_descriptor *, struct inode *);
 void pnfs_update_layout_commit(struct inode *, struct list_head *, pgoff_t, unsigned int);
 int pnfs_flush_one(struct inode *, struct list_head *, unsigned int, size_t, int);
 void pnfs_free_request_data(struct nfs_page *req);
+void pnfs_free_fsdata(void *fsdata);
 ssize_t pnfs_file_write(struct file *, const char __user *, size_t, loff_t *);
 void pnfs_get_layout_done(struct pnfs_layout_type *,
 			  struct nfs4_pnfs_layoutget *, int);
 void pnfs_layout_release(struct pnfs_layout_type *);
+int _pnfs_write_begin(struct inode *inode, struct nfs_server *nfss,
+		      struct page *page, loff_t pos, unsigned len,
+		      unsigned flags, struct pnfs_fsdata **fsdata);
+int _pnfs_do_flush(struct inode *inode, struct nfs_server *nfss,
+		   struct nfs_page *req, struct pnfs_fsdata *fsdata);
 
 #define PNFS_EXISTS_LDIO_OP(opname) (nfss->pnfs_curr_ld && \
 				     nfss->pnfs_curr_ld->ld_io_ops && \
@@ -109,6 +115,37 @@ static inline int pnfs_try_to_commit(struct nfs_write_data *data)
 	return 1;
 }
 
+static inline int pnfs_write_begin(struct file *filp, struct page *page,
+				   loff_t pos, unsigned len, unsigned flags,
+				   void **fsdata)
+{
+	struct inode *inode = filp->f_dentry->d_inode;
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	struct pnfs_fsdata *pnfs_fsdata = NULL;
+	int status = 0;
+
+	if (PNFS_EXISTS_LDIO_OP(write_begin))
+		status = _pnfs_write_begin(inode, nfss, page, pos, len, flags,
+					   &pnfs_fsdata);
+	*fsdata = pnfs_fsdata; /* fsdata should never be NULL */
+	return status;
+}
+
+static inline int pnfs_do_flush(struct nfs_page *req, void *fsdata)
+{
+	struct inode *inode = req->wb_context->path.dentry->d_inode;
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	if (PNFS_EXISTS_LDPOLICY_OP(do_flush))
+		return _pnfs_do_flush(inode, nfss, req, fsdata);
+	else
+		return 0;
+}
+
+static inline void pnfs_write_end_cleanup(void *fsdata)
+{
+	pnfs_free_fsdata(fsdata);
+}
+
 #else  /* CONFIG_PNFS */
 
 static inline int pnfs_try_to_read_data(struct nfs_read_data *data,
@@ -127,6 +164,22 @@ static inline int pnfs_try_to_write_data(struct nfs_write_data *data,
 static inline int pnfs_try_to_commit(struct nfs_write_data *data)
 {
 	return 1;
+}
+
+static inline int pnfs_do_flush(struct nfs_page *req, void *fsdata)
+{
+	return 0;
+}
+
+static inline int pnfs_write_begin(struct file *filp, struct page *page,
+				   loff_t pos, unsigned len, unsigned flags,
+				   void **fsdata)
+{
+	return 0;
+}
+
+static inline void pnfs_write_end_cleanup(void *fsdata)
+{
 }
 
 #endif /* CONFIG_PNFS */
