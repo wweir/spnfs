@@ -53,11 +53,9 @@
 #include "callback.h"
 #include "delegation.h"
 #include "internal.h"
-#ifdef CONFIG_PNFS
 #include <linux/pnfs_xdr.h>
 #include <linux/nfs4_pnfs.h>
 #include "pnfs.h"
-#endif /* CONFIG_PNFS */
 
 #define NFSDBG_FACILITY		NFSDBG_PROC
 
