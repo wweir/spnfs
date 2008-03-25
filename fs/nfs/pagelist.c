@@ -57,7 +57,7 @@ nfs_page_free(struct nfs_page *p)
 struct nfs_page *
 nfs_create_request(struct nfs_open_context *ctx, struct inode *inode,
 		   struct page *page,
-		   unsigned int offset, unsigned int count)
+		   unsigned int offset, unsigned int count, void *fsdata)
 {
 	struct nfs_page		*req;
 
