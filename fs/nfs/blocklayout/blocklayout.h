@@ -109,7 +109,8 @@ enum exstate4 {
 
 /* sector_t fields are all in 512-byte sectors */
 struct pnfs_block_extent {
-	struct list_head be_node;
+	struct list_head be_node;     /* link into lseg list */
+	struct list_head be_lc_node;  /* link into layoutcommit list */
 	struct pnfs_deviceid be_devid;
 	struct block_device *be_mdev;
 	sector_t	be_f_offset;  /* the starting offset in the file */
@@ -120,6 +121,12 @@ struct pnfs_block_extent {
 	struct kref	be_refcnt;
 };
 
+struct pnfs_block_layout_top {
+	struct list_head	blt_commit_list; /* extents for layoutcommit */
+	int			blt_count;       /* number of entries in list */
+	spinlock_t		blt_lock;        /* protects blt_commit_list */
+};
+
 struct pnfs_block_layout {
 	spinlock_t		bl_ext_lock;    /* protects list manipulation */
 	uint32_t		bl_n_ext;
@@ -128,6 +135,7 @@ struct pnfs_block_layout {
 
 #define BLK_ID(lt)	((struct block_mount_id *)(PNFS_MOUNTID(lt)->mountid))
 #define BLK_LO(lseg)	((struct pnfs_block_layout *)lseg->ld_data)
+#define BLK_LOT(lseg)	((struct pnfs_block_layout_top *)lseg->layout->ld_data)
 
 uint32_t *blk_overflow(uint32_t *p, uint32_t *end, size_t nbytes);
 
@@ -141,6 +149,15 @@ uint32_t *blk_overflow(uint32_t *p, uint32_t *end, size_t nbytes);
 	} \
 } while (0)
 
+#define WRITE32(n)               *p++ = htonl(n)
+#define WRITE64(n)               do {				\
+	*p++ = htonl((uint32_t)((n) >> 32));				\
+	*p++ = htonl((uint32_t)(n));					\
+} while (0)
+#define WRITEMEM(ptr,nbytes)     do {				\
+	p = xdr_encode_opaque_fixed(p, ptr, nbytes);		\
+} while (0)
+#define WRITE_DEVID(x)	WRITEMEM((x)->data, NFS4_PNFS_DEVICEID4_SIZE)
 #define READ32(x)         (x) = ntohl(*p++)
 #define READ64(x)         do {                  \
 	(x) = (uint64_t)ntohl(*p++) << 32;           \
