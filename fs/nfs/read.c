@@ -23,10 +23,8 @@
 
 #include <asm/system.h>
 #include <linux/module.h>
-#ifdef CONFIG_PNFS
 #include <linux/pnfs_xdr.h>
 #include "pnfs.h"
-#endif /* CONFIG_PNFS */
 
 #include "nfs4_fs.h"
 #include "internal.h"
