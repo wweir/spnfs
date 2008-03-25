@@ -736,6 +736,7 @@ static void nfs_server_set_fsinfo(struct nfs_server *server, struct nfs_fsinfo *
 		server->wsize = NFS_MAX_FILE_IO_SIZE;
 	server->wpages = (server->wsize + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 #ifdef CONFIG_PNFS
+	server->pnfs_blksize = fsinfo->blksize; /* XXX Need default if 0? */
 	/* Save the layout type for use during init of layout driver */
 	server->pnfs_fs_ltype = fsinfo->layoutclass;
 #endif /* CONFIG_PNFS */

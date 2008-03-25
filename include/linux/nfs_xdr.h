@@ -55,7 +55,7 @@ struct nfs_fattr {
 	struct timespec		atime;
 	struct timespec		mtime;
 	struct timespec		ctime;
-	__u32			bitmap[2];	/* NFSv4 returned attribute bitmap */
+	__u32			bitmap[3];	/* NFSv4 returned attr bitmap */
 	__u64			change_attr;	/* NFSv4 change attribute */
 	__u64			pre_change_attr;/* pre-op NFSv4 change attribute */
 	unsigned long		time_start;
@@ -84,6 +84,7 @@ struct nfs_fsinfo {
 	__u32			lease_time; /* in seconds */
 #if defined(CONFIG_PNFS)
 	__u32			layoutclass; /* supported pnfs layout driver */
+	__u32			blksize; /* preferred pnfs io block size */
 #endif
 };
 
