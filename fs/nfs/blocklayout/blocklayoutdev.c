@@ -568,6 +568,7 @@ nfs4_blk_process_layoutget(struct pnfs_block_layout *bl,
 		}
 		INIT_LIST_HEAD(&be->be_node);
 		kref_init(&be->be_refcnt);
+		be->be_bitmap = 0;
 		READ_DEVID(&be->be_devid);
 		be->be_mdev = translate_devid(bl, &be->be_devid);
 		if (!be->be_mdev)

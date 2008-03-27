@@ -103,7 +103,8 @@ enum exstate4 {
 	PNFS_BLOCK_READWRITE_DATA	= 0,
 	PNFS_BLOCK_READ_DATA		= 1,
 	PNFS_BLOCK_INVALID_DATA		= 2, /* mapped, but data is invalid */
-	PNFS_BLOCK_NONE_DATA		= 3  /* unmapped, it's a hole */
+	PNFS_BLOCK_NONE_DATA		= 3, /* unmapped, it's a hole */
+	PNFS_BLOCK_NEEDS_INIT		= 4  /* INVAL upgrading to RW */
 };
 
 /* sector_t fields are all in 512-byte sectors */
@@ -115,6 +116,7 @@ struct pnfs_block_extent {
 	sector_t	be_length;    /* the size of the extent */
 	sector_t	be_v_offset;  /* the starting offset in the volume */
 	enum exstate4	be_state;     /* the state of this extent */
+	uint32_t	be_bitmap;    /* state tracking for NEEDS_INIT */
 	struct kref	be_refcnt;
 };
 

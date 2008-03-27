@@ -32,6 +32,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
+#include <linux/buffer_head.h> /* DEBUG Needed for print_page calls */
+#include <linux/bio.h> /* struct bio */
 #include "blocklayout.h"
 
 #define NFSDBG_FACILITY         NFSDBG_PNFS_LD
@@ -42,6 +44,20 @@ MODULE_DESCRIPTION("The NFSv4.1 pNFS Block layout driver");
 
 /* Callback operations to the pNFS client */
 struct pnfs_client_operations *pnfs_callback_ops;
+
+static void print_page(struct page *page)
+{
+	dprintk("PRINTPAGE page %p\n", page);
+	dprintk("        PagePrivate %d\n", PagePrivate(page));
+	dprintk("        PageUptodate %d\n", PageUptodate(page));
+	dprintk("        PageError %d\n", PageError(page));
+	dprintk("        PageDirty %d\n", PageDirty(page));
+	dprintk("        PageReferenced %d\n", PageReferenced(page));
+	dprintk("        PageLocked %d\n", PageLocked(page));
+	dprintk("        PageWriteback %d\n", PageWriteback(page));
+	dprintk("        PageMappedToDisk %d\n", PageMappedToDisk(page));
+	dprintk("\n");
+}
 
 static void print_bl_extent(struct pnfs_block_extent *be)
 {
@@ -124,6 +140,36 @@ find_get_extent(struct pnfs_layout_segment *lseg, sector_t isect,
 	return out;
 }
 
+/* Given the be associated with isect, determine if page data needs to be
+ * initialized.
+ */
+static int is_hole(struct pnfs_block_extent *be, sector_t isect)
+{
+	if (be->be_state == PNFS_BLOCK_INVALID_DATA ||
+	    be->be_state == PNFS_BLOCK_NONE_DATA)
+		return 1;
+	else if (be->be_state != PNFS_BLOCK_NEEDS_INIT)
+		return 0;
+	else {
+		uint32_t mask;
+		mask = 1 << ((isect - be->be_f_offset) >>
+			     (PAGE_CACHE_SHIFT - 9));
+		return be->be_bitmap & mask;
+	}
+}
+
+static int
+dont_like_caller(struct nfs_page *req)
+{
+	if (atomic_read(&req->wb_complete)) {
+		/* Called by _multi */
+		return 1;
+	} else {
+		/* Called by _one */
+		return 0;
+	}
+}
+
 static int
 bl_commit(struct pnfs_layout_type *layoutid,
 		int sync,
@@ -137,16 +183,104 @@ bl_commit(struct pnfs_layout_type *layoutid,
 	return 1;
 }
 
+static void bl_readlist_done(struct nfs_read_data *rdata, int status)
+{
+	/* STUB - need to think through what to put into rdata */
+	rdata->task.tk_status = status;
+	rdata->res.eof = 0;
+	rdata->res.count = (status ? 0 : rdata->args.count);
+	pnfs_callback_ops->nfs_readlist_complete(rdata);
+}
+
+static void bl_end_read_bio(struct bio *bio, int err)
+{
+	struct nfs_read_data *data = (struct nfs_read_data *)bio->bi_private;
+
+	dprintk("%s called with err=%i\n", __func__, err);
+	bl_readlist_done(data, err);
+	bio_put(bio);
+}
+
 static int
 bl_read_pagelist(struct pnfs_layout_type *layoutid,
 		struct page **pages,
 		unsigned int pgbase,
 		unsigned nr_pages,
-		loff_t offset,
+		loff_t f_offset,
 		size_t count,
-		struct nfs_read_data *nfs_data)
+		struct nfs_read_data *rdata)
 {
-	dprintk("%s enter\n", __func__);
+	int i, hole;
+	struct bio *bio;
+	struct pnfs_block_extent *be = NULL, *cow_read = NULL;
+	sector_t isect;
+
+	dprintk("%s enter nr_pages %u offset %Ld count %Zd\n", __func__,
+	       nr_pages, f_offset, count);
+
+	if (f_offset & 0x1ff) {
+		/* This shouldn't be needed, just being paranoid */
+		int diff;
+		dprintk("%s f_offset %Ld not aligned\n",
+			__func__, f_offset);
+		diff = f_offset & 0x1ff;
+		f_offset &= ~0x1ff;
+		count += diff;
+	}
+	if (dont_like_caller(rdata->req)) {
+		dprintk("%s dont_like_caller failed\n", __func__);
+		goto use_mds;
+	}
+	isect = (sector_t) (f_offset >> 9);
+	be = find_get_extent(rdata->lseg, isect, &cow_read);
+	if (!be || count > (be->be_length << 9)) {
+		/* STUB - if count is large, should break into
+		 * multiple bios. Also, need to check cow_read size.
+		 */
+		goto use_mds;
+	}
+	hole = is_hole(be, isect);
+	if (hole && !cow_read) {
+		/* Fill hole w/ zeroes w/o accessing device */
+		dprintk("%s Zeroing pages for hole\n", __func__);
+		for (i = 0; i < nr_pages; i++) {
+			zero_user(pages[i], 0,
+				  min_t(int, PAGE_CACHE_SIZE, count));
+			print_page(pages[i]);
+			count -= PAGE_CACHE_SIZE;
+		}
+		bl_readlist_done(rdata, 0);
+	} else {
+		struct pnfs_block_extent *be_read;
+		int added;
+		be_read = hole && cow_read ? cow_read : be;
+		bio = bio_alloc(GFP_NOIO, nr_pages);
+		bio->bi_sector = isect - be_read->be_f_offset +
+			be_read->be_v_offset;
+		bio->bi_bdev = be_read->be_mdev;
+		bio->bi_end_io = bl_end_read_bio;
+		bio->bi_private = rdata;
+		for (i = 0; i < nr_pages; i++) {
+			added = bio_add_page(bio, pages[i], PAGE_SIZE, 0);
+			if (added < PAGE_SIZE) {
+				dprintk("%s bio_add_page(%lu)=%i\n",
+					__func__, PAGE_SIZE, added);
+				bio_put(bio);
+				goto use_mds;
+			}
+		}
+		dprintk("%s submitting read bio %u@%Lu\n", __func__,
+			bio->bi_size, (u64)bio->bi_sector);
+		submit_bio(READ, bio);
+	}
+	put_extent(be);
+	put_extent(cow_read);
+	return 0;
+
+ use_mds:
+	dprintk("Giving up and using normal NFS\n");
+	put_extent(be);
+	put_extent(cow_read);
 	return 1;
 }
 
