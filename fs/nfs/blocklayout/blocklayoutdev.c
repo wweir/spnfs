@@ -52,7 +52,7 @@ uint32_t *blk_overflow(uint32_t *p, uint32_t *end, size_t nbytes)
 EXPORT_SYMBOL(blk_overflow);
 
 /* Open a block_device by device number. */
-static struct block_device *nfs4_blkdev_get(dev_t dev)
+struct block_device *nfs4_blkdev_get(dev_t dev)
 {
 	struct block_device *bd;
 
@@ -70,7 +70,7 @@ fail:
 /*
  * Release the block device
  */
-static int nfs4_blkdev_put(struct block_device *bdev)
+int nfs4_blkdev_put(struct block_device *bdev)
 {
 	dprintk("%s for device %d:%d\n", __func__, MAJOR(bdev->bd_dev),
 			MINOR(bdev->bd_dev));

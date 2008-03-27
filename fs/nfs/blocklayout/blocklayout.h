@@ -131,6 +131,8 @@ uint32_t *blk_overflow(uint32_t *p, uint32_t *end, size_t nbytes);
 	(x) = tmp >> 9; \
 } while (0)
 
+struct block_device *nfs4_blkdev_get(dev_t dev);
+int nfs4_blkdev_put(struct block_device *bdev);
 struct pnfs_block_dev *nfs4_blk_decode_device(struct super_block *sb,
 					      struct pnfs_device *dev,
 					      struct list_head *sdlist);
