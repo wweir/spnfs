@@ -38,6 +38,19 @@
 
 extern struct class shost_class; /* exported from drivers/scsi/hosts.c */
 
+struct block_mount_id {
+	struct super_block		*bm_sb;     /* back pointer */
+	spinlock_t			bm_lock;    /* protects list */
+	struct list_head		bm_devlist; /* holds pnfs_block_dev */
+};
+
+struct pnfs_block_dev {
+	struct list_head		bm_node;
+	char				*bm_mdevname; /* meta device name */
+	struct pnfs_deviceid		bm_mdevid;    /* associated devid */
+	struct block_device		*bm_mdev;     /* meta device itself */
+};
+
 /* holds visible disks that can be matched against VOLUME_SIMPLE signatures */
 struct visible_block_device {
 	struct list_head	vi_node;
@@ -45,7 +58,83 @@ struct visible_block_device {
 	int			vi_mapped;
 };
 
+enum blk_vol_type {
+	PNFS_BLOCK_VOLUME_SIMPLE   = 0,	/* maps to a single LU */
+	PNFS_BLOCK_VOLUME_SLICE    = 1,	/* slice of another volume */
+	PNFS_BLOCK_VOLUME_CONCAT   = 2,	/* concatenation of multiple volumes */
+	PNFS_BLOCK_VOLUME_STRIPE   = 3	/* striped across multiple volumes */
+};
+
+/* All disk offset/lengths are stored in 512-byte sectors */
+struct pnfs_blk_volume {
+	struct pnfs_deviceid	bv_id;
+	uint32_t		bv_type;
+	sector_t 		bv_size;
+	struct pnfs_blk_volume 	**bv_vols;
+	int 			bv_vol_n;
+	union {
+		dev_t			bv_dev;
+		sector_t		bv_stripe_unit;
+		sector_t 		bv_offset;
+	};
+};
+
+/* Since components need not be aligned, cannot use sector_t */
+struct pnfs_blk_sig_comp {
+	int64_t 	bs_offset;  /* In bytes */
+	uint32_t   	bs_length;  /* In bytes */
+	char 		*bs_string;
+};
+
+/* Maximum number of signatures components in a simple volume */
+# define PNFS_BLOCK_MAX_SIG_COMP 16
+
+struct pnfs_blk_sig {
+	int 				si_num_comps;
+	struct pnfs_blk_sig_comp	si_comps[PNFS_BLOCK_MAX_SIG_COMP];
+};
+
+uint32_t *blk_overflow(uint32_t *p, uint32_t *end, size_t nbytes);
+
+#define BLK_READBUF(p, e, nbytes)  do { \
+	p = blk_overflow(p, e, nbytes); \
+	if (!p) { \
+		printk(KERN_WARNING \
+			"%s: reply buffer overflowed in line %d.\n", \
+			__func__, __LINE__); \
+		goto out_err; \
+	} \
+} while (0)
+
+#define READ32(x)         (x) = ntohl(*p++)
+#define READ64(x)         do {                  \
+	(x) = (uint64_t)ntohl(*p++) << 32;           \
+	(x) |= ntohl(*p++);                     \
+} while (0)
+#define COPYMEM(x,nbytes) do {                  \
+	memcpy((x), p, nbytes);                 \
+	p += XDR_QUADLEN(nbytes);               \
+} while (0)
+#define READ_DEVID(x)	COPYMEM((x)->data, NFS4_PNFS_DEVICEID4_SIZE)
+#define READ_SECTOR(x)     do { \
+	READ64(tmp); \
+	if (tmp & 0x1ff) { \
+		printk(KERN_WARNING \
+		       "%s Value not 512-byte aligned at line %d\n", \
+		       __func__, __LINE__);			     \
+		goto out_err; \
+	} \
+	(x) = tmp >> 9; \
+} while (0)
+
+struct pnfs_block_dev *nfs4_blk_decode_device(struct super_block *sb,
+					      struct pnfs_device *dev,
+					      struct list_head *sdlist);
 int nfs4_blk_create_scsi_disk_list(struct list_head *);
 void nfs4_blk_destroy_disk_list(struct list_head *);
+struct pnfs_block_dev *nfs4_blk_init_metadev(struct super_block *sb,
+					     struct pnfs_device *dev);
+int nfs4_blk_flatten(struct pnfs_blk_volume *, int, struct pnfs_block_dev *);
+void free_block_dev(struct pnfs_block_dev *bdev);
 
 #endif /* FS_NFS_NFS4BLOCKLAYOUT_H */
