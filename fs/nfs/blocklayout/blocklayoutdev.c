@@ -225,7 +225,7 @@ out:
 static int set_vol_array(uint32_t **pp, uint32_t *end,
 			 struct pnfs_blk_volume *vols, int working)
 {
-	pnfs_deviceid id;
+	struct pnfs_deviceid id;
 	int i, j;
 	uint32_t *p = *pp;
 	struct pnfs_blk_volume **array = vols[working].bv_vols;
@@ -517,7 +517,7 @@ nfs4_blk_decode_device(struct super_block *sb,
 }
 
 static struct block_device *translate_devid(struct pnfs_block_layout *bl,
-					    pnfs_deviceid *id)
+					    struct pnfs_deviceid *id)
 {
 	struct pnfs_layout_segment *lseg;
 	struct block_device *rv = NULL;

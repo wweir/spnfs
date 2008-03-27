@@ -161,7 +161,7 @@ struct pnfs_block_dev *nfs4_blk_init_metadev(struct super_block *sb,
 	}
 
 	rv->bm_mdev = bd;
-	memcpy(&rv->bm_mdevid, &dev->dev_id, sizeof(pnfs_deviceid));
+	memcpy(&rv->bm_mdevid, &dev->dev_id, sizeof(struct pnfs_deviceid));
 	dprintk("%s Created device %s named %s with bd_block_size %u\n",
 				__func__,
 				bd->bd_disk->disk_name,

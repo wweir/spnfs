@@ -52,7 +52,7 @@ struct block_mount_id {
 struct pnfs_block_dev {
 	struct list_head		bm_node;
 	char				*bm_mdevname; /* meta device name */
-	pnfs_deviceid 			bm_mdevid;    /* associated devid */
+	struct pnfs_deviceid		bm_mdevid;    /* associated devid */
 	struct block_device		*bm_mdev;     /* meta device itself */
 };
 
@@ -72,7 +72,7 @@ enum blk_vol_type {
 
 /* All disk offset/lengths are stored in 512-byte sectors */
 struct pnfs_blk_volume {
-	pnfs_deviceid		bv_id;
+	struct pnfs_deviceid	bv_id;
 	uint32_t		bv_type;
 	sector_t 		bv_size;
 	struct pnfs_blk_volume 	**bv_vols;
@@ -111,7 +111,7 @@ enum exstate4 {
 struct pnfs_block_extent {
 	struct list_head be_node;     /* link into lseg list */
 	struct list_head be_lc_node;  /* link into layoutcommit list */
-	pnfs_deviceid    be_devid;
+	struct pnfs_deviceid be_devid;
 	struct block_device *be_mdev;
 	sector_t	be_f_offset;  /* the starting offset in the file */
 	sector_t	be_length;    /* the size of the extent */

@@ -753,7 +753,7 @@ static void free_blk_mountid(struct block_mount_id *mid)
  */
 static struct pnfs_block_dev *
 nfs4_blk_get_deviceinfo(struct super_block *sb, struct nfs_fh *fh,
-			pnfs_deviceid *d_id,
+			struct pnfs_deviceid *d_id,
 			struct list_head *sdlist)
 {
 	struct pnfs_device *dev;
