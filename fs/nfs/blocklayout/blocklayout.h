@@ -99,6 +99,33 @@ struct pnfs_blk_sig {
 	struct pnfs_blk_sig_comp	si_comps[PNFS_BLOCK_MAX_SIG_COMP];
 };
 
+enum exstate4 {
+	PNFS_BLOCK_READWRITE_DATA	= 0,
+	PNFS_BLOCK_READ_DATA		= 1,
+	PNFS_BLOCK_INVALID_DATA		= 2, /* mapped, but data is invalid */
+	PNFS_BLOCK_NONE_DATA		= 3  /* unmapped, it's a hole */
+};
+
+/* sector_t fields are all in 512-byte sectors */
+struct pnfs_block_extent {
+	struct list_head be_node;
+	struct pnfs_deviceid be_devid;
+	struct block_device *be_mdev;
+	sector_t	be_f_offset;  /* the starting offset in the file */
+	sector_t	be_length;    /* the size of the extent */
+	sector_t	be_v_offset;  /* the starting offset in the volume */
+	enum exstate4	be_state;     /* the state of this extent */
+	struct kref	be_refcnt;
+};
+
+struct pnfs_block_layout {
+	spinlock_t		bl_ext_lock;    /* protects list manipulation */
+	uint32_t		bl_n_ext;
+	struct list_head	bl_extents;
+};
+
+#define BLK_ID(lt)	((struct block_mount_id *)(PNFS_MOUNTID(lt)->mountid))
+
 uint32_t *blk_overflow(uint32_t *p, uint32_t *end, size_t nbytes);
 
 #define BLK_READBUF(p, e, nbytes)  do { \
@@ -137,6 +164,8 @@ int nfs4_blkdev_put(struct block_device *bdev);
 struct pnfs_block_dev *nfs4_blk_decode_device(struct super_block *sb,
 					      struct pnfs_device *dev,
 					      struct list_head *sdlist);
+int nfs4_blk_process_layoutget(struct pnfs_block_layout *bl,
+			       struct nfs4_pnfs_layoutget_res *lgr);
 int nfs4_blk_create_scsi_disk_list(struct list_head *);
 void nfs4_blk_destroy_disk_list(struct list_head *);
 struct pnfs_block_dev *nfs4_blk_init_metadev(struct super_block *sb,
