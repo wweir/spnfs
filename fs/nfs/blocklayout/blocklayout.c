@@ -414,9 +414,8 @@ bl_read_pagelist(struct pnfs_layout_type *layoutid,
 		/* Fill hole w/ zeroes w/o accessing device */
 		dprintk("%s Zeroing pages for hole\n", __func__);
 		for (i = 0; i < nr_pages; i++) {
-			zero_user_page(pages[i], 0,
-				       min_t(int, PAGE_CACHE_SIZE, count),
-				       KM_USER0);
+			zero_user(pages[i], 0,
+				  min_t(int, PAGE_CACHE_SIZE, count));
 			print_page(pages[i]);
 			count -= PAGE_CACHE_SIZE;
 		}
