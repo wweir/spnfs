@@ -133,26 +133,137 @@ bl_cleanup_layoutcommit(struct pnfs_layout_type *layoutid,
 	dprintk("%s enter\n", __func__);
 }
 
+static void free_blk_mountid(struct block_mount_id *mid)
+{
+	if (mid) {
+		struct pnfs_block_dev *dev;
+		spin_lock(&mid->bm_lock);
+		while (!list_empty(&mid->bm_devlist)) {
+			dev = list_first_entry(&mid->bm_devlist,
+					       struct pnfs_block_dev,
+					       bm_node);
+			list_del(&dev->bm_node);
+			free_block_dev(dev);
+		}
+		spin_unlock(&mid->bm_lock);
+		kfree(mid);
+	}
+}
+
+/* Send and process GETDEVICEINFO for given deviceid.  We search for
+ * device sigs among drives in the sdlist.
+ */
+static struct pnfs_block_dev *
+nfs4_blk_get_deviceinfo(struct super_block *sb, struct nfs_fh *fh,
+			struct pnfs_deviceid *d_id,
+			struct list_head *sdlist)
+{
+	struct pnfs_device *dev;
+	struct pnfs_block_dev *rv = NULL;
+
+	dprintk("%s enter\n", __func__);
+	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
+	if (!dev) {
+		dprintk("%s kmalloc failed\n", __func__);
+		return NULL;
+	}
+	memcpy(&dev->dev_id, d_id, sizeof(*dev));
+	dev->layout_type = LAYOUT_BLOCK_VOLUME;
+	dev->dev_notify_types = 0;
+	if (!pnfs_callback_ops->nfs_getdeviceinfo(sb, fh, dev))
+		rv = nfs4_blk_decode_device(sb, dev, sdlist);
+	kfree(dev);
+	return rv;
+}
+
+
 /*
- * This is just a STUB to check the scsi scanning code
+ * Retrieve the list of available devices for the mountpoint.
  */
 static struct pnfs_mount_type *
 bl_initialize_mountpoint(struct super_block *sb, struct nfs_fh *fh)
 {
+	struct block_mount_id *b_mt_id = NULL;
+	struct pnfs_mount_type *mtype = NULL;
+	struct pnfs_devicelist *dlist = NULL;
+	struct pnfs_block_dev *bdev;
 	LIST_HEAD(scsi_disklist);
+	int status, i;
 
 	dprintk("%s enter\n", __func__);
 
-	nfs4_blk_create_scsi_disk_list(&scsi_disklist);
-	nfs4_blk_destroy_disk_list(&scsi_disklist);
+	b_mt_id = kzalloc(sizeof(struct block_mount_id), GFP_KERNEL);
+	if (!b_mt_id)
+		goto out_error;
+	/* Initialize nfs4 block layout mount id */
+	b_mt_id->bm_sb = sb; /* back pointer to retrieve nfs_server struct */
+	spin_lock_init(&b_mt_id->bm_lock);
+	INIT_LIST_HEAD(&b_mt_id->bm_devlist);
+	mtype = kzalloc(sizeof(struct pnfs_mount_type), GFP_KERNEL);
+	if (!mtype)
+		goto out_error;
+	mtype->mountid = (void *)b_mt_id;
 
-	return NULL;
+	/* Construct a list of all visible scsi disks that have not been
+	 * claimed.
+	 */
+	status =  nfs4_blk_create_scsi_disk_list(&scsi_disklist);
+	if (status < 0)
+		goto out_error;
+
+	dlist = kmalloc(sizeof(struct pnfs_devicelist), GFP_KERNEL);
+	if (!dlist)
+		goto out_error;
+	dlist->eof = 0;
+	while (!dlist->eof) {
+		status = pnfs_callback_ops->nfs_getdevicelist(sb, fh, dlist);
+		if (status)
+			goto out_error;
+		dprintk("%s GETDEVICELIST numdevs=%i, eof=%i\n",
+			__func__, dlist->num_devs, dlist->eof);
+		/* For each device returned in dlist, call GETDEVICEINFO, and
+		 * decode the opaque topology encoding to create a flat
+		 * volume topology, matching VOLUME_SIMPLE disk signatures
+		 * to disks in the visible scsi disk list.
+		 * Construct an LVM meta device from the flat volume topology.
+		 */
+		for (i = 0; i < dlist->num_devs; i++) {
+			bdev = nfs4_blk_get_deviceinfo(sb, fh,
+						     &dlist->dev_id[i],
+						     &scsi_disklist);
+			if (!bdev)
+				goto out_error;
+			spin_lock(&b_mt_id->bm_lock);
+			list_add(&bdev->bm_node, &b_mt_id->bm_devlist);
+			spin_unlock(&b_mt_id->bm_lock);
+		}
+	}
+	dprintk("%s SUCCESS\n", __func__);
+
+ out_return:
+	kfree(dlist);
+	nfs4_blk_destroy_disk_list(&scsi_disklist);
+	return mtype;
+
+ out_error:
+	free_blk_mountid(b_mt_id);
+	kfree(mtype);
+	mtype = NULL;
+	goto out_return;
 }
 
 static int
 bl_uninitialize_mountpoint(struct pnfs_mount_type *mtype)
 {
+	struct block_mount_id *b_mt_id = NULL;
+
 	dprintk("%s enter\n", __func__);
+	if (!mtype)
+		return 0;
+	b_mt_id = (struct block_mount_id *)mtype->mountid;
+	free_blk_mountid(b_mt_id);
+	kfree(mtype);
+	dprintk("%s RETURNS\n", __func__);
 	return 0;
 }
 
