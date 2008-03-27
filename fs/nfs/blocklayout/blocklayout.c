@@ -43,6 +43,26 @@ MODULE_DESCRIPTION("The NFSv4.1 pNFS Block layout driver");
 /* Callback operations to the pNFS client */
 struct pnfs_client_operations *pnfs_callback_ops;
 
+static void
+destroy_extent(struct kref *kref)
+{
+	struct pnfs_block_extent *be;
+
+	be = container_of(kref, struct pnfs_block_extent, be_refcnt);
+	dprintk("%s be=%p\n", __func__, be);
+	kfree(be);
+}
+
+static void
+put_extent(struct pnfs_block_extent *be)
+{
+	if (be) {
+		dprintk("%s enter %p (%i)\n", __func__, be,
+			atomic_read(&be->be_refcnt.refcount));
+		kref_put(&be->be_refcnt, destroy_extent);
+	}
+}
+
 static int
 bl_commit(struct pnfs_layout_type *layoutid,
 		int sync,
@@ -89,6 +109,22 @@ bl_write_pagelist(struct pnfs_layout_type *layoutid,
 }
 
 static void
+release_extents(struct pnfs_block_layout *bl)
+{
+	struct pnfs_block_extent *be;
+
+	spin_lock(&bl->bl_ext_lock);
+	while (!list_empty(&bl->bl_extents)) {
+		be = list_first_entry(&bl->bl_extents, struct pnfs_block_extent,
+				      be_node);
+		list_del(&be->be_node);
+		put_extent(be);
+	}
+	bl->bl_n_ext = 0;
+	spin_unlock(&bl->bl_ext_lock);
+}
+
+static void
 bl_free_layout(struct pnfs_layout_type *lt)
 {
 	dprintk("%s enter\n", __func__);
@@ -110,7 +146,14 @@ bl_alloc_layout(struct pnfs_mount_type *mtype, struct inode *inode)
 static void
 bl_free_lseg(struct pnfs_layout_segment *lseg)
 {
+	struct pnfs_block_layout *bl;
+
 	dprintk("%s enter\n", __func__);
+	if (lseg) {
+		bl = (struct pnfs_block_layout *)lseg->ld_data;
+		release_extents(bl);
+		kfree(lseg);
+	}
 	return;
 }
 
@@ -118,8 +161,27 @@ static struct pnfs_layout_segment *
 bl_alloc_lseg(struct pnfs_layout_type *layoutid,
 	      struct nfs4_pnfs_layoutget_res *lgr)
 {
+	struct pnfs_layout_segment *lseg;
+	struct pnfs_block_layout *bl;
+	int status;
+
 	dprintk("%s enter\n", __func__);
-	return NULL;
+	lseg = kzalloc(sizeof(*lseg) + sizeof(*bl), GFP_KERNEL);
+	if (!lseg)
+		return NULL;
+	bl = (struct pnfs_block_layout *) lseg->ld_data;
+	/* This is needed to get layoutid->ld_data (metadevice list) from bl */
+	lseg->layout = layoutid;
+
+	spin_lock_init(&bl->bl_ext_lock);
+	INIT_LIST_HEAD(&bl->bl_extents);
+
+	status = nfs4_blk_process_layoutget(bl, lgr);
+	if (status) {
+		bl_free_lseg(lseg);
+		return ERR_PTR(status);
+	}
+	return lseg;
 }
 
 static int
