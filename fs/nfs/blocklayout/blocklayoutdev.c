@@ -515,3 +515,83 @@ nfs4_blk_decode_device(struct super_block *sb,
 	kfree(vols);
 	return rv;
 }
+
+static struct block_device *translate_devid(struct pnfs_block_layout *bl,
+					    struct pnfs_deviceid *id)
+{
+	struct pnfs_layout_segment *lseg;
+	struct block_device *rv = NULL;
+	struct block_mount_id *mid;
+	struct pnfs_block_dev *dev;
+
+	dprintk("%s enter, bl=%p, id=%p\n", __func__, bl, id);
+	lseg = container_of((void *)bl, struct pnfs_layout_segment, ld_data);
+	mid = BLK_ID(lseg->layout);
+	spin_lock(&mid->bm_lock);
+	list_for_each_entry(dev, &mid->bm_devlist, bm_node) {
+		if (memcmp(id->data, dev->bm_mdevid.data,
+			   NFS4_PNFS_DEVICEID4_SIZE) == 0) {
+			rv = dev->bm_mdev;
+			goto out;
+		}
+	}
+ out:
+	spin_unlock(&mid->bm_lock);
+	dprintk("%s returning %p\n", __func__, rv);
+	return rv;
+}
+
+/* XDR decode pnfs_block_layout4 structure */
+int
+nfs4_blk_process_layoutget(struct pnfs_block_layout *bl,
+			   struct nfs4_pnfs_layoutget_res *lgr)
+{
+	uint32_t *p = (uint32_t *)lgr->layout.buf;
+	uint32_t *end = (uint32_t *)((char *)lgr->layout.buf + lgr->layout.len);
+	int i, status = -EIO;
+	uint32_t count;
+
+	BLK_READBUF(p, end, 4);
+	READ32(count);
+
+	dprintk("%s enter, number of extents %i\n", __func__, count);
+	BLK_READBUF(p, end, (28 + NFS4_PNFS_DEVICEID4_SIZE) * count);
+
+	for (i = 0; i < count; i++) {
+		struct pnfs_block_extent  *be;
+		uint64_t tmp; /* Used by READSECTOR */
+
+		be = kmalloc(sizeof(struct pnfs_block_extent), GFP_KERNEL);
+		if (!be) {
+			status = -ENOMEM;
+			goto out_err;
+		}
+		INIT_LIST_HEAD(&be->be_node);
+		kref_init(&be->be_refcnt);
+		READ_DEVID(&be->be_devid);
+		be->be_mdev = translate_devid(bl, &be->be_devid);
+		if (!be->be_mdev)
+			goto out_err;
+		/* The next three values are read in as bytes,
+		 * but stored as 512-byte sector lengths
+		 */
+		READ_SECTOR(be->be_f_offset);
+		READ_SECTOR(be->be_length);
+		READ_SECTOR(be->be_v_offset);
+		READ32(be->be_state);
+
+		spin_lock(&bl->bl_ext_lock);
+		list_add_tail(&be->be_node, &bl->bl_extents);
+		bl->bl_n_ext++;
+		spin_unlock(&bl->bl_ext_lock);
+	}
+	if (p != end) {
+		dprintk("%s Undecoded cruft at end of opaque\n", __func__);
+		status = -EIO;
+		goto out_err;
+	}
+	status = 0;
+ out_err:
+	dprintk("%s returns %i\n", __func__, status);
+	return status;
+}
