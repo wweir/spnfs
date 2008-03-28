@@ -303,7 +303,7 @@ static void get_sector(struct block_device *bdev,
 	*offset_in_block = use_offset - (*block << blkshift);
 
 	dprintk("%s block %Lu offset_in_block %u\n",
-			__func__, *block, *offset_in_block);
+			__func__, (u64)*block, *offset_in_block);
 	return;
 }
 
@@ -410,11 +410,11 @@ static int decode_blk_volume(uint32_t **pp, uint32_t *end,
 			return -EIO;
 		}
 		status = 0;
-		dprintk("%s Set Simple vol to dev %d:%d, size %Li\n",
+		dprintk("%s Set Simple vol to dev %d:%d, size %Lu\n",
 				__func__,
 				MAJOR(vol->bv_dev),
 				MINOR(vol->bv_dev),
-				vol->bv_size);
+				(u64)vol->bv_size);
 		break;
 	case PNFS_BLOCK_VOLUME_SLICE:
 		BLK_READBUF(p, end, 16);
@@ -435,8 +435,8 @@ static int decode_blk_volume(uint32_t **pp, uint32_t *end,
 		*array_cnt = vol->bv_vol_n;
 		status = set_vol_array(&p, end, vols, i);
 		vol->bv_size = sum_subvolume_sizes(vol);
-		dprintk("%s Set Concat vol to size %Li\n",
-				__func__, vol->bv_size);
+		dprintk("%s Set Concat vol to size %Lu\n",
+				__func__, (u64)vol->bv_size);
 		break;
 	default:
 		dprintk("Unknown volume type %i\n", vol->bv_type);

@@ -71,9 +71,9 @@ static void print_bl_extent(struct pnfs_block_extent *be)
 {
 	dprintk("PRINT EXTENT extent %p\n", be);
 	if (be) {
-		dprintk("        be_f_offset %Lu\n", be->be_f_offset);
-		dprintk("        be_length   %Lu\n", be->be_length);
-		dprintk("        be_v_offset %Lu\n", be->be_v_offset);
+		dprintk("        be_f_offset %Lu\n", (u64)be->be_f_offset);
+		dprintk("        be_length   %Lu\n", (u64)be->be_length);
+		dprintk("        be_v_offset %Lu\n", (u64)be->be_v_offset);
 		dprintk("        be_state    %d\n", be->be_state);
 	}
 }
@@ -114,7 +114,7 @@ find_get_extent(struct pnfs_layout_segment *lseg, sector_t isect,
 	struct pnfs_block_layout *bl = BLK_LO(lseg);
 	struct pnfs_block_extent *be, *cow, *out;
 
-	dprintk("%s enter with isect %Ld\n", __func__, isect);
+	dprintk("%s enter with isect %Lu\n", __func__, (u64)isect);
 	cow = out = NULL;
 	spin_lock(&bl->bl_ext_lock);
 	list_for_each_entry(be, &bl->bl_extents, be_node) {
@@ -259,7 +259,7 @@ split_inval_extent(struct pnfs_layout_segment *lseg,
 	struct pnfs_block_extent *rv = NULL, *inval = NULL, *e1, *e2, *e3;
 	struct nfs_server *nfss = PNFS_NFS_SERVER(lseg->layout);
 
-	dprintk("%s isect=%Lu\n", __func__, isect);
+	dprintk("%s isect=%Lu\n", __func__, (u64)isect);
 	put_extent(be);
 
 	/* Preallocate prior to taking spinlock */
@@ -385,7 +385,7 @@ bl_read_pagelist(struct pnfs_layout_type *layoutid,
 	struct pnfs_block_extent *be = NULL, *cow_read = NULL;
 	sector_t isect;
 
-	dprintk("%s enter nr_pages %u offset %Ld count %d\n", __func__,
+	dprintk("%s enter nr_pages %u offset %Ld count %Zd\n", __func__,
 	       nr_pages, f_offset, count);
 
 	if (f_offset & 0x1ff) {
@@ -440,7 +440,7 @@ bl_read_pagelist(struct pnfs_layout_type *layoutid,
 			}
 		}
 		dprintk("%s submitting read bio %u@%Lu\n", __func__,
-			bio->bi_size, bio->bi_sector);
+			bio->bi_size, (u64)bio->bi_sector);
 		submit_bio(READ, bio);
 	}
 	put_extent(be);
@@ -495,7 +495,7 @@ bl_write_pagelist(struct pnfs_layout_type *layoutid,
 	struct pnfs_block_extent *be;
 	sector_t isect;
 
-	dprintk("%s enter, %u@%Ld\n", __func__, count, offset);
+	dprintk("%s enter, %Zu@%Ld\n", __func__, count, offset);
 	if (!test_bit(PG_USE_PNFS, &wdata->req->wb_flags)) {
 		dprintk("PG_USE_PNFS not set\n");
 		return 1;
@@ -552,7 +552,7 @@ bl_write_pagelist(struct pnfs_layout_type *layoutid,
 		}
 	}
 	dprintk("%s submitting write bio %u@%Lu\n", __func__,
-		bio->bi_size, bio->bi_sector);
+		bio->bi_size, (u64)bio->bi_sector);
 	submit_bio(WRITE, bio);
 	put_extent(be);
 	return 0;
@@ -923,7 +923,7 @@ map_block(sector_t isect, struct pnfs_block_extent *be,
 				bitsize;
 	res_bh->b_size = 1 << (bitsize + 9);
 
-	dprintk("%s isect %ld, res_bh->b_blocknr %ld, using bsize %d\n",
+	dprintk("%s isect %ld, res_bh->b_blocknr %ld, using bsize %Zd\n",
 				__func__, (long)isect,
 				(long)res_bh->b_blocknr,
 				res_bh->b_size);
