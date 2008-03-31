@@ -19,6 +19,7 @@
 #include <linux/nfs_mount.h>
 #include <linux/nfs_page.h>
 #include <linux/backing-dev.h>
+#include <linux/module.h>
 
 #include <asm/uaccess.h>
 
@@ -783,26 +784,22 @@ static int flush_task_priority(int how)
 	return RPC_PRIORITY_NORMAL;
 }
 
-/*
- * Set up the argument/result storage required for the RPC call.
- */
-static void nfs_write_rpcsetup(struct nfs_page *req,
-		struct nfs_write_data *data,
-		const struct rpc_call_ops *call_ops,
-		unsigned int count, unsigned int offset,
-		int how)
+int nfs_initiate_write(struct nfs_write_data *data,
+		       struct rpc_clnt *clnt,
+		       const struct rpc_call_ops *call_ops,
+		       int how)
 {
-	struct inode *inode = req->wb_context->path.dentry->d_inode;
+	struct inode *inode = data->inode;
 	int flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
 	int priority = flush_task_priority(how);
 	struct rpc_task *task;
 	struct rpc_message msg = {
 		.rpc_argp = &data->args,
 		.rpc_resp = &data->res,
-		.rpc_cred = req->wb_context->cred,
+		.rpc_cred = data->cred,
 	};
 	struct rpc_task_setup task_setup_data = {
-		.rpc_client = NFS_CLIENT(inode),
+		.rpc_client = clnt,
 		.task = &data->task,
 		.rpc_message = &msg,
 		.callback_ops = call_ops,
@@ -811,12 +808,42 @@ static void nfs_write_rpcsetup(struct nfs_page *req,
 		.priority = priority,
 	};
 
+	/* Set up the initial task struct.  */
+	NFS_PROTO(inode)->write_setup(data, &msg);
+
+	dprintk("NFS: %5u initiated write call "
+		"(req %s/%Ld, %u bytes @ offset %Lu)\n",
+		data->task.tk_pid,
+		inode->i_sb->s_id,
+		(long long)NFS_FILEID(inode),
+		data->args.count,
+		(unsigned long long)data->args.offset);
+
+	task = rpc_run_task(&task_setup_data);
+	if (unlikely(IS_ERR(task)))
+		return PTR_ERR(task);
+	rpc_put_task(task);
+	return 0;
+}
+EXPORT_SYMBOL(nfs_initiate_write);
+
+/*
+ * Set up the argument/result storage required for the RPC call.
+ */
+static int nfs_write_rpcsetup(struct nfs_page *req,
+		struct nfs_write_data *data,
+		const struct rpc_call_ops *call_ops,
+		unsigned int count, unsigned int offset,
+		int how)
+{
+	struct inode *inode = req->wb_context->path.dentry->d_inode;
+
 	/* Set up the RPC argument and reply structs
 	 * NB: take care not to mess about with data->commit et al. */
 
 	data->req = req;
 	data->inode = inode = req->wb_context->path.dentry->d_inode;
-	data->cred = msg.rpc_cred;
+	data->cred = req->wb_context->cred;
 
 	data->args.fh     = NFS_FH(inode);
 	data->args.offset = req_offset(req) + offset;
@@ -836,20 +863,7 @@ static void nfs_write_rpcsetup(struct nfs_page *req,
 	data->res.verf    = &data->verf;
 	nfs_fattr_init(&data->fattr);
 
-	/* Set up the initial task struct.  */
-	NFS_PROTO(inode)->write_setup(data, &msg);
-
-	dprintk("NFS: %5u initiated write call "
-		"(req %s/%Ld, %u bytes @ offset %Lu)\n",
-		data->task.tk_pid,
-		inode->i_sb->s_id,
-		(long long)NFS_FILEID(inode),
-		count,
-		(unsigned long long)data->args.offset);
-
-	task = rpc_run_task(&task_setup_data);
-	if (!IS_ERR(task))
-		rpc_put_task(task);
+	return nfs_initiate_write(data, NFS_CLIENT(inode), call_ops, how);
 }
 
 /*
@@ -865,6 +879,7 @@ static int nfs_flush_multi(struct inode *inode, struct list_head *head, unsigned
 	unsigned int offset;
 	int requests = 0;
 	LIST_HEAD(list);
+	int status = -ENOMEM;
 
 	nfs_list_remove_request(req);
 
@@ -892,8 +907,10 @@ static int nfs_flush_multi(struct inode *inode, struct list_head *head, unsigned
 
 		if (nbytes < wsize)
 			wsize = nbytes;
-		nfs_write_rpcsetup(req, data, &nfs_write_partial_ops,
-				   wsize, offset, how);
+		status = nfs_write_rpcsetup(req, data, &nfs_write_partial_ops,
+					    wsize, offset, how);
+		if (status < 0)
+			goto out_bad;
 		offset += wsize;
 		nbytes -= wsize;
 	} while (nbytes != 0);
@@ -909,7 +926,7 @@ out_bad:
 	nfs_redirty_request(req);
 	nfs_end_page_writeback(req->wb_page);
 	nfs_clear_page_tag_locked(req);
-	return -ENOMEM;
+	return status;
 }
 
 /*
@@ -925,6 +942,7 @@ static int nfs_flush_one(struct inode *inode, struct list_head *head, unsigned i
 	struct nfs_page		*req;
 	struct page		**pages;
 	struct nfs_write_data	*data;
+	int			status = -ENOMEM;
 
 	data = nfs_writedata_alloc(npages);
 	if (!data)
@@ -941,9 +959,10 @@ static int nfs_flush_one(struct inode *inode, struct list_head *head, unsigned i
 	req = nfs_list_entry(data->pages.next);
 
 	/* Set up the argument struct */
-	nfs_write_rpcsetup(req, data, &nfs_write_full_ops, count, 0, how);
-
-	return 0;
+	status = nfs_write_rpcsetup(req, data, &nfs_write_full_ops, count, 0,
+				    how);
+	if (!status)
+		return 0;
  out_bad:
 	while (!list_empty(head)) {
 		req = nfs_list_entry(head->next);
@@ -952,7 +971,7 @@ static int nfs_flush_one(struct inode *inode, struct list_head *head, unsigned i
 		nfs_end_page_writeback(req->wb_page);
 		nfs_clear_page_tag_locked(req);
 	}
-	return -ENOMEM;
+	return status;
 }
 
 static void nfs_pageio_init_write(struct nfs_pageio_descriptor *pgio,
