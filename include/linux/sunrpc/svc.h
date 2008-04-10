@@ -90,6 +90,7 @@ struct svc_serv {
 	wait_queue_head_t	sv_cb_waitq;	/* sleep here if there are no
 						 * entries in the svc_cb_list
 						 */
+	struct svc_xprt		*bc_xprt;
 #endif /* CONFIG_NFS_V4_1 */
 };
 
