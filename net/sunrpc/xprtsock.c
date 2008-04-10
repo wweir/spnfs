@@ -967,10 +967,11 @@ static inline void xs_tcp_read_calldir(struct sock_xprt *transport,
 	transport->tcp_flags &= ~TCP_RCV_COPY_CALLDIR;
 	transport->tcp_flags |= TCP_RCV_COPY_DATA;
 	transport->tcp_copied += 4;
+	transport->tcp_calldir = ntohl(transport->tcp_calldir);
 	dprintk("RPC:       reading %s CALL/REPLY flag %08x\n",
 			(transport->tcp_calldir == RPC_REPLY) ? "reply for"
 							      : "request with",
-						ntohl(transport->tcp_calldir));
+							transport->tcp_calldir);
 	xs_tcp_check_fraghdr(transport);
 }
 
@@ -1132,7 +1133,7 @@ static void xs_tcp_read_data(struct rpc_xprt *xprt,
 				container_of(xprt, struct sock_xprt, xprt);
 	int status;
 
-	status = (ntohl(transport->tcp_calldir) == RPC_REPLY) ?
+	status = (transport->tcp_calldir == RPC_REPLY) ?
 		xs_tcp_read_reply(xprt, desc) :
 		xs_tcp_read_callback(xprt, desc);
 
