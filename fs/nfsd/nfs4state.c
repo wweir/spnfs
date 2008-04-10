@@ -1302,14 +1302,12 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 
 		if (session->flags & SESSION4_BACK_CHAN) {
 			unconf->cl_cb_xprt = rqstp->rq_xprt;
+			unconf->cl_callback.cb_minorversion = 1;
 			unconf->cl_callback.cb_prog = session->callback_prog;
 			nfsd4_probe_callback(unconf);
 		}
 		conf = unconf;
 	}
-
-	conf->cl_callback.cb_minorversion = 1;
-	conf->cl_callback.cb_prog = session->callback_prog;
 
 	status = alloc_init_session(conf, session);
 
