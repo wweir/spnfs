@@ -43,6 +43,7 @@
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/clnt.h>
+#include <linux/sunrpc/svcsock.h>
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/state.h>
 #include <linux/sunrpc/sched.h>
@@ -465,10 +466,15 @@ static struct rpc_procinfo     nfs4_cb_procedures[] = {
     PROC(CB_RECALL,    COMPOUND,   enc_cb_recall,      dec_cb_recall),
 };
 
-static struct rpc_version       nfs_cb_version4 = {
-	.number                 = 0,
+static struct rpc_version       nfs4_cb_version1 = {
+	.number                 = 1,
         .nrprocs                = ARRAY_SIZE(nfs4_cb_procedures),
         .procs                  = nfs4_cb_procedures
+};
+
+static struct rpc_version *nfs4_cb_version[] = {
+	NULL,
+	&nfs4_cb_version1,
 };
 
 #if defined(CONFIG_NFSD_V4_1)
@@ -488,19 +494,17 @@ static struct rpc_procinfo     nfs41_cb_procedures[] = {
 	PROC41(CB_RECALL,    COMPOUND,   enc_cb_recall,      dec_cb_recall),
 };
 
-static struct rpc_version       nfs_cb_version41 = {
+static struct rpc_version       nfs41_cb_version1 = {
 	.number                 = 1,
 	.nrprocs                = ARRAY_SIZE(nfs41_cb_procedures),
 	.procs                  = nfs41_cb_procedures
 };
-#endif /* defined(CONFIG_NFSD_V4_1) */
 
-static struct rpc_version *	nfs_cb_version[] = {
-	&nfs_cb_version4,
-#if defined(CONFIG_NFSD_V4_1)
-	&nfs_cb_version41,
-#endif
+static struct rpc_version *nfs41_cb_version[] = {
+	NULL,
+	&nfs41_cb_version1,
 };
+#endif /* defined(CONFIG_NFSD_V4_1) */
 
 /* Reference counting, callback cleanup, etc., all look racy as heck.
  * And why is cb_set an atomic? */
@@ -522,7 +526,7 @@ static int do_probe_callback(void *data)
 		.addrsize	= sizeof(addr),
 		.timeout	= &timeparms,
 		.program	= program,
-		.version	= nfs_cb_version[1]->number,
+		.version	= 1,
 		.authflavor	= RPC_AUTH_UNIX, /* XXX: need AUTH_GSS... */
 		.flags		= (RPC_CLNT_CREATE_NOPING),
 	};
@@ -540,14 +544,33 @@ static int do_probe_callback(void *data)
 	addr.sin_addr.s_addr = htonl(cb->cb_addr);
 
 	/* Initialize rpc_program */
-	if (!clp->cl_cb_xprt)
+	switch (cb->cb_minorversion) {
+	case 0:
 		program->name = "nfs4_cb";
-	else
+		program->nrvers = ARRAY_SIZE(nfs4_cb_version);
+		program->version = nfs4_cb_version;
+		break;
+#if defined(CONFIG_NFSD_V4_1)
+	case 1:
 		program->name = "nfs41_cb";
+		program->nrvers = ARRAY_SIZE(nfs41_cb_version);
+		program->version = nfs41_cb_version;
+		args.bc_sock = container_of(clp->cl_cb_xprt, struct svc_sock,
+					    sk_xprt);
+		break;
+#endif /* CONFIG_NFSD_V4_1 */
+	default:
+		BUG();
+	}
+
 	program->number = cb->cb_prog;
-	program->nrvers = ARRAY_SIZE(nfs_cb_version);
-	program->version = nfs_cb_version;
 	program->stats = &cb->cb_stat;
+	BUG_ON(program->nrvers <= args.version);
+	BUG_ON(!program->version[args.version]);
+	BUG_ON(program->version[args.version]->number != args.version);
+	dprintk("%s: program %s 0x%x nrvers %u version %u minorversion %u\n",
+		__func__, program->name, program->number,
+		program->nrvers, args.version, cb->cb_minorversion);
 
 	/* Initialize rpc_stat */
 	memset(program->stats, 0, sizeof(cb->cb_stat));
