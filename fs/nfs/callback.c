@@ -186,16 +186,32 @@ int nfs4_callback_up(struct svc_serv *serv)
  */
 int nfs41_callback_up(struct svc_serv *serv, struct rpc_xprt *xprt)
 {
+	int ret = -ENOMEM;
+	struct svc_xprt *bc_xprt;
+
+	dprintk("--> %s\n", __func__);
+	/* Create a svc_sock for the service */
+	bc_xprt = svc_sock_create(serv, xprt->prot);
+	if (!bc_xprt)
+		goto out;
+
 	/*
 	 * Save the svc_serv in the transport so that it can
 	 * be referenced when the session backchannel is initialized
 	 */
+	serv->bc_xprt = bc_xprt;
 	xprt->bc_serv = serv;
 
 	INIT_LIST_HEAD(&serv->sv_cb_list);
 	spin_lock_init(&serv->sv_cb_lock);
 	init_waitqueue_head(&serv->sv_cb_waitq);
-	return svc_create_thread(nfs41_callback_svc, serv);
+	ret = svc_create_thread(nfs41_callback_svc, serv);
+out:
+	dprintk("--> %s return %d\n", __func__, ret);
+	if (!ret)
+		return 0;
+	svc_sock_destroy(bc_xprt);
+	return ret;
 }
 #endif /* CONFIG_NFS_V4_1 */
 
