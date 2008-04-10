@@ -491,6 +491,10 @@ svc_destroy(struct svc_serv *serv)
 	if (svc_serv_is_pooled(serv))
 		svc_pool_map_put();
 
+#if defined(CONFIG_NFS_V4_1)
+	svc_sock_destroy(serv->bc_xprt);
+#endif /* CONFIG_NFS_V4_1 */
+
 	/* Unregister service with the portmapper */
 	svc_register(serv, 0, 0);
 	kfree(serv->sv_pools);
