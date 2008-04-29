@@ -822,7 +822,7 @@ rpc_mkpipe_compat(char *path, void *private, struct rpc_pipe_ops *ops,
 	dentry = rpc_lookup_negative(path, &nd);
 	if (IS_ERR(dentry))
 		return dentry;
-	dir = nd.dentry->d_inode;
+	dir = nd.path.dentry->d_inode;
 	inode = rpc_get_inode(dir->i_sb, S_IFSOCK | S_IRUSR | S_IWUSR);
 	if (!inode)
 		goto err_dput;
