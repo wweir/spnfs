@@ -88,6 +88,9 @@ enum {
 	Opt_mountport,
 	Opt_mountvers,
 	Opt_nfsvers,
+#ifdef CONFIG_NFS_V4_1
+	Opt_minorvers,
+#endif /* CONFIG_NFS_V4_1 */
 
 	/* Mount options that take string arguments */
 	Opt_sec, Opt_proto, Opt_mountproto, Opt_mounthost,
@@ -143,6 +146,9 @@ static match_table_t nfs_mount_option_tokens = {
 	{ Opt_mountvers, "mountvers=%u" },
 	{ Opt_nfsvers, "nfsvers=%u" },
 	{ Opt_nfsvers, "vers=%u" },
+#ifdef CONFIG_NFS_V4_1
+	{ Opt_minorvers, "minorvers=%u" },
+#endif /* CONFIG_NFS_V4_1 */
 
 	{ Opt_sec, "sec=%s" },
 	{ Opt_proto, "proto=%s" },
@@ -882,6 +888,15 @@ static int nfs_parse_mount_options(char *raw,
 				goto out_unrec_vers;
 			}
 			break;
+#ifdef CONFIG_NFS_V4_1
+		case Opt_minorvers:
+			if (match_int(args, &option))
+				return 0;
+			if (option < 0 || option > NFS4_MAX_MINOR_VERSION)
+				return 0;
+			mnt->minorvers = option;
+			break;
+#endif /* CONFIG_NFS_V4_1 */
 
 		case Opt_sec:
 			string = match_strdup(args);
@@ -1753,6 +1768,9 @@ static int nfs4_validate_mount_data(void *options,
 	args->acdirmin		= 30;
 	args->acdirmax		= 60;
 	args->nfs_server.protocol = XPRT_TRANSPORT_TCP;
+#ifdef CONFIG_NFS_V4_1
+	args->minorvers		= NFS4_MAX_MINOR_VERSION;
+#endif /* CONFIG_NFS_V4_1 */
 
 	switch (data->version) {
 	case 1:
