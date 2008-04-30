@@ -125,6 +125,7 @@ struct nfs_server {
 	u32			acl_bitmask;	/* V4 bitmask representing the ACEs
 						   that are supported on this
 						   filesystem */
+	u32			minorversion;
 #endif
 
 #ifdef CONFIG_NFS_V4_1

@@ -973,11 +973,10 @@ static int nfs4_init_client(struct nfs_client *clp,
 		return 0;
 	}
 
-#if defined(CONFIG_NFS_V4_1)
-	clp->cl_boot_time = CURRENT_TIME;
-	clp->cl_state = 1 << NFS4CLNT_LEASE_EXPIRED;
-	clp->cl_minorversion = NFS4_MAX_MINOR_VERSION;
-#endif /* CONFIG_NFS_V4_1 */
+	if (clp->cl_minorversion == 1) {
+		clp->cl_boot_time = CURRENT_TIME;
+		clp->cl_state = 1 << NFS4CLNT_LEASE_EXPIRED;
+	}
 
 	/* Check NFS protocol revision and initialize RPC op vector */
 	clp->rpc_ops = nfsv4_minorversion_clientops[clp->cl_minorversion];
@@ -1049,6 +1048,7 @@ static int nfs4_set_client(struct nfs_server *server,
 		error = PTR_ERR(clp);
 		goto error;
 	}
+	clp->cl_minorversion = server->minorversion;
 	error = nfs4_init_client(clp, timeparms, ip_addr, authflavour);
 	if (error < 0)
 		goto error_put;
@@ -1167,6 +1167,8 @@ struct nfs_server *nfs4_create_server(const struct nfs_parsed_mount_data *data,
 	if (!server)
 		return ERR_PTR(-ENOMEM);
 
+	server->minorversion = data->minorvers;
+
 	/* set up the general RPC client */
 	error = nfs4_init_server(server, data);
 	if (error < 0)
@@ -1177,10 +1179,12 @@ struct nfs_server *nfs4_create_server(const struct nfs_parsed_mount_data *data,
 	BUG_ON(!server->nfs_client->rpc_ops->file_inode_ops);
 
 #if defined(CONFIG_NFS_V4_1)
-	error = nfs4_init_session(server->nfs_client, &server->session,
-				  server->client);
-	if (error)
-		goto error;
+	if (server->minorversion == 1) {
+		error = nfs4_init_session(server->nfs_client, &server->session,
+					  server->client);
+		if (error)
+			goto error;
+	}
 #endif /* CONFIG_NFS_V4_1 */
 
 	/* Probe the root fh to retrieve its FSID */
