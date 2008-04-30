@@ -2133,13 +2133,13 @@ access_permit_write(unsigned long access_bmap)
 }
 
 static
-__be32 nfs4_check_openmode(unsigned long st_access_bmap, int flags)
+__be32 nfs4_check_openmode(struct nfs4_stateid *stp, int flags)
 {
         __be32 status = nfserr_openmode;
 
-	if ((flags & WR_STATE) && (!access_permit_write(st_access_bmap)))
+	if ((flags & WR_STATE) && (!access_permit_write(stp->st_access_bmap)))
                 goto out;
-	if ((flags & RD_STATE) && (!access_permit_read(st_access_bmap)))
+	if ((flags & RD_STATE) && (!access_permit_read(stp->st_access_bmap)))
                 goto out;
 	status = nfs_ok;
 out:
@@ -2242,8 +2242,7 @@ nfs4_preprocess_stateid_op(struct svc_fh *current_fh, stateid_t *stateid, int fl
 
 checkmode:
 	if (stp) {
-		status = nfs4_check_openmode(stp->st_access_bmap, flags);
-		if (status)
+		if ((status = nfs4_check_openmode(stp,flags)))
 			goto out;
 		renew_client(stp->st_stateowner->so_client);
 		if (filpp)
@@ -2329,15 +2328,12 @@ nfs4_preprocess_seqid_op(struct svc_fh *current_fh, u32 seqid, stateid_t *statei
 			    !same_clid(&clp->cl_clientid, lockclid))
 			       return nfserr_bad_stateid;
 			/* stp is the open stateid */
-			status = nfs4_check_openmode(stp->st_access_bmap,
-						     lkflg);
+			status = nfs4_check_openmode(stp, lkflg);
 			if (status)
 				return status;
 		} else {
 			/* stp is the lock stateid */
-			status = nfs4_check_openmode(
-						stp->st_openstp->st_access_bmap,
-						lkflg);
+			status = nfs4_check_openmode(stp->st_openstp, lkflg);
 			if (status)
 				return status;
                }
