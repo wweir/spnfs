@@ -881,6 +881,7 @@ static int nfs_write_rpcsetup(struct nfs_page *req,
  */
 static void nfs_redirty_request(struct nfs_page *req)
 {
+	pnfs_redirty_request(req);
 	nfs_mark_request_dirty(req);
 	nfs_end_page_writeback(req->wb_page);
 	nfs_clear_page_tag_locked(req);
