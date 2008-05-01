@@ -39,7 +39,8 @@
  */
 static struct nfs_page * nfs_update_request(struct nfs_open_context*,
 					    struct page *,
-					    unsigned int, unsigned int);
+					    unsigned int, unsigned int,
+					    void *);
 static void nfs_pageio_init_write(struct nfs_pageio_descriptor *desc,
 				  struct inode *inode, int ioflags);
 static void nfs_redirty_request(struct nfs_page *req);
@@ -185,13 +186,13 @@ static void nfs_mark_uptodate(struct page *page, unsigned int base, unsigned int
 }
 
 static int nfs_writepage_setup(struct nfs_open_context *ctx, struct page *page,
-		unsigned int offset, unsigned int count)
+			unsigned int offset, unsigned int count, void *fsdata)
 {
 	struct nfs_page	*req;
 	int ret;
 
 	for (;;) {
-		req = nfs_update_request(ctx, page, offset, count);
+		req = nfs_update_request(ctx, page, offset, count, fsdata);
 		if (!IS_ERR(req))
 			break;
 		ret = PTR_ERR(req);
@@ -590,7 +591,8 @@ static inline int nfs_scan_commit(struct inode *inode, struct list_head *dst, pg
  * Note: Should always be called with the Page Lock held!
  */
 static struct nfs_page * nfs_update_request(struct nfs_open_context* ctx,
-		struct page *page, unsigned int offset, unsigned int bytes)
+				struct page *page, unsigned int offset,
+				unsigned int bytes, void *fsdata)
 {
 	struct address_space *mapping = page->mapping;
 	struct inode *inode = mapping->host;
@@ -640,7 +642,8 @@ static struct nfs_page * nfs_update_request(struct nfs_open_context* ctx,
 		}
 		spin_unlock(&inode->i_lock);
 
-		new = nfs_create_request(ctx, inode, page, offset, bytes);
+		new = nfs_create_request(ctx, inode, page,
+					 offset, bytes, fsdata);
 		if (IS_ERR(new))
 			return new;
 	}
@@ -726,7 +729,7 @@ static int nfs_write_pageuptodate(struct page *page, struct inode *inode)
  * things with a page scheduled for an RPC call (e.g. invalidate it).
  */
 int nfs_updatepage(struct file *file, struct page *page,
-		unsigned int offset, unsigned int count)
+		   unsigned int offset, unsigned int count, void *fsdata)
 {
 	struct nfs_open_context *ctx = nfs_file_open_context(file);
 	struct inode	*inode = page->mapping->host;
@@ -751,7 +754,7 @@ int nfs_updatepage(struct file *file, struct page *page,
 		offset = 0;
 	}
 
-	status = nfs_writepage_setup(ctx, page, offset, count);
+	status = nfs_writepage_setup(ctx, page, offset, count, fsdata);
 	__set_page_dirty_nobuffers(page);
 
         dprintk("NFS:      nfs_updatepage returns %d (isize %Ld)\n",
