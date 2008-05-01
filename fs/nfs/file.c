@@ -376,7 +376,7 @@ static int nfs_write_end(struct file *file, struct address_space *mapping,
 	int status;
 
 	lock_kernel();
-	status = nfs_updatepage(file, page, offset, copied);
+	status = nfs_updatepage(file, page, offset, copied, fsdata);
 	unlock_kernel();
 
 	unlock_page(page);
@@ -444,7 +444,7 @@ static int nfs_vm_page_mkwrite(struct vm_area_struct *vma, struct page *page)
 	if (ret != 0)
 		goto out_unlock;
 
-	ret = nfs_updatepage(filp, page, 0, pagelen);
+	ret = nfs_updatepage(filp, page, 0, pagelen, NULL);
 	if (ret == 0)
 		ret = pagelen;
 out_unlock:
