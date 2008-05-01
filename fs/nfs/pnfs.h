@@ -60,12 +60,12 @@ void pnfs_get_layout_done(struct pnfs_layout_type *,
 			  struct nfs4_pnfs_layoutget *, int);
 void pnfs_layout_release(struct pnfs_layout_type *);
 
-#define PNFS_EXISTS_LDIO_OP(opname) (nfss->pnfs_curr_ld && \
-				     nfss->pnfs_curr_ld->ld_io_ops && \
-				     nfss->pnfs_curr_ld->ld_io_ops->opname)
-#define PNFS_EXISTS_LDPOLICY_OP(opname) (nfss->pnfs_curr_ld && \
-				     nfss->pnfs_curr_ld->ld_policy_ops && \
-				     nfss->pnfs_curr_ld->ld_policy_ops->opname)
+#define PNFS_EXISTS_LDIO_OP(srv, opname) ((srv)->pnfs_curr_ld &&	\
+				     (srv)->pnfs_curr_ld->ld_io_ops &&	\
+				     (srv)->pnfs_curr_ld->ld_io_ops->opname)
+#define PNFS_EXISTS_LDPOLICY_OP(srv, opname) ((srv)->pnfs_curr_ld &&	\
+				     (srv)->pnfs_curr_ld->ld_policy_ops && \
+				     (srv)->pnfs_curr_ld->ld_policy_ops->opname)
 
 static inline int pnfs_try_to_read_data(struct nfs_read_data *data,
 					const struct rpc_call_ops *call_ops)
@@ -74,7 +74,7 @@ static inline int pnfs_try_to_read_data(struct nfs_read_data *data,
 	struct nfs_server *nfss = NFS_SERVER(inode);
 
 	/* FIXME: read_pagelist should probably be mandated */
-	if (PNFS_EXISTS_LDIO_OP(read_pagelist))
+	if (PNFS_EXISTS_LDIO_OP(nfss, read_pagelist))
 		return _pnfs_try_to_read_data(data, call_ops);
 
 	return 1;
@@ -88,7 +88,7 @@ static inline int pnfs_try_to_write_data(struct nfs_write_data *data,
 	struct nfs_server *nfss = NFS_SERVER(inode);
 
 	/* FIXME: write_pagelist should probably be mandated */
-	if (PNFS_EXISTS_LDIO_OP(write_pagelist))
+	if (PNFS_EXISTS_LDIO_OP(nfss, write_pagelist))
 		return _pnfs_try_to_write_data(data, call_ops, how);
 
 	return 1;
@@ -103,7 +103,7 @@ static inline int pnfs_try_to_commit(struct nfs_write_data *data)
 	   since if async writes were done and pages weren't marked as stable
 	   the commit method MUST be defined by the LD */
 	/* FIXME: write_pagelist should probably be mandated */
-	if (PNFS_EXISTS_LDIO_OP(write_pagelist))
+	if (PNFS_EXISTS_LDIO_OP(nfss, write_pagelist))
 		return _pnfs_try_to_commit(data);
 
 	return 1;
