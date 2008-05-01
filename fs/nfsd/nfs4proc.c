@@ -1596,7 +1596,6 @@ static struct nfsd4_operation nfsd4_ops[NFSD4_LAST_OP+1] = {
 #if defined(CONFIG_PNFSD)
 	[OP_GETDEVICELIST] = {
 		.op_func = (nfsd4op_func)nfsd4_getdevlist,
-		.op_flags = ALLOWED_WITHOUT_FH,
 	},
 	[OP_GETDEVICEINFO] = {
 		.op_func = (nfsd4op_func)nfsd4_getdevinfo,
