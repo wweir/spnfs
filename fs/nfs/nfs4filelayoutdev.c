@@ -240,7 +240,7 @@ nfs4_pnfs_ds_create(struct nfs_server *mds_srv, struct nfs4_pnfs_ds *ds)
 	err = nfs4_set_client(&tmp,
 			      mds_srv->nfs_client->cl_hostname,
 			      (struct sockaddr *)&sin,
-			      addrlen,
+			      sizeof(struct sockaddr),
 			      ip_addr,
 			      RPC_AUTH_UNIX,
 			      IPPROTO_TCP,
