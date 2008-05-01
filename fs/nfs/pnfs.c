@@ -1925,6 +1925,25 @@ out_unlock:
 	goto out;
 }
 
+/* Note that fsdata != NULL */
+void _pnfs_modify_new_write_request(struct nfs_page *req,
+				    struct pnfs_fsdata *fsdata)
+{
+	struct inode *inode = req->wb_page->mapping->host;
+	struct pnfs_layout_segment *lseg = NULL;
+	loff_t pos;
+	unsigned count;
+
+	pos = ((loff_t)req->wb_index << PAGE_CACHE_SHIFT) + req->wb_offset;
+	count = req->wb_bytes;
+	lseg = pnfs_find_get_lseg(inode, pos, count, IOMODE_RW);
+	if (lseg) {
+		if (fsdata->ok_to_use_pnfs)
+			set_bit(PG_USE_PNFS, &req->wb_flags);
+		put_lseg(lseg);
+	}
+}
+
 void pnfs_free_request_data(struct nfs_page *req)
 {
 	struct layoutdriver_io_operations *lo;
