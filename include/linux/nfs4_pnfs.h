@@ -138,6 +138,9 @@ struct layoutdriver_io_operations {
 			       unsigned nr_pages, loff_t offset, size_t count,
 			       int sync, struct nfs_write_data *nfs_data);
 	int (*flush_one) (struct pnfs_layout_segment *, struct list_head *head, unsigned int npages, size_t count, int how);
+	int (*write_begin) (struct pnfs_layout_segment *lseg, struct page *page,
+			    loff_t pos, unsigned count,
+			    struct pnfs_fsdata *fsdata);
 	void (*free_request_data) (struct nfs_page *);
 
 

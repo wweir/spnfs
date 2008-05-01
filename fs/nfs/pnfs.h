@@ -55,10 +55,13 @@ void pnfs_pageio_init_write(struct nfs_pageio_descriptor *, struct inode *);
 void pnfs_update_layout_commit(struct inode *, struct list_head *, pgoff_t, unsigned int);
 int pnfs_flush_one(struct inode *, struct list_head *, unsigned int, size_t, int);
 void pnfs_free_request_data(struct nfs_page *req);
+void pnfs_free_fsdata(struct pnfs_fsdata *fsdata);
 ssize_t pnfs_file_write(struct file *, const char __user *, size_t, loff_t *);
 void pnfs_get_layout_done(struct pnfs_layout_type *,
 			  struct nfs4_pnfs_layoutget *, int);
 void pnfs_layout_release(struct pnfs_layout_type *);
+int _pnfs_write_begin(struct inode *inode, struct page *page,
+		      loff_t pos, unsigned len, void **fsdata);
 int _pnfs_do_flush(struct inode *inode, struct nfs_page *req,
 		   struct pnfs_fsdata *fsdata);
 
@@ -111,6 +114,19 @@ static inline int pnfs_try_to_commit(struct nfs_write_data *data)
 	return 1;
 }
 
+static inline int pnfs_write_begin(struct file *filp, struct page *page,
+				   loff_t pos, unsigned len, void **fsdata)
+{
+	struct inode *inode = filp->f_dentry->d_inode;
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	int status = 0;
+
+	*fsdata = NULL;
+	if (PNFS_EXISTS_LDIO_OP(nfss, write_begin))
+		status = _pnfs_write_begin(inode, page, pos, len, fsdata);
+	return status;
+}
+
 /* req may not be locked, so we have to be prepared for req->wb_page being
  * set to NULL at any time.
  */
@@ -127,6 +143,11 @@ static inline int pnfs_do_flush(struct nfs_page *req, void *fsdata)
 		return _pnfs_do_flush(inode, req, fsdata);
 	else
 		return 0;
+}
+
+static inline void pnfs_write_end_cleanup(void *fsdata)
+{
+	pnfs_free_fsdata(fsdata);
 }
 
 #else  /* CONFIG_PNFS */
@@ -152,6 +173,16 @@ static inline int pnfs_try_to_commit(struct nfs_write_data *data)
 static inline int pnfs_do_flush(struct nfs_page *req, void *fsdata)
 {
 	return 0;
+}
+
+static inline int pnfs_write_begin(struct file *filp, struct page *page,
+				   loff_t pos, unsigned len, void **fsdata)
+{
+	return 0;
+}
+
+static inline void pnfs_write_end_cleanup(void *fsdata)
+{
 }
 
 #endif /* CONFIG_PNFS */
