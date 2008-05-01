@@ -807,6 +807,28 @@ pnfs_has_layout(struct pnfs_layout_type *lo,
 	return ret;
 }
 
+static struct pnfs_layout_segment *
+pnfs_find_get_lseg(struct inode *inode,
+		   loff_t pos,
+		   size_t count,
+		   enum pnfs_iomode iomode)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+	struct pnfs_layout_segment *lseg;
+	struct pnfs_layout_type *lo;
+	struct nfs4_pnfs_layout_segment range;
+
+	lo = get_lock_current_layout(nfsi);
+	if (!lo)
+		return NULL;
+	range.iomode = iomode;
+	range.offset = pos;
+	range.length = count;
+	lseg = pnfs_has_layout(lo, &range, 1);
+	put_unlock_current_layout(nfsi, lo);
+	return lseg;
+}
+
 /* Update the file's layout for the given range and iomode.
  * Layout is retreived from the server if needed.
  * If lsegpp is given, the appropriate layout segment is referenced and
@@ -1542,6 +1564,26 @@ int _pnfs_try_to_read_data(struct nfs_read_data *data,
 		data->call_ops = call_ops;
 		return pnfs_readpages(data);
 	}
+}
+
+/* Given an nfs request, determine if it should be flushed before proceeding.
+ * It should default to returning False, returning True only if there is a
+ * specific reason to flush.
+ */
+int _pnfs_do_flush(struct inode *inode, struct nfs_page *req,
+		   struct pnfs_fsdata *fsdata)
+{
+	struct nfs_server *nfss = NFS_SERVER(inode);
+	struct pnfs_layout_segment *lseg;
+	loff_t pos = (req->wb_index << PAGE_CACHE_SHIFT) + req->wb_offset;
+	int status = 0;
+
+	lseg = pnfs_find_get_lseg(inode, pos, req->wb_bytes, IOMODE_RW);
+	/* Note that lseg==NULL may be useful info for do_flush */
+	status = nfss->pnfs_curr_ld->ld_policy_ops->do_flush(lseg, req,
+							     fsdata);
+	put_lseg(lseg);
+	return status;
 }
 
 int _pnfs_try_to_write_data(struct nfs_write_data *data,
