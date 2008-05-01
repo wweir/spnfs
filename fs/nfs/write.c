@@ -654,7 +654,7 @@ static struct nfs_page * nfs_update_request(struct nfs_open_context* ctx,
 	rqend = req->wb_offset + req->wb_bytes;
 	if (req->wb_context != ctx
 	    || req->wb_page != page
-	    || !nfs_dirty_request(req)
+	    || !nfs_dirty_request(req) || pnfs_do_flush(req, NULL)
 	    || offset > rqend || end < req->wb_offset) {
 		nfs_clear_page_tag_locked(req);
 		return ERR_PTR(-EBUSY);
@@ -699,7 +699,7 @@ int nfs_flush_incompatible(struct file *file, struct page *page)
 		if (req == NULL)
 			return 0;
 		do_flush = req->wb_page != page || req->wb_context != ctx
-			|| !nfs_dirty_request(req);
+			|| !nfs_dirty_request(req) || pnfs_do_flush(req, NULL);
 		nfs_release_request(req);
 		if (!do_flush)
 			return 0;
