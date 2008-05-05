@@ -207,6 +207,7 @@ nfs4_pnfs_ds_create(struct nfs_server *mds_srv, struct nfs4_pnfs_ds *ds)
 {
 	struct nfs_server	tmp = {
 		.nfs_client = NULL,
+		.minorversion = 1,
 	};
 	struct sockaddr_in	sin;
 	struct rpc_clnt 	*mds_clnt = mds_srv->client;
