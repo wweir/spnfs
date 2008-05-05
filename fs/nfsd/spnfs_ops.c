@@ -424,16 +424,18 @@ spnfs_get_state(struct inode *inode, void *fh, void *state)
 /*
  * Return the filehandle for the specified file descriptor
  */
-struct nfs_fh *
-spnfs_getfh(int fd)
+int
+spnfs_getfh(int fd, struct nfs_fh *fh)
 {
 	struct file *file;
 
 	file = fget(fd);
 	if (file == NULL)
-		return NULL;
+		return -EIO;
 
-	return(NFS_FH(file->f_dentry->d_inode));
+	memcpy(fh, NFS_FH(file->f_dentry->d_inode), sizeof(struct nfs_fh));
+	fput(file);
+	return 0;
 }
 
 #endif /* CONFIG_PNFSD */
