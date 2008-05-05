@@ -103,6 +103,7 @@ nfsd_spnfs_new(void)
 		return -EPIPE;
 	}
 
+	dput(spnfs->spnfs_dentry);
 	mutex_init(&spnfs->spnfs_lock);
 	mutex_init(&spnfs->spnfs_plock);
 	init_waitqueue_head(&spnfs->spnfs_wq);
