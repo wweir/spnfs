@@ -475,32 +475,32 @@ panlayout_get_stripesize(struct pnfs_layout_type *pnfslay)
 		struct panlayout_segment *panlseg = LSEG_LD_DATA(lseg);
 		struct pnfs_osd_layout *lo =
 			(struct pnfs_osd_layout *)panlseg->pnfs_osd_layout;
-		struct pnfs_osd_data_map *map = &lo->map;
+		struct pnfs_osd_data_map *map = &lo->olo_map;
 
-		switch (map->raid_algorithm) {
+		switch (map->odm_raid_algorithm) {
 		case PNFS_OSD_RAID_0:
-			n = lo->num_comps;
+			n = lo->olo_num_comps;
 			break;
 
 		case PNFS_OSD_RAID_4:
 		case PNFS_OSD_RAID_5:
-			n = map->group_width;
+			n = map->odm_group_width;
 			if (n == 0)
-				n = lo->num_comps;
+				n = lo->olo_num_comps;
 			n -= 1;
 			break;
 
 		case PNFS_OSD_RAID_PQ:
-			n = map->group_width;
+			n = map->odm_group_width;
 			if (n == 0)
-				n = lo->num_comps;
+				n = lo->olo_num_comps;
 			n -= 2;
 			break;
 
 		default:
 			BUG_ON(1);
 		}
-		sz = map->stripe_unit * n;
+		sz = map->odm_stripe_unit * n;
 		if (sz > maxsz)
 			maxsz = sz;
 	}

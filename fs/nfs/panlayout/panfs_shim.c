@@ -39,6 +39,7 @@
 
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <asm/byteorder.h>
 
 #include "panlayout.h"
 #include "pnfs_osd_xdr.h"
@@ -56,6 +57,61 @@ panfs_shim_ready(void)
 	return panfs_export_ops != NULL;
 }
 
+static int
+panfs_shim_conv_raid01(struct pnfs_osd_layout *layout,
+		       struct pnfs_osd_data_map *lo_map,
+		       pan_agg_layout_hdr_t *hdr)
+{
+	if (lo_map->odm_mirror_cnt) {
+		hdr->type = PAN_AGG_RAID1;
+		hdr->hdr.raid1.num_comps = lo_map->odm_mirror_cnt + 1;
+	} else if (layout->olo_num_comps > 1) {
+		hdr->type = PAN_AGG_RAID0;
+		hdr->hdr.raid0.num_comps = layout->olo_num_comps;
+		hdr->hdr.raid0.stripe_unit = lo_map->odm_stripe_unit;
+	} else
+		hdr->type = PAN_AGG_SIMPLE;
+	return 0;
+}
+
+static int
+panfs_shim_conv_raid5(struct pnfs_osd_layout *layout,
+		      struct pnfs_osd_data_map *lo_map,
+		      pan_agg_layout_hdr_t *hdr)
+{
+	if (lo_map->odm_mirror_cnt)
+		goto err;
+
+	if (lo_map->odm_group_width || lo_map->odm_group_depth) {
+		if (!lo_map->odm_group_width || !lo_map->odm_group_depth)
+			goto err;
+
+		hdr->type = PAN_AGG_GRP_RAID5_LEFT;
+		hdr->hdr.grp_raid5_left.num_comps = layout->olo_num_comps;
+		if (hdr->hdr.grp_raid5_left.num_comps != layout->olo_num_comps)
+			goto err;
+		hdr->hdr.grp_raid5_left.stripe_unit = lo_map->odm_stripe_unit;
+		hdr->hdr.grp_raid5_left.rg_width = lo_map->odm_group_width;
+		hdr->hdr.grp_raid5_left.rg_depth = lo_map->odm_group_depth;
+		/* this is a guess, panasas server is not supposed to
+		   hand out layotu otherwise */
+		hdr->hdr.grp_raid5_left.group_layout_policy =
+			PAN_AGG_GRP_RAID5_LEFT_POLICY_ROUND_ROBIN;
+	} else {
+		hdr->type = PAN_AGG_RAID5_LEFT;
+		hdr->hdr.raid5_left.num_comps = layout->olo_num_comps;
+		if (hdr->hdr.raid5_left.num_comps != layout->olo_num_comps)
+			goto err;
+		hdr->hdr.raid5_left.stripe_unit2 =
+		hdr->hdr.raid5_left.stripe_unit1 =
+		hdr->hdr.raid5_left.stripe_unit0 = lo_map->odm_stripe_unit;
+	}
+
+	return 0;
+err:
+	return -EINVAL;
+}
+
 /*
  * Convert a pnfs_osd data map into Panasas aggregation layout header
  */
@@ -65,56 +121,22 @@ panfs_shim_conv_pnfs_osd_data_map(
 	pan_agg_layout_hdr_t *hdr)
 {
 	int status = -EINVAL;
-	struct pnfs_osd_data_map *lo_map = &layout->map;
+	struct pnfs_osd_data_map *lo_map = &layout->olo_map;
 
-	if (!layout->num_comps)
+	if (!layout->olo_num_comps)
 		goto err;
 
-	switch (lo_map->raid_algorithm) {
+	/* FIXME: need to handle maps describing only parity stripes */
+	if (lo_map->odm_num_comps != layout->olo_num_comps)
+		goto err;
+
+	switch (lo_map->odm_raid_algorithm) {
 	case PNFS_OSD_RAID_0:
-		if (lo_map->mirror_cnt) {
-			hdr->type = PAN_AGG_RAID1;
-			hdr->hdr.raid1.num_comps = lo_map->mirror_cnt + 1;
-		} else {
-			if (layout->num_comps > 1) {
-				hdr->type = PAN_AGG_RAID0;
-				hdr->hdr.raid0.num_comps = layout->num_comps;
-				hdr->hdr.raid0.stripe_unit =
-					lo_map->stripe_unit;
-			} else
-				hdr->type = PAN_AGG_SIMPLE;
-		}
+		status = panfs_shim_conv_raid01(layout, lo_map, hdr);
 		break;
 
 	case PNFS_OSD_RAID_5:
-		if (lo_map->mirror_cnt)
-			goto err;
-
-		if (lo_map->group_width || lo_map->group_depth) {
-			if (!lo_map->group_width || !lo_map->group_depth)
-				goto err;
-			hdr->type = PAN_AGG_GRP_RAID5_LEFT;
-			hdr->hdr.grp_raid5_left.num_comps = layout->num_comps;
-			if (hdr->hdr.grp_raid5_left.num_comps !=
-			    layout->num_comps)
-				goto err;
-			hdr->hdr.grp_raid5_left.stripe_unit =
-							lo_map->stripe_unit;
-			hdr->hdr.grp_raid5_left.rg_width = lo_map->group_width;
-			hdr->hdr.grp_raid5_left.rg_depth = lo_map->group_depth;
-			/* this is a guess, panasas server is not supposed to
-			   hand out layotu otherwise */
-			hdr->hdr.grp_raid5_left.group_layout_policy =
-				PAN_AGG_GRP_RAID5_LEFT_POLICY_ROUND_ROBIN;
-		} else {
-			hdr->type = PAN_AGG_RAID5_LEFT;
-			hdr->hdr.raid5_left.num_comps = layout->num_comps;
-			if (hdr->hdr.raid5_left.num_comps != layout->num_comps)
-				goto err;
-			hdr->hdr.raid5_left.stripe_unit2 =
-			hdr->hdr.raid5_left.stripe_unit1 =
-			hdr->hdr.raid5_left.stripe_unit0 = lo_map->stripe_unit;
-		}
+		status = panfs_shim_conv_raid5(layout, lo_map, hdr);
 		break;
 
 	case PNFS_OSD_RAID_4:
@@ -148,10 +170,10 @@ panfs_shim_conv_layout(
 	pan_sm_sec_t *pan_sec;
 
 	status = -EINVAL;
-	alloc_sz = layout->num_comps *
+	alloc_sz = layout->olo_num_comps *
 		   (sizeof(pan_agg_comp_obj_t) + sizeof(pan_sm_sec_t));
-	for (i = 0; i < layout->num_comps; i++) {
-		void *p = layout->comps[i].opaque_cred->cred;
+	for (i = 0; i < layout->olo_num_comps; i++) {
+		void *p = layout->olo_comps[i].oc_cap->cred;
 		if (panfs_export_ops->sm_sec_t_get_size_otw(
 			(pan_sm_sec_otw_t *)&p, &local_sz, NULL, NULL))
 			goto err;
@@ -177,41 +199,50 @@ panfs_shim_conv_layout(
 	if (status)
 		goto err;
 
-	mcs->full_map.components.size = layout->num_comps;
+	mcs->full_map.components.size = layout->olo_num_comps;
 	mcs->full_map.components.data = (pan_agg_comp_obj_t *)buf;
-	buf += layout->num_comps * sizeof(pan_agg_comp_obj_t);
+	buf += layout->olo_num_comps * sizeof(pan_agg_comp_obj_t);
 
-	mcs->secs.size = layout->num_comps;
+	mcs->secs.size = layout->olo_num_comps;
 	mcs->secs.data = (pan_sm_sec_t *)buf;
-	buf += layout->num_comps * sizeof(pan_sm_sec_t);
+	buf += layout->olo_num_comps * sizeof(pan_sm_sec_t);
 
-	lo_comp = layout->comps;
+	lo_comp = layout->olo_comps;
 	pan_comp = mcs->full_map.components.data;
 	pan_sec = mcs->secs.data;
-	for (i = 0; i < layout->num_comps; i++) {
+	for (i = 0; i < layout->olo_num_comps; i++) {
 		void *p;
 		pan_stor_obj_id_t *obj_id = &mcs->full_map.map_hdr.obj_id;
+		u64 dev_id = __be64_to_cpup((__be64 *)
+				(lo_comp->oc_object_id.oid_device_id.data + 8));
 
 		if (i == 0) {
 			/* make up mgr_id to calm sam down */
-			pan_mgr_id_construct_artificial(PAN_MGR_SM, 0,
-							&obj_id->dev_id);
-			obj_id->grp_id = lo_comp->object_id.partition_id;
-			obj_id->obj_id = lo_comp->object_id.object_id;
+			pan_mgr_id_construct_artificial(PAN_MGR_SM, 0, &dev_id);
+			obj_id->grp_id = lo_comp->oc_object_id.oid_partition_id;
+			obj_id->obj_id = lo_comp->oc_object_id.oid_object_id;
 		}
 
-		if ((obj_id->grp_id != lo_comp->object_id.partition_id) ||
-		    (obj_id->obj_id != lo_comp->object_id.object_id))
+		if ((obj_id->grp_id != lo_comp->oc_object_id.oid_partition_id) ||
+		    (obj_id->obj_id != lo_comp->oc_object_id.oid_object_id))
 			goto err;
 
-		pan_comp->dev_id = lo_comp->object_id.device_id;
+		pan_comp->dev_id = dev_id;
 		if (!pan_stor_is_device_id_an_obsd_id(pan_comp->dev_id))
 			goto err;
-		if (lo_comp->osd_version == PNFS_OSD_MISSING)
+		if (lo_comp->oc_osd_version == PNFS_OSD_MISSING) {
+			dprintk("%s: degraded maps not supported yet\n",
+				__func__);
 			goto err;
+		}
 		pan_comp->avail_state = PAN_AGG_COMP_STATE_NORMAL;
+		if (lo_comp->oc_cap_key_sec != PNFS_OSD_CAP_KEY_SEC_NONE) {
+			dprintk("%s: cap key security not supported yet\n",
+				__func__);
+			goto err;
+		}
 
-		p = layout->comps[i].opaque_cred->cred;
+		p = layout->olo_comps[i].oc_cap->cred;
 		panfs_export_ops->sm_sec_t_unmarshall(
 			(pan_sm_sec_otw_t *)&p,
 			pan_sec,

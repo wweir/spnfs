@@ -44,21 +44,22 @@
 /*
  * The following implementation is based on these Internet Drafts:
  *
- * draft-ietf-nfsv4-minorversion-14
- * draft-ietf-nfsv4-pnfs-osd-04
+ * draft-ietf-nfsv4-minorversion-21
+ * draft-ietf-nfsv4-pnfs-osd-07
  */
 
-/* struct pnfs_osd_objid4 {
- *     deviceid4       device_id;
- *     uint64_t        partition_id;
- *     uint64_t        object_id;
- * }; */
+/*   struct pnfs_osd_objid4 {
+ *       deviceid4       oid_device_id;
+ *       uint64_t        oid_partition_id;
+ *       uint64_t        oid_object_id;
+ *   };
+ */
 static inline u32 *
 pnfs_osd_xdr_decode_objid(u32 *p, struct pnfs_osd_objid *objid)
 {
-	READ64(objid->device_id);
-	READ64(objid->partition_id);
-	READ64(objid->object_id);
+	COPYMEM(objid->oid_device_id.data, sizeof(objid->oid_device_id.data));
+	READ64(objid->oid_partition_id);
+	READ64(objid->oid_object_id);
 	return p;
 }
 
@@ -71,34 +72,55 @@ pnfs_osd_xdr_decode_opaque_cred(u32 *p,
 	return p;
 }
 
-/* struct pnfs_osd_object_cred4 {
- *     pnfs_osd_objid4     object_id;
- *     pnfs_osd_version4   osd_version;
- *     opaque              credential<>;
- * }; */
+/*   struct pnfs_osd_object_cred4 {
+ *       pnfs_osd_objid4         oc_object_id;
+ *       pnfs_osd_version4       oc_osd_version;
+ *       pnfs_osd_cap_key_sec4   oc_cap_key_sec;
+ *       opaque                  oc_capability_key<>;
+ *       opaque                  oc_capability<>;
+ *   };
+ */
 static inline u32 *
-pnfs_osd_xdr_decode_object_cred(u32 *p, struct pnfs_osd_object_cred *cred)
+pnfs_osd_xdr_decode_object_cred(u32 *p, struct pnfs_osd_object_cred *comp,
+				struct pnfs_osd_opaque_cred **credp)
 {
-	p = pnfs_osd_xdr_decode_objid(p, &cred->object_id);
-	READ32(cred->osd_version);
+	struct pnfs_osd_opaque_cred *cred;
+
+	p = pnfs_osd_xdr_decode_objid(p, &comp->oc_object_id);
+	READ32(comp->oc_osd_version);
+	READ32(comp->oc_cap_key_sec);
+
+	cred = *credp;
+	comp->oc_cap_key = cred;
+	p = pnfs_osd_xdr_decode_opaque_cred(p, cred);
+	cred = (struct pnfs_osd_opaque_cred *)((u32 *)cred + 1 +
+						XDR_QUADLEN(cred->cred_len));
+	comp->oc_cap = cred;
+	p = pnfs_osd_xdr_decode_opaque_cred(p, cred);
+	*credp = (struct pnfs_osd_opaque_cred *)((u32 *)cred + 1 +
+						XDR_QUADLEN(cred->cred_len));
+
 	return p;
 }
 
-/* struct pnfs_osd_data_map4 {
- *     length4                     stripe_unit;
- *     uint32_t                    group_width;
- *     uint32_t                    group_depth;
- *     uint32_t                    mirror_cnt;
- *     pnfs_osd_raid_algorithm4    raid_algorithm;
- * }; */
+/*   struct pnfs_osd_data_map4 {
+ *       uint32_t                    odm_num_comps;
+ *       length4                     odm_stripe_unit;
+ *       uint32_t                    odm_group_width;
+ *       uint32_t                    odm_group_depth;
+ *       uint32_t                    odm_mirror_cnt;
+ *       pnfs_osd_raid_algorithm4    odm_raid_algorithm;
+ *   };
+ */
 static inline u32 *
 pnfs_osd_xdr_decode_data_map(u32 *p, struct pnfs_osd_data_map *data_map)
 {
-	READ64(data_map->stripe_unit);
-	READ32(data_map->group_width);
-	READ32(data_map->group_depth);
-	READ32(data_map->mirror_cnt);
-	READ32(data_map->raid_algorithm);
+	READ32(data_map->odm_num_comps);
+	READ64(data_map->odm_stripe_unit);
+	READ32(data_map->odm_group_width);
+	READ32(data_map->odm_group_depth);
+	READ32(data_map->odm_mirror_cnt);
+	READ32(data_map->odm_raid_algorithm);
 	return p;
 }
 
@@ -109,21 +131,17 @@ pnfs_osd_xdr_decode_layout(struct pnfs_osd_layout *layout, u32 *p)
 	struct pnfs_osd_object_cred *comp;
 	struct pnfs_osd_opaque_cred *cred;
 
-	p = pnfs_osd_xdr_decode_data_map(p, &layout->map);
-	READ32(layout->num_comps);
-	layout->comps = (struct pnfs_osd_object_cred *)(layout + 1);
-	comp = layout->comps;
-	cred = (struct pnfs_osd_opaque_cred *)(comp + layout->num_comps);
+	p = pnfs_osd_xdr_decode_data_map(p, &layout->olo_map);
+	READ32(layout->olo_num_comps);
+	layout->olo_comps = (struct pnfs_osd_object_cred *)(layout + 1);
+	comp = layout->olo_comps;
+	cred = (struct pnfs_osd_opaque_cred *)(comp + layout->olo_num_comps);
 	dprintk("%s: layout=%p num_comps=%u comps=%p\n", __func__,
-	       layout, layout->num_comps, layout->comps);
-	for (i = 0; i < layout->num_comps; i++) {
-		comp->opaque_cred = cred;
-		p = pnfs_osd_xdr_decode_object_cred(p, comp);
-		p = pnfs_osd_xdr_decode_opaque_cred(p, cred);
+	       layout, layout->olo_num_comps, layout->olo_comps);
+	for (i = 0; i < layout->olo_num_comps; i++) {
+		p = pnfs_osd_xdr_decode_object_cred(p, comp, &cred);
 		dprintk("%s: cred[%d]=%p cred_len=%u\n", __func__,
 			i, cred, cred->cred_len);
-		cred = (struct pnfs_osd_opaque_cred *)((u32 *)cred + 1 +
-						XDR_QUADLEN(cred->cred_len));
 		comp++;
 	}
 	dprintk("%s: end=%p count=%Zd\n", __func__,

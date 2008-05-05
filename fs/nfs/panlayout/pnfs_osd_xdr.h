@@ -67,56 +67,11 @@
 } while (0)
 
 /*
- * draft-ietf-nfsv4-minorversion-14
- * draft-ietf-nfsv4-pnfs-osd-04
+ * draft-ietf-nfsv4-minorversion-22
+ * draft-ietf-nfsv4-pnfs-osd-07
  */
 
-enum pnfs_obj_addr_type {
-	OBJ_TARGET_NETADDR            = 1,
-	OBJ_TARGET_IQN                = 2,
-	OBJ_TARGET_WWN                = 3
-};
-
-
-/*   struct netaddr4 {
- *       // see struct rpcb in RFC1833
- *       string r_netid<>;    // network id
- *       string r_addr<>;     // universal address
- *   }; */
-struct pnfs_osd_net_addr {
-	struct nfs4_string            r_netid;
-	struct nfs4_string            r_addr;
-};
-
-/*   struct pnfs_osd_deviceaddr4 {
- *       union target switch (pnfs_osd_addr_type4 type) {
- *           case OBJ_TARGET_NETADDR:
- *               pnfs_netaddr4   netaddr;
- *
- *           case OBJ_TARGET_IQN:
- *               string          iqn<>;
- *
- *           case OBJ_TARGET_WWN:
- *               string          wwn<>;
- *
- *           default:
- *               void;
- *       };
- *       uint64_t            lun;
- *       opaque              systemid<>;
- *       opaque              osdname<>;
- *   }; */
-struct pnfs_osd_deviceaddr {
-	u32                           type;
-	union {
-		struct pnfs_osd_net_addr  netaddr;
-		struct nfs4_string        iqn;
-		struct nfs4_string        wwn;
-	} u;
-	u64                           lun;
-	struct nfs4_string            systemid;
-	struct nfs4_string            osdname;
-};
+/* Layout Structure */
 
 enum pnfs_osd_raid_algorithm4 {
 	PNFS_OSD_RAID_0               = 1,
@@ -126,24 +81,27 @@ enum pnfs_osd_raid_algorithm4 {
 };
 
 /*   struct pnfs_osd_data_map4 {
- *       length4                     stripe_unit;
- *       uint32_t                    group_width;
- *       uint32_t                    group_depth;
- *       uint32_t                    mirror_cnt;
- *       pnfs_osd_raid_algorithm4    raid_algorithm;
- *   }; */
+ *       uint32_t                    odm_num_comps;
+ *       length4                     odm_stripe_unit;
+ *       uint32_t                    odm_group_width;
+ *       uint32_t                    odm_group_depth;
+ *       uint32_t                    odm_mirror_cnt;
+ *       pnfs_osd_raid_algorithm4    odm_raid_algorithm;
+ *   };
+ */
 struct pnfs_osd_data_map {
-	u64                           stripe_unit;
-	u32                           group_width;
-	u32                           group_depth;
-	u32                           mirror_cnt;
-	u32                           raid_algorithm;
+	u32				odm_num_comps;
+	u64				odm_stripe_unit;
+	u32				odm_group_width;
+	u32				odm_group_depth;
+	u32				odm_mirror_cnt;
+	u32				odm_raid_algorithm;
 };
 
 static inline size_t
 pnfs_osd_data_map_xdr_sz(u32 *p)
 {
-	return 2 + 1 + 1 + 1 + 1;
+	return 1 + 2 + 1 + 1 + 1 + 1;
 }
 
 static inline size_t
@@ -153,20 +111,21 @@ pnfs_osd_data_map_incore_sz(u32 *p)
 }
 
 /*   struct pnfs_osd_objid4 {
- *       deviceid4       device_id;
- *       uint64_t        partition_id;
- *       uint64_t        object_id;
- *   }; */
+ *       deviceid4       oid_device_id;
+ *       uint64_t        oid_partition_id;
+ *       uint64_t        oid_object_id;
+ *   };
+ */
 struct pnfs_osd_objid {
-	u64                           device_id;
-	u64                           partition_id;
-	u64                           object_id;
+	struct pnfs_deviceid		oid_device_id;
+	u64				oid_partition_id;
+	u64				oid_object_id;
 };
 
 static inline size_t
 pnfs_osd_objid_xdr_sz(u32 *p)
 {
-	return 3 * 2;
+	return (NFS4_PNFS_DEVICEID4_SIZE / 4) + 2 + 2;
 }
 
 static inline size_t
@@ -212,22 +171,19 @@ enum pnfs_osd_cap_key_sec {
 };
 
 /*   struct pnfs_osd_object_cred4 {
- *       pnfs_osd_objid4         object_id;
- *       pnfs_osd_version4       osd_version;
- *       pnfs_osd_cap_key_sec4   cap_key_sec;
- *       opaque                  capability_key<>;
- *       opaque                  capability<>;
- *   }; */
+ *       pnfs_osd_objid4         oc_object_id;
+ *       pnfs_osd_version4       oc_osd_version;
+ *       pnfs_osd_cap_key_sec4   oc_cap_key_sec;
+ *       opaque                  oc_capability_key<>;
+ *       opaque                  oc_capability<>;
+ *   };
+ */
 struct pnfs_osd_object_cred {
-	struct pnfs_osd_objid         object_id;
-	u32                           osd_version;
-	struct pnfs_osd_opaque_cred *opaque_cred;
-#if 0
-/* FIXME: break the credential into cap_key and cap as per draft-04 */
-	u32                           cap_key_sec;
-	struct nfs4_string            cap_key;
-	struct nfs4_string            cap;
-#endif
+	struct pnfs_osd_objid		oc_object_id;
+	u32				oc_osd_version;
+	u32				oc_cap_key_sec;
+	struct pnfs_osd_opaque_cred	*oc_cap_key;
+	struct pnfs_osd_opaque_cred	*oc_cap;
 };
 
 static inline size_t
@@ -235,7 +191,8 @@ pnfs_osd_object_cred_xdr_sz(u32 *p)
 {
 	u32 *start = p;
 
-	p += pnfs_osd_objid_xdr_sz(p) + 1;
+	p += pnfs_osd_objid_xdr_sz(p) + 2;
+	p += pnfs_osd_opaque_cred_xdr_sz(p);
 	p += pnfs_osd_opaque_cred_xdr_sz(p);
 	return p - start;
 }
@@ -243,29 +200,23 @@ pnfs_osd_object_cred_xdr_sz(u32 *p)
 static inline size_t
 pnfs_osd_object_cred_incore_sz(u32 *p)
 {
-	p += pnfs_osd_objid_xdr_sz(p) + 1;
+	p += pnfs_osd_objid_xdr_sz(p) + 2;
 	return sizeof(struct pnfs_osd_object_cred) +
+	       pnfs_osd_opaque_cred_incore_sz(p) +
 	       pnfs_osd_opaque_cred_incore_sz(p);
 }
 
 /*   struct pnfs_osd_layout4 {
- *       pnfs_osd_data_map4      map;
- *       pnfs_osd_object_cred4   components<>;
- *   }; */
+ *       pnfs_osd_data_map4      olo_map;
+ *       uint32_t                olo_comps_index;
+ *       pnfs_osd_object_cred4   olo_components<>;
+ *   };
+ */
 struct pnfs_osd_layout {
-	struct pnfs_osd_data_map      map;
-	u32                           num_comps;
-	struct pnfs_osd_object_cred  *comps;
-};
-
-/*   struct pnfs_osd_layoutupdate4 {
- *       pnfs_osd_deltaspaceused4    delta_space_used;
- *       pnfs_osd_ioerr4             ioerr<>;
- *   }; */
-struct nfs4_panlayout_update {
-	u32                           delta_space_valid;
-	s64                           delta_space_used;
-/* FIXME: implement ioerr */
+	struct pnfs_osd_data_map	olo_map;
+	u32				olo_comps_index;
+	u32				olo_num_comps;
+	struct pnfs_osd_object_cred	*olo_comps;
 };
 
 static inline size_t
@@ -296,6 +247,118 @@ pnfs_osd_layout_incore_sz(u32 *p)
 	}
 	return sz;
 }
+
+/* Device Address */
+
+enum pnfs_osd_targetid_type {
+	OBJ_TARGET_ANON = 1,
+	OBJ_TARGET_SCSI_NAME = 2,
+	OBJ_TARGET_SCSI_DEVICE_ID = 3,
+};
+
+/*   union pnfs_osd_targetid4 switch (pnfs_osd_targetid_type4 oti_type) {
+ *       case OBJ_TARGET_SCSI_NAME:
+ *           string              oti_scsi_name<>;
+ *
+ *       case OBJ_TARGET_SCSI_DEVICE_ID:
+ *           opaque              oti_scsi_device_id<>;
+ *
+ *       default:
+ *           void;
+ *   };
+ *
+ *   union pnfs_osd_targetaddr4 switch (bool ota_available) {
+ *       case TRUE:
+ *           netaddr4            ota_netaddr;
+ *       case FALSE:
+ *           void;
+ *   };
+ *
+ *   struct pnfs_osd_deviceaddr4 {
+ *       pnfs_osd_targetid4      oda_targetid;
+ *       pnfs_osd_targetaddr4    oda_targetaddr;
+ *       uint64_t                oda_lun;
+ *       opaque                  oda_systemid<>;
+ *       pnfs_osd_object_cred4   oda_root_obj_cred;
+ *       opaque                  oda_osdname<>;
+ *   };
+ */
+struct pnfs_osd_targetid {
+	u32				oti_type;
+	struct nfs4_string		oti_scsi_device_id;
+};
+
+/*   struct netaddr4 {
+ *       // see struct rpcb in RFC1833
+ *       string r_netid<>;    // network id
+ *       string r_addr<>;     // universal address
+ *   }; */
+struct pnfs_osd_net_addr {
+	struct nfs4_string		r_netid;
+	struct nfs4_string		r_addr;
+};
+
+struct pnfs_osd_targetaddr {
+	u32				ota_available;
+	struct pnfs_osd_net_addr	ota_netaddr;
+};
+
+struct pnfs_osd_deviceaddr {
+	struct pnfs_osd_targetid	oda_targetid;
+	struct pnfs_osd_targetaddr	oda_targetaddr;
+	u8				oda_lun[8];
+	struct nfs4_string		oda_systemid;
+	struct pnfs_osd_object_cred	oda_root_obj_cred;
+	struct nfs4_string		oda_osdname;
+};
+
+/* LAYOUTCOMMIT: layoutupdate */
+
+/*   union pnfs_osd_deltaspaceused4 switch (bool dsu_valid) {
+ *       case TRUE:
+ *           int64_t     dsu_delta;
+ *       case FALSE:
+ *           void;
+ *   };
+ *
+ *   struct pnfs_osd_layoutupdate4 {
+ *       pnfs_osd_deltaspaceused4    olu_delta_space_used;
+ *       bool                        olu_ioerr_flag;
+ *   };
+ */
+struct nfs4_panlayout_update {
+	u32				dsu_valid;
+	s64				dsu_delta;
+	u32				olu_ioerr_flag;
+};
+
+/* LAYOUTRETURN: I/O Rrror Report */
+
+enum pnfs_osd_errno {
+	PNFS_OSD_ERR_EIO		= 1,
+	PNFS_OSD_ERR_NOT_FOUND		= 2,
+	PNFS_OSD_ERR_NO_SPACE		= 3,
+	PNFS_OSD_ERR_BAD_CRED		= 4,
+	PNFS_OSD_ERR_NO_ACCESS		= 5,
+	PNFS_OSD_ERR_UNREACHABLE	= 6,
+	PNFS_OSD_ERR_RESOURCE		= 7
+};
+
+/*   struct pnfs_osd_ioerr4 {
+ *       pnfs_osd_objid4     oer_component;
+ *       length4             oer_comp_offset;
+ *       length4             oer_comp_length;
+ *       bool                oer_iswrite;
+ *       pnfs_osd_errno4     oer_errno;
+ *   };
+ */
+struct pnfs_osd_ioerr {
+    struct pnfs_osd_objid		oer_component;
+    u64					oer_comp_offset;
+    u64					oer_comp_length;
+    u32					oer_iswrite;
+    u32					oer_errno;
+};
 
 extern struct pnfs_osd_layout *pnfs_osd_xdr_decode_layout(
 	struct pnfs_osd_layout *layout, u32 *p);
