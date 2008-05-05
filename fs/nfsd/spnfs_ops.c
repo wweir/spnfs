@@ -62,6 +62,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 extern struct spnfs *global_spnfs;
+static struct inode *recall_inode;
 
 int
 spnfs_layout_type(void)
@@ -344,26 +345,42 @@ spnfs_open(struct inode *inode, void *p)
 	}
 	status = res.open_res.status;
 
+	/*
+	 * Some temporary hackery to test layoutrecall.  If the file
+	 * starts with .recall, save its inode.  Upon close of this file,
+	 * a layoutrecall will be triggered.
+	 */
+	if (strncmp(poa->op_fn, ".recall", 7) == 0) {
+		recall_inode = inode;
+		dprintk("%s: will recall layout for %s, ino = %lu\n",
+			__func__, poa->op_fn, inode->i_ino);
+	}
+
 open_out:
 	return status;
 }
 
-/* DMXXX: this is only a test function atm.  Unrelated to close. */
+/* MSXXX: some temporary hackery used to test layoutrecall */
 int
-spnfs_close(void)
+spnfs_close(struct inode *inode)
 {
-	struct spnfs *spnfs = global_spnfs; /* keep up the pretence */
-	struct spnfs_msg im;
-	union spnfs_msg_res res;
+	struct super_block *sb = inode->i_sb;
+	struct nfsd4_pnfs_cb_layout lr;
 
-	im.im_type = SPNFS_TYPE_CLOSE;
-	im.im_args.close_args.x = 1337;
+	/* trigger layoutrecall */
+	if (inode == recall_inode) {
+		dprintk("%s: recalling layout for ino = %lu\n",
+			__func__, inode->i_ino);
+		recall_inode = NULL;
 
-	/* call generic function to queue the msg for upcall */
-	if (spnfs_upcall(spnfs, &im, &res) == 0) {
-		dprintk("spnfs_close success: %d\n", res.close_res.y);
-	} else {
-		dprintk("failed spnfs upcall: close\n");
+		lr.cbl_recall_type = RECALL_FILE;
+		lr.cbl_seg.clientid = 0;
+		lr.cbl_seg.offset = 0;
+		lr.cbl_seg.length = NFS4_LENGTH_EOF;
+		lr.cbl_seg.iomode = IOMODE_ANY;
+		lr.cbl_layoutchanged = 0;
+
+		sb->s_export_op->cb_layout_recall(sb, inode, &lr);
 	}
 
 	return 0;

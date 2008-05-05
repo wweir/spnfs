@@ -239,6 +239,7 @@ struct export_operations {
 
 		/* pNFS: spnfs calls */
 	int (*propagate_open) (struct inode *inode, void *p);
+	int (*close) (struct inode *inode);
 #endif /* CONFIG_PNFSD */
 };
 

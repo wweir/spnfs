@@ -466,6 +466,9 @@ static int check_export(struct inode *inode, int flags, unsigned char *uuid)
 		if (!inode->i_sb->s_export_op->propagate_open)
 			inode->i_sb->s_export_op->propagate_open =
 				spnfs_open;
+		if (!inode->i_sb->s_export_op->close)
+			inode->i_sb->s_export_op->close =
+				spnfs_close;
 		if (!inode->i_sb->s_export_op->layout_get)
 			inode->i_sb->s_export_op->layout_get =
 				spnfs_layoutget;
