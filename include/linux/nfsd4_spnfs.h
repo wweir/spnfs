@@ -267,6 +267,7 @@ int spnfs_getdeviceiter(struct super_block *, struct pnfs_deviter_arg *);
 int spnfs_getdeviceinfo(struct super_block *, struct pnfs_devinfo_arg *);
 int spnfs_setattr(void);
 int spnfs_open(struct inode *, void *);
+int spnfs_close(struct inode *);
 int spnfs_get_state(struct inode *, void *, void *);
 int spnfs_remove(unsigned long ino);
 

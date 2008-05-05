@@ -103,6 +103,7 @@ struct nfsd4_pnfs_open {
 	u32			op_create;
 	u32			op_createmode;
 	int			op_truncate;
+	char			op_fn[128];	/* XXX fix constant */
 };
 
 struct nfsd4_pnfs_cb_layout {
