@@ -99,7 +99,7 @@ spnfs_layoutget(struct inode *inode, struct pnfs_layoutget_arg *lgp)
 		status = -ENOMEM;
 		goto layoutget_cleanup;
 	}
-	/* XXX FIX: figure out what to do about fsid */
+	flp->device_id.pnfs_fsid = lgp->fsid;
 	flp->device_id.pnfs_devid = res.layoutget_res.devid;
 	flp->lg_layout_type = 1; /* XXX */
 	flp->lg_stripe_type = res.layoutget_res.stripe_type;
