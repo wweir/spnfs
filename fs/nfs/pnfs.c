@@ -1324,40 +1324,6 @@ pnfs_writeback_done(struct nfs_write_data *data)
 }
 
 /*
- * return 0 for success, 1 for legacy nfs fallback, negative for error
- */
-int
-pnfs_flush_one(struct inode *inode, struct list_head *head,
-		 unsigned int npages, size_t count, int how)
-{
-	struct nfs_server *nfss = NFS_SERVER(inode);
-	struct layoutdriver_io_operations *io_ops;
-	struct nfs_page *req;
-	struct pnfs_layout_segment *lseg;
-	int status;
-
-	if (!pnfs_enabled_sb(nfss) || !nfss->pnfs_curr_ld->ld_io_ops->flush_one)
-		goto fallback;
-
-	req = nfs_list_entry(head->next);
-	status = pnfs_update_layout(inode,
-				    req->wb_context,
-				    count,
-				    req->wb_offset,
-				    IOMODE_RW,
-				    &lseg);
-	if (status)
-		goto fallback;
-	io_ops = nfss->pnfs_curr_ld->ld_io_ops;
-	status = io_ops->flush_one(lseg, head, npages, count, how);
-	put_lseg(lseg);
-
-	return status;
-fallback:
-	return nfs_flush_one(inode, head, npages, count, how);
-}
-
-/*
  * Obtain a layout for the the write range, and call do_sync_write.
  *
  * Unlike the read path which can wait until page coalescing
@@ -1949,17 +1915,6 @@ void _pnfs_modify_new_write_request(struct nfs_page *req,
 			set_bit(PG_USE_PNFS, &req->wb_flags);
 		put_lseg(lseg);
 	}
-}
-
-void pnfs_free_request_data(struct nfs_page *req)
-{
-	struct layoutdriver_io_operations *lo;
-
-	if (!req->wb_ops || !req->wb_private)
-		return;
-	lo = (struct layoutdriver_io_operations *)req->wb_ops;
-	if (lo->free_request_data)
-		lo->free_request_data(req);
 }
 
 void pnfs_free_fsdata(struct pnfs_fsdata *fsdata)

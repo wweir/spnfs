@@ -695,6 +695,22 @@ nfs4_pnfs_device_item_get(struct filelayout_mount_type *mt,
 	return dev;
 }
 
+/* Want res = ((offset / layout->stripe_unit) % di->stripe_count)
+ * Then: ((res + fsi) % di->stripe_count)
+ */
+u32
+filelayout_dserver_get_index(loff_t offset,
+			     struct nfs4_pnfs_dev_item *di,
+			     struct nfs4_filelayout_segment *layout)
+{
+	u64 tmp, tmp2;
+
+	tmp = offset;
+	do_div(tmp, layout->stripe_unit);
+	tmp2 = do_div(tmp, di->stripe_count) + layout->first_stripe_index;
+	return do_div(tmp2, di->stripe_count);
+}
+
 /* Retrieve the rpc client for a specified byte range
  * in 'inode' by filling in the contents of 'dserver'.
  */
@@ -718,15 +734,9 @@ nfs4_pnfs_dserver_get(struct pnfs_layout_segment *lseg,
 	if (di == NULL)
 		return 1;
 
-	/* Want res = ((offset / layout->stripe_unit) % di->stripe_count)
-	 * Then: ((res + fsi) % di->stripe_count)
-	 */
+	stripe_idx = filelayout_dserver_get_index(offset, di, layout);
 
-	tmp = offset;
-	do_div(tmp, layout->stripe_unit);
-	tmp2 = do_div(tmp, di->stripe_count) + layout->first_stripe_index;
-	stripe_idx = do_div(tmp2, di->stripe_count);
-
+	/* For debugging, ensure entire requested range is in this dserver */
 	tmp = offset + count - 1;
 	do_div(tmp, layout->stripe_unit);
 	tmp2 = do_div(tmp, di->stripe_count) + layout->first_stripe_index;

@@ -240,14 +240,7 @@ struct rpc_call_ops filelayout_write_call_ops = {
  * allows the original read/write data structs to be passed in the
  * last argument.
  *
-
- * This is called after the pNFS client has already created, so I pass it
- * in via the last argument (void*).  I think this is the only way as there
- * are just too many NFS specific arguments in the read/write data structs
- * to pass to the layout drivers.
- *
- * TODO:
- * 1. This is a lot of arguments, create special non-nfs-specific structure?
+ * TODO: join with write_pagelist?
  */
 static int filelayout_read_pagelist(
 	struct pnfs_layout_type *layoutid,
@@ -259,12 +252,11 @@ static int filelayout_read_pagelist(
 	struct nfs_read_data *data)
 {
 	struct inode *inode = PNFS_INODE(layoutid);
-	struct nfs4_filelayout *nfslay = NULL;
 	struct nfs4_filelayout_segment *flseg;
 	struct nfs4_pnfs_dserver dserver;
+	struct nfs4_pnfs_ds *ds;
 	int status;
 
-	nfslay = PNFS_LD_DATA(layoutid);
 	flseg = LSEG_LD_DATA(data->lseg);
 
 	/* Retrieve the correct rpc_client for the byte range */
@@ -280,7 +272,9 @@ static int filelayout_read_pagelist(
 		data->args.fh = NFS_FH(inode);
 		status = 0;
 	} else {
-		struct nfs4_pnfs_ds *ds = dserver.dev->ds_list[0];
+		ds = dserver.dev->ds_list[0];
+
+		dprintk("%s USE DS:ip %x\n", __func__, htonl(ds->ds_ip_addr));
 
 		/* just try the first data server for the index..*/
 		data->pnfs_client = ds->ds_clp->cl_rpcclient;
@@ -316,179 +310,7 @@ print_ds(struct nfs4_pnfs_ds *ds)
 	dprintk("        ds->ds_count %d\n", atomic_read(&ds->ds_count));
 }
 
-static struct nfs4_pnfs_dserver *
-filelayout_create_dserver(void)
-{
-	struct nfs4_pnfs_dserver *local;
-
-	local = kzalloc(sizeof(*local), GFP_KERNEL);
-	if (!local)
-		return NULL;
-	kref_init(&local->ref);
-	dprintk("<-- %s dserver %p\n", __func__, local);
-	return local;
-}
-
-static void filelayout_free_dserver(struct kref *kref)
-{
-	struct nfs4_pnfs_dserver *dserver;
-	dserver = container_of(kref, struct nfs4_pnfs_dserver, ref);
-
-	dprintk("--> %s dserver %p\n", __func__, dserver);
-	kfree(dserver);
-}
-
-static void filelayout_release_dserver(struct nfs4_pnfs_dserver *dserver)
-{
-	kref_put(&dserver->ref, filelayout_free_dserver);
-}
-
-static void filelayout_get_dserver(struct nfs4_pnfs_dserver *dserver)
-{
-	kref_get(&dserver->ref);
-}
-
-/*
- * Called by nfs_release_request()
- */
-void
-filelayout_free_request_data(struct nfs_page *req)
-{
-	struct nfs4_pnfs_dserver *dserver;
-
-	dserver = (struct nfs4_pnfs_dserver *)req->wb_private;
-	BUG_ON(!dserver);
-	filelayout_release_dserver(dserver);
-}
-
-static struct nfs4_pnfs_ds *
-filelayout_create_init_ds(struct pnfs_layout_segment *lseg,
-			loff_t file_offset, size_t wb_bytes,
-			struct nfs4_pnfs_dserver **dsp)
-{
-	struct nfs4_pnfs_dserver *dserver;
-	struct nfs4_pnfs_ds *ds;
-	int status = -ENOMEM;
-
-	*dsp = dserver = filelayout_create_dserver();
-	if (!dserver) {
-		dprintk("%s failed to get dserver. status %d\n",
-					__func__, status);
-		goto out_err;
-	}
-
-	/* get the data server that serves this page */
-	status = nfs4_pnfs_dserver_get(lseg, file_offset, wb_bytes, dserver);
-
-	if (status != 0) {
-		dprintk("%s failed to get dataserver. status %d\n",
-						__func__, status);
-		filelayout_release_dserver(dserver);
-		status =  -EIO;
-		goto out_err;
-	}
-	/* just try the first multipath data server */
-	ds = dserver->dev->ds_list[0];
-
-	return ds;
-out_err:
-	return ERR_PTR(status);
-}
-
-/*
-* feed nfs_flush_one with per data server pages.
-*
-* Assume stripesz >= PAGE_SIZE.
-* TODO: If stripesz < PAGE_SIZE, use i/o through MDS
-*
-*/
-int filelayout_flush_one(struct pnfs_layout_segment *lseg,
-			 struct list_head *head, unsigned int npages,
-			 size_t count, int how)
-{
-	struct nfs4_pnfs_dserver *dserver = NULL;
-	struct nfs4_pnfs_ds *ds = NULL;  /* current stripe data server */
-	struct nfs_page *req;
-	loff_t file_offset = 0, stripe_offset, temp;
-	size_t stripesz, dstotal = 0;
-	struct list_head dslist;
-	int status = -ENOMEM, use_ds = 0, ndspages = 0;
-
-	dprintk("--> %s npages %d, count %Zd, lseg %p\n", __func__,
-				npages, count, lseg);
-
-	INIT_LIST_HEAD(&dslist);
-	stripesz = filelayout_get_stripesize(lseg->layout);
-	dprintk("%s stripesize %Zd\n", __func__, stripesz);
-
-	/* split up the list according to DS */
-	while (!list_empty(head)) {
-next_ds:
-		req = nfs_list_entry(head->next);
-
-		file_offset = req->wb_index << PAGE_CACHE_SHIFT;
-
-		if (!use_ds) {
-			ds = filelayout_create_init_ds(lseg, file_offset,
-						       req->wb_bytes, &dserver);
-			if (IS_ERR(ds)) {
-				status = PTR_ERR(ds);
-				goto out;
-			}
-			/* reset for new data server */
-			dstotal = 0;
-			ndspages = 0;
-			use_ds = 1;
-		} else
-			filelayout_get_dserver(dserver);
-
-		req->wb_ops = &filelayout_io_operations;
-		req->wb_private = dserver;
-
-		/* move request to dslist */
-		nfs_list_remove_request(req);
-		nfs_list_add_request(req, &dslist);
-		ndspages++;
-		npages--;
-
-		count -= req->wb_bytes;
-		dstotal += req->wb_bytes;
-
-		/* Are we done with this DS? */
-		temp = file_offset + req->wb_bytes;
-		stripe_offset = do_div(temp, stripesz);
-
-		if (count == 0 || stripe_offset == 0) {
-			use_ds = 0;
-			goto send;
-		}
-	}
-send:
-	/* XXX should recover to send through MDS */
-	dprintk("%s Send: ndspages %d dstotal %Zd list_empty %d \n",
-				__func__, ndspages, dstotal, list_empty(head));
-	status = nfs_flush_one(PNFS_INODE(lseg->layout), &dslist, ndspages,
-			       dstotal, how);
-	if (status < 0)
-		goto out;
-
-	/* Is there more data to process? */
-	if (!list_empty(head)) {
-		/* count and npages better not be zero! */
-		dprintk("%s next_ds count %Zd npages %d\n",
-				__func__, count, npages);
-		goto next_ds;
-	}
-
-out:
-	dprintk("<-- %s npages %d (should be zero!)\n", __func__, npages);
-	return status;
-}
-
-/* Perform async writes.
- *
- * TODO: See filelayout_read_pagelist.
- */
+/* Perform async writes. */
 static int filelayout_write_pagelist(
 	struct pnfs_layout_type *layoutid,
 	struct page **pages,
@@ -499,48 +321,52 @@ static int filelayout_write_pagelist(
 	int sync,
 	struct nfs_write_data *data)
 {
+	struct inode *inode = PNFS_INODE(layoutid);
 	struct nfs4_filelayout_segment *flseg = LSEG_LD_DATA(data->lseg);
-	struct nfs4_pnfs_dserver *dserver = NULL;
+	struct nfs4_pnfs_dserver dserver;
 	struct nfs4_pnfs_ds *ds;
-	struct nfs_page *req = NULL;
-	struct list_head *h;
+	int status;
 
-	dprintk("--> %s nr_pages %d offset:count %Lu:%Zu\n", __func__,
-						nr_pages, offset, count);
+	dprintk("--> %s ino %lu nr_pages %d pgbase %u req %Zu@%Lu sync %d\n",
+		__func__, inode->i_ino, nr_pages, pgbase, count, offset, sync);
 
 	/* Retrieve the correct rpc_client for the byte range */
-	list_for_each(h, &data->pages) {
-		req = list_entry(h, struct nfs_page, wb_list);
-		break;
+	status = nfs4_pnfs_dserver_get(data->lseg,
+				       offset,
+				       count,
+				       &dserver);
+
+	if (status) {
+		printk(KERN_ERR "%s: dserver get failed status %d use MDS\n",
+		       __func__, status);
+		data->pnfs_client = NFS_CLIENT(inode);
+		data->ds_nfs_client = NULL;
+		data->args.fh = NFS_FH(inode);
+		status = 0;
+	} else {
+		/* use the first multipath data server */
+		ds = dserver.dev->ds_list[0];
+
+		dprintk("%s ino %lu %Zu@%Lu DS:%x:%hu\n",
+			__func__, inode->i_ino, count, offset,
+			htonl(ds->ds_ip_addr), ntohs(ds->ds_port));
+
+		data->pnfs_client = ds->ds_clp->cl_rpcclient;
+		data->ds_nfs_client = ds->ds_clp;
+		data->args.fh = dserver.fh;
+
+		/* Get the file offset on the dserver. Set the write offset to
+		 * this offset and save the original offset.
+		 */
+		data->args.offset = filelayout_get_dserver_offset(offset, flseg);
+		data->orig_offset = offset;
 	}
-	BUG_ON(!req);
-
-	dserver = (struct nfs4_pnfs_dserver *)req->wb_private;
-	BUG_ON(!dserver);
-
-	/* use the first multipath data server */
-	ds = dserver->dev->ds_list[0];
-	dprintk("%s USE DS:\n", __func__);
-	print_ds(ds);
-
-	data->pnfs_client = ds->ds_clp->cl_rpcclient;
-	data->ds_nfs_client = ds->ds_clp;
-	data->args.fh = dserver->fh;
-
-	dprintk("%s using DS %x:%hu\n", __func__,
-		htonl(ds->ds_ip_addr), ntohs(ds->ds_port));
-
-	/* Get the file offset on the dserver. Set the write offset to
-	 * this offset and save the original offset.
-	 */
-	data->args.offset = filelayout_get_dserver_offset(offset, flseg);
-	data->orig_offset = offset;
 
 	/* Perform an asynchronous write The offset will be reset in the
 	 * call_ops->rpc_call_done() routine
 	 */
 	nfs_initiate_write(data, data->pnfs_client,
-			&filelayout_write_call_ops, sync);
+			   &filelayout_write_call_ops, sync);
 
 	return 0;
 }
@@ -639,24 +465,6 @@ filelayout_free_lseg(struct pnfs_layout_segment *lseg)
 }
 
 /*
- * Do two nfs_pnfs_dserver pointers point to the same structure?
- * Just compare the first multipath servers.
- */
-static int
-filelayout_same_ds(struct nfs4_pnfs_dserver *one, struct nfs4_pnfs_dserver *two)
-{
-	struct nfs4_pnfs_dev *d_one = one->dev, *d_two = two->dev;
-	struct nfs4_pnfs_ds *ds_one, *ds_two;
-
-	ds_one = d_one->ds_list[0];
-	ds_two = d_two->ds_list[0];
-	return (d_one->stripe_index == d_two->stripe_index &&
-		d_one->num_ds == d_two->num_ds &&
-		ds_one->ds_ip_addr == ds_two->ds_ip_addr &&
-		ds_one->ds_port == ds_two->ds_port);
-}
-
-/*
  * Allocate a new nfs_write_data struct and initialize
  */
 static struct nfs_write_data *
@@ -693,66 +501,102 @@ filelayout_commit(struct pnfs_layout_type *layoutid, int sync,
 {
 	struct nfs4_filelayout_segment *nfslay;
 	struct nfs_write_data   *dsdata = NULL;
-	struct nfs4_pnfs_dserver *dserver = NULL;
+	struct nfs4_pnfs_dserver dserver;
 	struct nfs4_pnfs_ds *ds;
-	struct nfs_page *req;
+	struct nfs_page *req, *reqt;
 	struct list_head *pos, *tmp, *head = &data->pages;
+	loff_t file_offset, comp_offset;
+	size_t stripesz, cbytes;
+	int status;
+	struct nfs4_pnfs_dev_item *di;
+	u32 idx1, idx2;
 
 	nfslay = LSEG_LD_DATA(data->lseg);
 
-	dprintk("%s data %p pnfs_client %p nfslay %p\n",
-			__func__, data, data->pnfs_client, nfslay);
+	dprintk("%s data %p pnfs_client %p nfslay %p sync %d\n",
+		__func__, data, data->pnfs_client, nfslay, sync);
 
 	if (nfslay->commit_through_mds) {
 		dprintk("%s data %p commit through mds\n", __func__, data);
 		return 1;
 	}
 
+	stripesz = filelayout_get_stripesize(layoutid);
+	dprintk("%s stripesize %Zd\n", __func__, stripesz);
+
+	di = nfs4_pnfs_device_item_get(FILE_MT(data->inode),
+				       NFS_FH(data->inode), &nfslay->dev_id);
+	if (di == NULL) {
+		status = -EIO;
+		goto out_bad;
+	}
+
 	/* COMMIT to each Data Server */
 	while (!list_empty(head)) {
-
-		/* dserver and dsdata must be NULL */
 		req = nfs_list_entry(head->next);
 
-		dserver = (struct nfs4_pnfs_dserver *)req->wb_private;
-		/* XXX BUG_ON(!dserver) ?*/
-		if (!dserver)
+		file_offset = req->wb_index << PAGE_CACHE_SHIFT;
+
+		/* Get dserver for the current page */
+		status = nfs4_pnfs_dserver_get(data->lseg,
+					       file_offset,
+					       req->wb_bytes,
+					       &dserver);
+
+		/* Get its index */
+		idx1 = filelayout_dserver_get_index(file_offset, di, nfslay);
+
+		if (status) {
+			status = -EIO;
 			goto out_bad;
+		}
 
 		dsdata = filelayout_clone_write_data(data);
-		if (!dsdata)
+		if (!dsdata) {
+			status = -ENOMEM;
 			goto out_bad;
+		}
 
 		/* Just try the first multipath data server */
-		ds = dserver->dev->ds_list[0];
+		ds = dserver.dev->ds_list[0];
 		dsdata->pnfs_client = ds->ds_clp->cl_rpcclient;
 		dsdata->ds_nfs_client = ds->ds_clp;
-		dsdata->args.fh = dserver->fh;
+		dsdata->args.fh = dserver.fh;
+		cbytes = req->wb_bytes;
 
-		/* Gather all pages going to the data server */
+		/* Gather all pages going to the current data server by
+		 * comparing their indices.
+		 * XXX: This recalculates the indices unecessarily.
+		 *      One idea would be to calc the index for every page
+		 *      and then compare if they are the same. */
 		list_for_each_safe(pos, tmp, head) {
-			req = nfs_list_entry(pos);
-			if (filelayout_same_ds(dserver, req->wb_private)) {
-				nfs_list_remove_request(req);
-				nfs_list_add_request(req, &dsdata->pages);
+			reqt = nfs_list_entry(pos);
+			comp_offset = reqt->wb_index << PAGE_CACHE_SHIFT;
+			idx2 = filelayout_dserver_get_index(comp_offset, di, nfslay);
+			if (idx1 == idx2) {
+				nfs_list_remove_request(reqt);
+				nfs_list_add_request(reqt, &dsdata->pages);
+				cbytes += reqt->wb_bytes;
 			}
 		}
 
+		dprintk("%s: Initiating commit: %Zu@%llu USE DS:\n",
+			__func__, cbytes, file_offset);
+		print_ds(ds);
+
 		/* Send COMMIT to data server */
 		nfs_initiate_commit(dsdata, dsdata->pnfs_client, sync);
-
-		/* reset for next data server */
-		dsdata = NULL;
-		dserver = NULL;
 	}
 	/* Release original commit data since it is not used */
 	nfs_commit_free(data);
 	return 0;
 
 out_bad:
+	printk(KERN_ERR "%s: dserver get failed status %d\n", __func__, status);
+
 	/* XXX should we send COMMIT to MDS e.g. not free data and return 1 ? */
 	nfs_commit_free(data);
-	return -ENOMEM;
+	return status;
 }
 
 /* Return the stripesize for the specified file.
@@ -803,6 +647,10 @@ boundary:
 	r_stripe = req->wb_index << PAGE_CACHE_SHIFT;
 	do_div(r_stripe, pgio->pg_boundary);
 
+#if 0
+	dprintk("%s p %u r %u bnd %d bsize %Zu\n",__func__, p_stripe, r_stripe, pgio->pg_boundary, pgio->pg_bsize);
+#endif
+
 	return (p_stripe == r_stripe);
 }
 
@@ -831,8 +679,6 @@ struct layoutdriver_io_operations filelayout_io_operations = {
 	.commit                  = filelayout_commit,
 	.read_pagelist           = filelayout_read_pagelist,
 	.write_pagelist          = filelayout_write_pagelist,
-	.flush_one		 = filelayout_flush_one,
-	.free_request_data	 = filelayout_free_request_data,
 	.alloc_layout            = filelayout_alloc_layout,
 	.free_layout             = filelayout_free_layout,
 	.alloc_lseg              = filelayout_alloc_lseg,
