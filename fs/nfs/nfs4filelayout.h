@@ -74,7 +74,6 @@ struct nfs4_pnfs_devlist {
 struct nfs4_pnfs_dserver {
 	struct nfs_fh        *fh;
 	struct nfs4_pnfs_dev *dev;
-	struct kref           ref;
 };
 
 struct nfs4_filelayout_segment {
@@ -105,7 +104,6 @@ extern struct pnfs_client_operations *pnfs_callback_ops;
 char *deviceid_fmt(const struct pnfs_deviceid *dev_id);
 int  nfs4_pnfs_devlist_init(struct nfs4_pnfs_dev_hlist *hlist);
 void nfs4_pnfs_devlist_destroy(struct nfs4_pnfs_dev_hlist *hlist);
-
 int nfs4_pnfs_dserver_get(struct pnfs_layout_segment *lseg,
 			  loff_t offset,
 			  size_t count,
@@ -114,6 +112,12 @@ int decode_and_add_devicelist(struct filelayout_mount_type *mt, struct pnfs_devi
 int process_deviceid_list(struct filelayout_mount_type *mt,
 			  struct nfs_fh *fh,
 			  struct pnfs_devicelist *devlist);
+struct nfs4_pnfs_dev_item * nfs4_pnfs_device_item_get(struct filelayout_mount_type *mt,
+						      struct nfs_fh *fh,
+						      struct pnfs_deviceid *dev_id);
+u32 filelayout_dserver_get_index(loff_t offset,
+				 struct nfs4_pnfs_dev_item *di,
+				 struct nfs4_filelayout_segment *layout);
 
 #define READ32(x)         (x) = ntohl(*p++)
 #define READ64(x)         do {			\
