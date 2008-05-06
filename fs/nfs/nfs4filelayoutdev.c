@@ -499,10 +499,11 @@ decode_and_add_ds(uint32_t **pp, struct filelayout_mount_type *mt)
 	 */
 	if (!ds->ds_clp) {
 		err = nfs4_pnfs_ds_create(mds_srv, ds);
-		printk(KERN_ERR
-		       "%s nfs4_pnfs_ds_create returned %d\n", __func__, err);
-		if (err)
+		if (err) {
+			printk(KERN_ERR "%s nfs4_pnfs_ds_create error %d\n",
+			       __func__, err);
 			goto out_err;
+		}
 	}
 
 	/* adding ds to stripe */
