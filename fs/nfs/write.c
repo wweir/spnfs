@@ -1008,11 +1008,7 @@ static void nfs_pageio_init_write(struct nfs_pageio_descriptor *pgio,
 	if (wsize < PAGE_CACHE_SIZE)
 		nfs_pageio_init(pgio, inode, nfs_flush_multi, wsize, ioflags);
 	else
-#ifdef CONFIG_PNFS
-		nfs_pageio_init(pgio, inode, pnfs_flush_one, wsize, ioflags);
-#else
 		nfs_pageio_init(pgio, inode, nfs_flush_one, wsize, ioflags);
-#endif /* CONFIG_PNFS */
 }
 
 /*
