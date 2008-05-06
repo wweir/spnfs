@@ -707,7 +707,7 @@ nfs4_pnfs_dserver_get(struct pnfs_layout_segment *lseg,
 	struct nfs4_filelayout_segment *layout = LSEG_LD_DATA(lseg);
 	struct inode *inode = PNFS_INODE(lseg->layout);
 	struct nfs4_pnfs_dev_item *di;
-	u64 tmp;
+	u64 tmp, tmp2;
 	u32 stripe_idx, end_idx;
 
 	if (!layout)
@@ -718,24 +718,28 @@ nfs4_pnfs_dserver_get(struct pnfs_layout_segment *lseg,
 	if (di == NULL)
 		return 1;
 
-	/* Want ((offset / layout->stripe_unit) % di->stripe_count)
-	* n_str = stripe for offset */
+	/* Want res = ((offset / layout->stripe_unit) % di->stripe_count)
+	 * Then: ((res + fsi) % di->stripe_count)
+	 */
 
 	tmp = offset;
 	do_div(tmp, layout->stripe_unit);
-	stripe_idx = do_div(tmp, di->stripe_count) + layout->first_stripe_index;
+	tmp2 = do_div(tmp, di->stripe_count) + layout->first_stripe_index;
+	stripe_idx = do_div(tmp2, di->stripe_count);
 
 	tmp = offset + count - 1;
 	do_div(tmp, layout->stripe_unit);
-	end_idx = do_div(tmp, di->stripe_count) + layout->first_stripe_index;
+	tmp2 = do_div(tmp, di->stripe_count) + layout->first_stripe_index;
+	end_idx = do_div(tmp2, di->stripe_count);
 
 	dprintk("%s: offset=%Lu, count=%Zu, si=%u, dsi=%u, "
-		"stripe_count=%u, stripe_unit=%u first_stripe_index %d\n",
+		"stripe_count=%u, stripe_unit=%u first_stripe_index %u\n",
 		__func__,
 		offset, count, stripe_idx, end_idx, di->stripe_count,
 		layout->stripe_unit, layout->first_stripe_index);
 
 	BUG_ON(end_idx != stripe_idx);
+	BUG_ON(stripe_idx >= di->stripe_count);
 
 	dserver->dev = &di->stripe_devs[stripe_idx];
 	if (dserver->dev == NULL)
