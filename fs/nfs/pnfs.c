@@ -990,16 +990,6 @@ get_out:
 	return;
 }
 
-/* Return true if a layout driver is being used for this mountpoint */
-int
-pnfs_enabled_sb(struct nfs_server *nfss)
-{
-	if (!nfss->pnfs_curr_ld)
-		return 0;
-
-	return 1;
-}
-
 size_t
 pnfs_getthreshold(struct inode *inode, int iswrite)
 {
