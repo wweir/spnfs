@@ -45,7 +45,6 @@ void pnfs_layoutcommit_done(struct pnfs_layoutcommit_data *data, int status);
 int pnfs_layoutcommit_inode(struct inode *inode, int sync);
 void pnfs_update_last_write(struct nfs_inode *nfsi, loff_t offset, size_t extent);
 void pnfs_need_layoutcommit(struct nfs_inode *nfsi, struct nfs_open_context *ctx);
-int pnfs_enabled_sb(struct nfs_server *nfss);
 unsigned int pnfs_getiosize(struct nfs_server *server);
 void pnfs_set_ds_iosize(struct nfs_server *server);
 int pnfs_commit(struct nfs_write_data *data, int sync);
@@ -76,6 +75,12 @@ void _pnfs_modify_new_write_request(struct nfs_page *req,
 #define PNFS_EXISTS_LDPOLICY_OP(srv, opname) ((srv)->pnfs_curr_ld &&	\
 				     (srv)->pnfs_curr_ld->ld_policy_ops && \
 				     (srv)->pnfs_curr_ld->ld_policy_ops->opname)
+
+/* Return true if a layout driver is being used for this mountpoint */
+static inline int pnfs_enabled_sb(struct nfs_server *nfss)
+{
+	return nfss->pnfs_curr_ld != NULL;
+}
 
 static inline int pnfs_try_to_read_data(struct nfs_read_data *data,
 					const struct rpc_call_ops *call_ops)
