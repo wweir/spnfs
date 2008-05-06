@@ -561,8 +561,8 @@ out:
 }
 
 int
-pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range,
-		enum pnfs_layoutrecall_type type)
+_pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range,
+		    enum pnfs_layoutrecall_type type)
 {
 	struct pnfs_layout_type *lo;
 	struct nfs_inode *nfsi = NFS_I(ino);
