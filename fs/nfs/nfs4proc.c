@@ -3031,7 +3031,7 @@ static int pnfs4_write_done(struct rpc_task *task, struct nfs_write_data *data)
 
 	/* Is this a DS session */
 	if (data->ds_nfs_client) {
-		dprintk("%s DS read\n", __func__);
+		dprintk("%s DS write\n", __func__);
 		session = data->ds_nfs_client->cl_ds_session;
 		client = NULL; /* do not update mds lease...*/
 	}

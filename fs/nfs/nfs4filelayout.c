@@ -301,9 +301,6 @@ static int filelayout_read_pagelist(
 
 	/* In the case of aync reads, the offset will be reset in the
 	 * call_ops->rpc_call_done() routine.
-	 *
-	 * In the case of aync writes, the offset will be reset in the
-	 * call_ops->rpc_call_done() routine
 	 */
 	status = 0;
 
@@ -574,8 +571,8 @@ filelayout_free_layout(struct pnfs_layout_type *layoutid)
  */
 static void
 filelayout_set_layout(struct nfs4_filelayout *flo,
-			struct nfs4_filelayout_segment *fl,
-			struct nfs4_pnfs_layoutget_res *lgr)
+		      struct nfs4_filelayout_segment *fl,
+		      struct nfs4_pnfs_layoutget_res *lgr)
 {
 	int i;
 	uint32_t *p = (uint32_t *)lgr->layout.buf;
@@ -605,8 +602,9 @@ filelayout_set_layout(struct nfs4_filelayout *flo,
 	READ64(fl->pattern_offset);
 	READ32(fl->num_fh);
 
-	dprintk("%s: nfl_util 0x%X num_fh %u dev_id %s\n",
-		__func__, nfl_util, fl->num_fh, deviceid_fmt(&fl->dev_id));
+	dprintk("%s: nfl_util 0x%X num_fh %u fsi %u po %llu dev_id %s\n",
+		__func__, nfl_util, fl->num_fh, fl->first_stripe_index,
+		fl->pattern_offset, deviceid_fmt(&fl->dev_id));
 
 	for (i = 0; i < fl->num_fh; i++) {
 		/* fh */
