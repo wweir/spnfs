@@ -517,7 +517,7 @@ pnfs_free_layout(struct pnfs_layout_type *lo,
 		 struct nfs4_pnfs_layout_segment *range)
 {
 	struct pnfs_layout_segment *lseg, *next;
-	dprintk("%s:Begin lo %p offset %llu length %lld iomode %d\n",
+	dprintk("%s:Begin lo %p offset %llu length %llu iomode %d\n",
 		__func__, lo, range->offset, range->length, range->iomode);
 
 	BUG_ON_UNLOCKED_LO(lo);
@@ -525,7 +525,7 @@ pnfs_free_layout(struct pnfs_layout_type *lo,
 		if (!free_matching_lseg(lseg, range))
 			continue;
 		dprintk("%s: freeing lseg %p iomode %d "
-			"offset %llu length %lld\n", __func__,
+			"offset %llu length %llu\n", __func__,
 			lseg, lseg->range.iomode, lseg->range.offset,
 			lseg->range.length);
 		list_del(&lseg->fi_list);
@@ -1186,7 +1186,7 @@ pnfs_update_layout_commit(struct inode *inode,
 
 	dprintk("--> %s inode %p layout range: %Zd@%Lu\n", __func__, inode,
 				(size_t)(npages * PAGE_SIZE),
-				(loff_t)idx_start * PAGE_SIZE);
+				(u64)idx_start * PAGE_SIZE);
 
 	if (!pnfs_enabled_sb(nfss))
 		return;
