@@ -62,6 +62,7 @@
 #include <linux/exportfs.h>
 #include <linux/nfs_xdr.h>
 #include <linux/nfsd/pnfsd.h>
+#include <linux/nfsd4_spnfs.h>
 #endif /* CONFIG_PNFSD */
 
 #define NFSDDBG_FACILITY		NFSDDBG_XDR
@@ -2862,9 +2863,17 @@ nfsd4_encode_read(struct nfsd4_compoundres *resp, __be32 nfserr,
 	}
 	read->rd_vlen = v;
 
+#if defined(CONFIG_PNFSD)
+	nfserr = spnfs_read(read->rd_fhp->fh_dentry->d_inode->i_ino,
+			    read->rd_offset, &maxcount, read->rd_vlen,
+			    resp->rqstp);
+	if (nfserr < 0)
+		nfserr = nfserr_io;
+#else
 	nfserr = nfsd_read(read->rd_rqstp, read->rd_fhp, read->rd_filp,
 			read->rd_offset, resp->rqstp->rq_vec, read->rd_vlen,
 			&maxcount);
+#endif /* CONFIG_PNFSD */
 
 	if (nfserr == nfserr_symlink)
 		nfserr = nfserr_inval;
