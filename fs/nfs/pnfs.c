@@ -459,6 +459,45 @@ lo_seg_intersecting(struct nfs4_pnfs_layout_segment *l1,
 	       (end2 == NFS4_LENGTH_EOF || end2 > start1);
 }
 
+static void
+pnfs_set_layout_stateid(struct pnfs_layout_type *lo, nfs4_stateid *stateid)
+{
+	write_seqlock(&lo->seqlock);
+	memcpy(lo->stateid.data, stateid->data, sizeof(lo->stateid.data));
+	write_sequnlock(&lo->seqlock);
+}
+
+static void
+pnfs_get_layout_stateid(nfs4_stateid *dst, struct pnfs_layout_type *lo)
+{
+	int seq;
+
+	dprintk("--> %s\n", __func__);
+
+	do {
+		seq = read_seqbegin(&lo->seqlock);
+		memcpy(dst->data, lo->stateid.data, sizeof(lo->stateid.data));
+	} while (read_seqretry(&lo->seqlock, seq));
+
+	dprintk("<-- %s\n", __func__);
+}
+
+static void
+pnfs_layout_from_open_stateid(nfs4_stateid *dst, struct nfs4_state *state)
+{
+	int seq;
+
+	dprintk("--> %s\n", __func__);
+
+	do {
+		seq = read_seqbegin(&state->seqlock);
+		memcpy(dst->data, state->stateid.data,
+				sizeof(state->stateid.data));
+	} while (read_seqretry(&state->seqlock, seq));
+
+	dprintk("<-- %s\n", __func__);
+}
+
 /*
 * Get layout from server.
 *    for now, assume that whole file layouts are requested.
@@ -475,7 +514,8 @@ static int
 get_layout(struct inode *ino,
 	   struct nfs_open_context *ctx,
 	   struct nfs4_pnfs_layout_segment *range,
-	   struct pnfs_layout_segment **lsegpp)
+	   struct pnfs_layout_segment **lsegpp,
+	   struct pnfs_layout_type *lo)
 {
 	int status;
 	struct nfs_server *server = NFS_SERVER(ino);
@@ -495,6 +535,11 @@ get_layout(struct inode *ino,
 	lgp->args.inode = ino;
 	lgp->args.ctx = ctx;
 	lgp->lsegpp = lsegpp;
+
+	if (!memcmp(lo->stateid.data, &zero_stateid, NFS4_STATEID_SIZE))
+		pnfs_layout_from_open_stateid(&lgp->args.stateid, ctx->state);
+	else
+		pnfs_get_layout_stateid(&lgp->args.stateid, lo);
 
 	/* Retrieve layout information from server */
 	status = NFS_PROTO(ino)->pnfs_layoutget(lgp);
@@ -695,6 +740,8 @@ alloc_init_layout(struct inode *ino, struct layoutdriver_io_operations *io_ops)
 		return NULL;
 	}
 
+	seqlock_init(&lo->seqlock);
+	memset(&lo->stateid, 0, NFS4_STATEID_SIZE);
 	lo->refcount = 1;
 	INIT_LIST_HEAD(&lo->segs);
 	lo->roc_iomode = 0;
@@ -889,7 +936,7 @@ pnfs_update_layout(struct inode *ino,
 
 	spin_unlock(&nfsi->lo_lock);
 
-	result = get_layout(ino, ctx, &arg, lsegpp);
+	result = get_layout(ino, ctx, &arg, lsegpp, lo);
 out:
 	dprintk("%s end (err:%d) state 0x%lx lseg %p\n",
 			__func__, result, nfsi->pnfs_layout_state, lseg);
@@ -979,6 +1026,9 @@ get_out:
 	if (lgp->status < 0)
 		nfsi->pnfs_layout_state |= NFS_INO_LAYOUT_FAILED;
 	spin_unlock(&nfsi->lo_lock);
+
+	/* Done processing layoutget. Set the layout stateid */
+	pnfs_set_layout_stateid(lo, &res->stateid);
 
 	/* res->layout.buf kalloc'ed by the xdr decoder? */
 	kfree(res->layout.buf);
