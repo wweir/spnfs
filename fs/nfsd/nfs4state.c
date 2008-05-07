@@ -4125,6 +4125,144 @@ find_get_layout_state(struct nfs4_client *clp, struct nfs4_file *fp)
 	return NULL;
 }
 
+static int
+verify_stateid(struct nfs4_file *fp, stateid_t *stateid)
+{
+	struct nfs4_stateid *local = NULL;
+	struct nfs4_delegation *temp = NULL;
+
+	/* check if open or lock stateid */
+	local = find_stateid(stateid, RD_STATE);
+	if (local)
+		return 0;
+	temp = find_delegation_stateid(fp->fi_inode, stateid);
+	if (temp)
+		return 0;
+	return nfserr_bad_stateid;
+}
+
+/*
+ * nfs4_preocess_layout_stateid ()
+ *
+ * We have looked up the nfs4_file corresponding to the current_fh, and
+ * confirmed the clientid. Pull the few tests from nfs4_preprocess_stateid_op()
+ * that make sense with a layout stateid.
+ *
+ * Called with the nfs_lock held.
+ * Returns zero and stateid is updated, or error.
+ *
+ * Note: the struct nfs4_layout_state pointer is only set by layoutget.
+ */
+static __be32
+nfs4_process_layout_stateid(struct nfs4_client *clp, struct nfs4_file *fp,
+			    stateid_t *stateid, struct nfs4_layout_state **lsp)
+{
+	struct nfs4_layout_state *ls = NULL;
+	int status = 0;
+
+	dprintk("--> %s clp %p fp %p \n", __func__, clp, fp);
+
+	dprintk("%s:  operation stateid=(%08x/%08x/%08x/%08x)\n\n", __func__,
+					stateid->si_boot,
+					stateid->si_stateownerid,
+					stateid->si_fileid,
+					stateid->si_generation);
+
+	/* STALE STATEID */
+	status = nfserr_stale_stateid;
+	if (STALE_STATEID(stateid))
+		goto out;
+
+	/* BAD STATEID */
+	status = nfserr_bad_stateid;
+	if (ZERO_STATEID(stateid) || ONE_STATEID(stateid))
+		goto out;
+
+	/* Is this the first use of this layout ? */
+	ls = find_get_layout_state(clp, fp);
+	if (!ls) {
+		/* Only alloc layout state on layoutget (which sets lsp). */
+		if (!lsp) {
+			dprintk("%s ERROR: Not layoutget & no layout stateid\n",
+							__func__);
+			status = nfserr_bad_stateid;
+			goto out;
+		}
+		dprintk("%s Initial stateid for layout: file %p client %p\n",
+				__func__, fp, clp);
+
+		/* verify input stateid */
+		status = verify_stateid(fp, stateid);
+		if (status < 0) {
+			dprintk("%s ERROR: invalid open/deleg/lock stateid\n",
+							__func__);
+			goto out;
+		}
+		ls = alloc_init_layout_state(clp, fp, stateid);
+		if (!ls) {
+			dprintk("%s pNFS ERROR: no memory for layout state\n",
+							__func__);
+			status = nfserr_resource;
+			goto out;
+		}
+		dprintk("pNFS %s: before GET ls %p ls_ref %d\n",
+					__func__, ls,
+					atomic_read(&ls->ls_ref.refcount));
+		get_layout_state(ls);
+	} else {
+		dprintk("%s Not initial stateid. Layout state %p file %p\n",
+						__func__, ls, fp);
+
+		/* BAD STATEID */
+		status = nfserr_bad_stateid;
+		if (memcmp(&ls->ls_stateid.si_opaque, &stateid->si_opaque,
+		    sizeof(stateid_opaque_t)) != 0) {
+
+			/* if a LAYOUTGET operation and stateid is a valid
+			* open/deleg/lock stateid, accept it as a parallel
+			* initial layout stateid
+			*/
+			if (lsp && ((verify_stateid(fp, stateid)) == 0)) {
+				dprintk("%s parallel initial layout state\n",
+								__func__);
+				goto update;
+			}
+
+			dprintk("%s ERROR bad opaque in stateid 1\n", __func__);
+			goto out_put;
+		}
+
+		/* stateid is a valid layout stateid for this file. */
+		if (stateid->si_generation > ls->ls_stateid.si_generation) {
+			dprintk("%s bad stateid 1\n", __func__);
+			goto out_put;
+		}
+update:
+		update_stateid(&ls->ls_stateid);
+		dprintk("%s Updated ls_stateid to %d on layoutstate %p\n",
+				__func__, ls->ls_stateid.si_generation, ls);
+	}
+	status = 0;
+	/* Set the stateid to be encoded */
+	memcpy(stateid, &ls->ls_stateid, sizeof(stateid_t));
+
+/* Return the layout state if requested */
+	if (lsp)
+		*lsp = ls;
+out_put:
+	dprintk("%s PUT LO STATE:\n", __func__);
+	put_layout_state(ls);
+out:
+	dprintk("<-- %s status %d\n", __func__, htonl(status));
+	dprintk("%s: layout stateid=(%08x/%08x/%08x/%08x)\n\n", __func__,
+					ls->ls_stateid.si_boot,
+					ls->ls_stateid.si_stateownerid,
+					ls->ls_stateid.si_fileid,
+					ls->ls_stateid.si_generation);
+
+	return status;
+}
+
 static inline struct nfs4_layout *
 alloc_layout(void)
 {
