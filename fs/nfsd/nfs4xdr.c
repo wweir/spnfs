@@ -3604,8 +3604,8 @@ nfsd4_encode_layoutget(struct nfsd4_compoundres *resp,
 	args.xdr.end = resp->end;
 	args.xdr.maxcount = maxcount;
 
-	/* Retrieve, encode, and merge layout */
-	nfserr = nfs4_pnfs_get_layout(lgp->lg_fhp, &args);
+	/* Retrieve, encode, and merge layout; process stateid */
+	nfserr = nfs4_pnfs_get_layout(lgp->lg_fhp, &args, &lgp->lg_sid);
 	if (nfserr) {
 		printk(KERN_ERR "%s: export ERROR %d\n", __func__, nfserr);
 		return nfserrno(nfserr);
