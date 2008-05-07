@@ -4577,7 +4577,8 @@ merge_layout(struct nfs4_file *fp,
 
 int
 nfs4_pnfs_get_layout(struct svc_fh *current_fh,
-		     struct pnfs_layoutget_arg *args)
+		     struct pnfs_layoutget_arg *args,
+		     stateid_t *stateid)
 {
 	int status = nfserr_layouttrylater;
 	struct inode *ino = current_fh->fh_dentry->d_inode;
@@ -4595,6 +4596,11 @@ nfs4_pnfs_get_layout(struct svc_fh *current_fh,
 	clp = find_confirmed_client((clientid_t *)&args->seg.clientid);
 	dprintk("pNFS %s: fp %p clp %p \n", __FUNCTION__, fp, clp);
 	if (!fp || !clp)
+		goto out;
+
+	/* Check decoded layout stateid */
+	status = nfs4_process_layout_stateid(clp, fp, stateid, &ls);
+	if (status)
 		goto out;
 
 	if (is_layout_recalled(clp, current_fh, &args->seg)) {
