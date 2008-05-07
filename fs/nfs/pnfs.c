@@ -582,7 +582,7 @@ pnfs_free_layout(struct pnfs_layout_type *lo,
 
 static int
 return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range,
-	      enum pnfs_layoutrecall_type type)
+	      enum pnfs_layoutrecall_type type, struct pnfs_layout_type *lo)
 {
 	struct nfs4_pnfs_layoutreturn *lrp;
 	struct nfs_server *server = NFS_SERVER(ino);
@@ -599,6 +599,11 @@ return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range,
 	lrp->args.lseg = *range;
 	lrp->args.inode = ino;
 
+	/* FIX-ME: We don't hold a reference to lo if type != RECALL_FILE
+	 * and lo is NULL. Need to get_lock_current_layout for all types ?*/
+	if (lo)
+		pnfs_get_layout_stateid(&lrp->args.stateid, lo);
+
 	status = server->nfs_client->rpc_ops->pnfs_layoutreturn(lrp);
 out:
 	dprintk("<-- %s status: %d\n", __func__, status);
@@ -609,7 +614,7 @@ int
 _pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range,
 		    enum pnfs_layoutrecall_type type)
 {
-	struct pnfs_layout_type *lo;
+	struct pnfs_layout_type *lo = NULL;
 	struct nfs_inode *nfsi = NFS_I(ino);
 	struct nfs4_pnfs_layout_segment arg;
 	int status;
@@ -633,10 +638,25 @@ _pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range,
 		spin_unlock(&nfsi->lo_lock);
 	}
 
-	status = return_layout(ino, &arg, type);
+	status = return_layout(ino, &arg, type, lo);
 out:
 	dprintk("<-- %s status: %d\n", __func__, status);
 	return status;
+}
+
+void
+pnfs_return_layout_done(struct pnfs_layout_type *lo,
+		     struct nfs4_pnfs_layoutreturn *lrp,
+		     int rpc_status)
+{
+	dprintk("--> %s\n", __func__);
+
+	/* FIX-ME: If layoutreturn failed, we have already removed the
+	 * lseg from the cache...
+	 */
+	pnfs_set_layout_stateid(lo, &lrp->res.stateid);
+
+	dprintk("<-- %s\n", __func__);
 }
 
 /*
