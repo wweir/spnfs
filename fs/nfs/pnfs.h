@@ -24,6 +24,8 @@ extern int nfs4_pnfs_getdeviceinfo(struct super_block *sb, struct nfs_fh *fh,
 				   struct pnfs_device *dev);
 
 /* pnfs.c */
+extern const nfs4_stateid zero_stateid;
+
 int pnfs_update_layout(struct inode *ino, struct nfs_open_context *ctx,
 	size_t count, loff_t pos, enum pnfs_iomode access_type,
 	struct pnfs_layout_segment **lsegpp);
