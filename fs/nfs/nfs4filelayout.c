@@ -392,6 +392,56 @@ filelayout_free_layout(struct pnfs_layout_type *layoutid)
 	kfree(layoutid);
 }
 
+/*
+ * filelayout_check_layout()
+ *
+ * Make sure layout segment parameters are sane WRT the device.
+ *
+ * Notes:
+ * 1) current code insists that # stripe index = # multipath devices which
+ *    is wrong.
+ * 2) pattern_offset is ignored and must == 0 which is wrong;
+ * 3) the pattern_offset needs to be a mutliple of the stripe unit.
+*/
+
+static int
+filelayout_check_layout(struct pnfs_layout_type *lo,
+			struct pnfs_layout_segment *lseg)
+{
+	struct nfs4_filelayout_segment *fl = LSEG_LD_DATA(lseg);
+	struct nfs4_pnfs_dev_item *dev;
+	int status = -EINVAL;
+
+	dprintk("--> %s\n", __func__);
+	dev = nfs4_pnfs_device_item_get(FILE_MT(lo->inode), NFS_FH(lo->inode),
+					&fl->dev_id);
+	if (dev == NULL) {
+		dprintk("%s NO device for dev_id %s\n",
+				__func__, deviceid_fmt(&fl->dev_id));
+		goto out;
+	}
+	/* FIX-ME: need a # stripe index field */
+	if (fl->first_stripe_index < 0 ||
+	    fl->first_stripe_index > dev->stripe_count) {
+		dprintk("%s Bad first_stripe_index %d\n",
+				__func__, fl->first_stripe_index);
+		goto out;
+	}
+
+	/* FIX-ME: need a # stripe index field */
+	if (fl->pattern_offset != 0) {
+		dprintk("%s Unsupported no-zero pattern_offset %Ld\n",
+				__func__, fl->pattern_offset);
+		goto out;
+	}
+	status = 0;
+out:
+	dprintk("--> %s returns %d\n", __func__, status);
+	return status;
+}
+
+static void filelayout_free_lseg(struct pnfs_layout_segment *lseg);
+
 /* Decode layout and store in layoutid.  Overwrite any existing layout
  * information for this file.
  */
@@ -455,6 +505,10 @@ filelayout_alloc_lseg(struct pnfs_layout_type *layoutid,
 		return NULL;
 
 	filelayout_set_layout(flo, LSEG_LD_DATA(lseg), lgr);
+	if (filelayout_check_layout(layoutid, lseg)) {
+		filelayout_free_lseg(lseg);
+		lseg = NULL;
+	}
 	return lseg;
 }
 

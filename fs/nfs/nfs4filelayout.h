@@ -129,4 +129,9 @@ u32 filelayout_dserver_get_index(loff_t offset,
 	p += XDR_QUADLEN(nbytes);		\
 } while (0)
 
+struct nfs4_pnfs_dev_item *
+nfs4_pnfs_device_item_get(struct filelayout_mount_type *,
+			  struct nfs_fh *,
+			  struct pnfs_deviceid *);
+
 #endif /* FS_NFS_NFS4FILELAYOUT_H */
