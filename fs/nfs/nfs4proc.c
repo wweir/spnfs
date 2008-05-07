@@ -5256,11 +5256,14 @@ static void nfs4_pnfs_layoutreturn_release(void *calldata)
 	struct nfs_inode *nfsi = NFS_I(lrp->args.inode);
 	struct pnfs_layout_type *lo;
 
-	lo = nfsi->current_layout;
-	BUG_ON(!lo);
+	dprintk("--> %s nfsi->current_layout %p\n", __func__,
+					nfsi->current_layout);
 
-	dprintk("--> %s\n", __func__);
-	pnfs_layout_release(lo);
+	if (lrp->args.return_type == RECALL_FILE) {
+		lo = nfsi->current_layout;
+		BUG_ON(!lo);
+		pnfs_layout_release(lo);
+	}
 	kfree(calldata);
 	dprintk("<-- %s\n", __func__);
 }

@@ -569,7 +569,7 @@ _pnfs_return_layout(struct inode *ino, struct nfs4_pnfs_layout_segment *range,
 	struct nfs4_pnfs_layout_segment arg;
 	int status;
 
-	dprintk("--> %s\n", __func__);
+	dprintk("--> %s type %d\n", __func__, type);
 
 	if (range)
 		arg = *range;
