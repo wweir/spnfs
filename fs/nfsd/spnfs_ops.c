@@ -166,7 +166,7 @@ spnfs_getdeviceiter(struct super_block *sb, struct pnfs_deviter_arg *iter)
 	/* call function to queue the msg for upcall */
 	status = spnfs_upcall(spnfs, &im, &res);
 	if (status != 0) {
-		dprintk("%s spnfs upcall failure: %d\n", __FUNCTION__, status);
+		dprintk("%s spnfs upcall failure: %d\n", __func__, status);
 		return -EIO;
 	}
 	status = res.getdeviceiter_res.status;
@@ -202,7 +202,7 @@ spnfs_getdeviceinfo(struct super_block *sb, struct pnfs_devinfo_arg *info)
 	/* call function to queue the msg for upcall */
 	status = spnfs_upcall(spnfs, &im, &res);
 	if (status != 0) {
-		dprintk("%s spnfs upcall failure: %d\n", __FUNCTION__, status);
+		dprintk("%s spnfs upcall failure: %d\n", __func__, status);
 		status = -EIO;
 		goto getdeviceinfo_out;
 	}
@@ -339,7 +339,7 @@ spnfs_open(struct inode *inode, void *p)
 	/* call function to queue the msg for upcall */
 	status = spnfs_upcall(spnfs, &im, &res);
 	if (status != 0) {
-		dprintk("%s spnfs upcall failure: %d\n", __FUNCTION__, status);
+		dprintk("%s spnfs upcall failure: %d\n", __func__, status);
 		status = -EIO;
 		goto open_out;
 	}
@@ -412,7 +412,7 @@ spnfs_remove(unsigned long ino)
 	/* call function to queue the msg for upcall */
 	status = spnfs_upcall(spnfs, &im, &res);
 	if (status != 0) {
-		dprintk("%s spnfs upcall failure: %d\n", __FUNCTION__, status);
+		dprintk("%s spnfs upcall failure: %d\n", __func__, status);
 		status = -EIO;
 		goto remove_out;
 	}
@@ -420,6 +420,158 @@ spnfs_remove(unsigned long ino)
 
 remove_out:
 	return status;
+}
+
+int
+spnfs_read_one(unsigned long ino, loff_t offset, size_t len, char *buf)
+{
+	struct spnfs *spnfs = global_spnfs; /* keep up the pretence */
+	struct spnfs_msg im;
+	union spnfs_msg_res res;
+	int status = 0;
+	unsigned long todo = len;
+	unsigned long bytecount = 0;
+
+	im.im_type = SPNFS_TYPE_READ;
+	im.im_args.read_args.inode = ino;
+	while (todo > 0) {
+		im.im_args.read_args.offset = offset;
+		if (todo > SPNFS_MAX_IO)
+			im.im_args.read_args.len = SPNFS_MAX_IO;
+		else
+			im.im_args.read_args.len = todo;
+		/* call function to queue the msg for upcall */
+		status = spnfs_upcall(spnfs, &im, &res);
+		if (status != 0) {
+			dprintk("%s spnfs upcall failure: %d\n",
+				__func__, status);
+			status = -EIO;
+			goto read_out;
+		}
+		/* status < 0 => error, status > 0 => bytes moved */
+		status = res.read_res.status;
+		if (status < 0) {
+			dprintk("%s spnfs read failure: %d\n",
+				__func__, status);
+			status = -EIO;
+			goto read_out;
+		}
+		/* status == 0, maybe eof.  not making forward progress */
+		if (status == 0) {
+			status = bytecount;
+			goto read_out;
+		}
+		/* status = number of bytes successfully i/o'd */
+		memcpy(buf, res.read_res.data, status);
+		buf += status;
+		offset += status;
+		bytecount += status;
+		todo -= status;
+	}
+	status = bytecount;
+
+read_out:
+	return status;
+}
+
+int
+spnfs_read(unsigned long ino, loff_t offset, unsigned long *lenp, int vlen,
+		struct svc_rqst *rqstp)
+{
+	int vnum, err, bytecount = 0;
+	size_t iolen;
+
+	for (vnum = 0 ; vnum < vlen ; vnum++) {
+		iolen = rqstp->rq_vec[vnum].iov_len;
+		err = spnfs_read_one(ino, offset + bytecount, iolen,
+				(char *)rqstp->rq_vec[vnum].iov_base);
+		if (err < 0)
+			return -EIO;
+		if (err < iolen) {
+			bytecount += err;
+			goto out;
+		}
+		bytecount += rqstp->rq_vec[vnum].iov_len;
+	}
+
+out:
+	*lenp = bytecount;
+	return 0;
+}
+
+int
+spnfs_write_one(unsigned long ino, loff_t offset, size_t len, char *buf)
+{
+	struct spnfs *spnfs = global_spnfs; /* keep up the pretence */
+	struct spnfs_msg im;
+	union spnfs_msg_res res;
+	int status = 0;
+	size_t todo = len;
+	unsigned long bytecount = 0;
+
+	im.im_type = SPNFS_TYPE_WRITE;
+	im.im_args.write_args.inode = ino;
+	while (todo > 0) {
+		im.im_args.write_args.offset = offset;
+		if (todo > SPNFS_MAX_IO)
+			im.im_args.write_args.len = SPNFS_MAX_IO;
+		else
+			im.im_args.write_args.len = todo;
+		memcpy(im.im_args.write_args.data, buf,
+			im.im_args.write_args.len);
+		/* call function to queue the msg for upcall */
+		status = spnfs_upcall(spnfs, &im, &res);
+		if (status != 0) {
+			dprintk("%s spnfs upcall failure: %d\n",
+				__func__, status);
+			status = -EIO;
+			goto write_out;
+		}
+		/* status < 0 => error, status > 0 => bytes moved */
+		status = res.write_res.status;
+		if (status < 0) {
+			dprintk("%s spnfs write failure: %d\n",
+				__func__, status);
+			status = -EIO;
+			goto write_out;
+		}
+		/* status == 0.  not making forward progress */
+		if (status == 0) {
+			dprintk("spnfs write no forward progress\n");
+			status = bytecount;
+			goto write_out;
+		}
+		/* status = number of bytes successfully i/o'd */
+		buf += status;
+		offset += status;
+		bytecount += status;
+		todo -= status;
+	}
+	status = bytecount;
+
+write_out:
+	return status;
+}
+
+int
+spnfs_write(unsigned long ino, loff_t offset, size_t len, int vlen,
+		struct svc_rqst *rqstp)
+{
+	int vnum, err, bytecount = 0;
+	size_t iolen;
+
+	for (vnum = 0 ; vnum < vlen ; vnum++) {
+		iolen = rqstp->rq_vec[vnum].iov_len;
+		err = spnfs_write_one(ino, offset + bytecount, iolen,
+				(char *)rqstp->rq_vec[vnum].iov_base);
+		if (err != iolen) {
+			dprintk("err=%d expected %Zd\n", err, len);
+			return -EIO;
+		}
+		bytecount += rqstp->rq_vec[vnum].iov_len;
+	}
+
+	return 0;
 }
 
 int
