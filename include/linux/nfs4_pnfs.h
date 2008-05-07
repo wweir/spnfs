@@ -44,6 +44,7 @@ struct pnfs_layout_type {
 	struct list_head segs;		/* layout segments list */
 	int roc_iomode;			/* iomode to return on close, 0=none */
 	struct inode *inode;
+	seqlock_t seqlock;		/* Protects the stateid */
 	nfs4_stateid stateid;
 	u8 ld_data[];			/* layout driver private data */
 };
