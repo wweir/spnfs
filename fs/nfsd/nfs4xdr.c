@@ -3559,7 +3559,9 @@ nfsd4_encode_layoutget(struct nfsd4_compoundres *resp,
 	int maxcount, leadcount;
 	struct super_block *sb;
 	unsigned int *p_start = resp->p;
-	struct pnfs_layoutget_arg args;
+	struct pnfs_layoutget_arg args = {
+		.return_on_close = 0,
+	};
 	ENCODE_HEAD;
 
 	dprintk("%s: err %d\n", __func__, nfserr);
