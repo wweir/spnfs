@@ -4834,6 +4834,12 @@ int nfs4_pnfs_return_layout(struct super_block *sb, struct svc_fh *current_fh,
 	if (!fp)
 		goto out;
 
+	/* Check the stateid */
+	dprintk("%s PROCESS LO_STATEID inode %p\n", __func__, ino);
+	status = nfs4_process_layout_stateid(clp, fp, &lrp->lr_sid, NULL);
+	if (status)
+		goto out;
+
 	/* update layouts */
 	layouts_found += lrp->lr_return_type == RETURN_FILE ?
 		pnfs_return_file_layouts(clp, fp, lrp) :
