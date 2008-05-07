@@ -70,12 +70,17 @@ print_ds_list(struct nfs4_pnfs_dev *fdev)
 	int i;
 
 	ds = fdev->ds_list[0];
+	if (ds == NULL) {
+		dprintk("%s NULL device \n", __func__);
+		return;
+	}
 	for (i = 0; i < fdev->num_ds; i++) {
 		dprintk("        ip_addr %x\n", ntohl(ds->ds_ip_addr));
 		dprintk("        port %hu\n", ntohs(ds->ds_port));
 		dprintk("        client %p\n", ds->ds_clp);
-		dprintk("        cl_exchange_flags %x\n",
-				    ds->ds_clp->cl_exchange_flags);
+		if (ds->ds_clp)
+			dprintk("        cl_exchange_flags %x\n",
+					    ds->ds_clp->cl_exchange_flags);
 		ds++;
 	}
 }
