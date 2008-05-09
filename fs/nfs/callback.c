@@ -228,8 +228,11 @@ int nfs_callback_up(int minorversion, void *args)
 
 	lock_kernel();
 	mutex_lock(&nfs_callback_mutex);
-	if (nfs_callback_info.users++ || nfs_callback_info.pid != 0)
+	if (nfs_callback_info.users++ || nfs_callback_info.pid != 0) {
+		if (minorversion)
+			xprt->bc_serv = nfs_callback_info.serv;
 		goto out;
+	}
 	init_completion(&nfs_callback_info.started);
 	init_completion(&nfs_callback_info.stopped);
 	serv = svc_create(&nfs4_callback_program, NFS4_CALLBACK_BUFSIZE, NULL);
