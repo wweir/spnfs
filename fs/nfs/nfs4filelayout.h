@@ -60,17 +60,6 @@ struct nfs4_pnfs_dev_hlist {
 	struct hlist_head	dev_dslist[NFS4_PNFS_DEV_HASH_SIZE];
 };
 
-struct nfs4_pnfs_devaddr {
-	struct pnfs_deviceid dev_id;
-	u32 ip;
-	u16 port;
-};
-
-struct nfs4_pnfs_devlist {
-	struct list_head         devlist;
-	struct nfs4_pnfs_devaddr devaddr;
-};
-
 struct nfs4_pnfs_dserver {
 	struct nfs_fh        *fh;
 	struct nfs4_pnfs_dev *dev;
