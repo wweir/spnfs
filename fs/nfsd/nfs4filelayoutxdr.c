@@ -191,7 +191,7 @@ filelayout_encode_layout(struct pnfs_xdr_info *resp, void *layout)
 	nfl_util = flp->lg_stripe_unit;
 	if (flp->lg_commit_through_mds)
 		nfl_util |= NFL4_UFLG_COMMIT_THRU_MDS;
-	if (flp->lg_stripe_type)
+	if (flp->lg_stripe_type == STRIPE_DENSE)
 		nfl_util |= NFL4_UFLG_DENSE;
 	WRITE32(nfl_util);
 	len += 4;
