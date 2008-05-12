@@ -208,8 +208,12 @@ static void filelayout_read_call_done(struct rpc_task *task, void *data)
 {
 	struct nfs_read_data *rdata = (struct nfs_read_data *)data;
 
-	if (rdata->orig_offset)
+
+	if (rdata->orig_offset) {
+		dprintk("%s new off %llu orig offset %llu\n",
+			__func__, rdata->args.offset, rdata->orig_offset);
 		rdata->args.offset = rdata->orig_offset;
+	}
 
 	pnfs_callback_ops->nfs_readlist_complete(rdata);
 }
@@ -218,8 +222,11 @@ static void filelayout_write_call_done(struct rpc_task *task, void *data)
 {
 	struct nfs_write_data *wdata = (struct nfs_write_data *)data;
 
-	if (wdata->orig_offset)
+	if (wdata->orig_offset) {
+		dprintk("%s new off %llu orig offset %llu\n",
+			__func__, wdata->args.offset, wdata->orig_offset);
 		wdata->args.offset = wdata->orig_offset;
+	}
 
 	pnfs_callback_ops->nfs_writelist_complete(wdata);
 }
@@ -274,7 +281,8 @@ static int filelayout_read_pagelist(
 	} else {
 		ds = dserver.dev->ds_list[0];
 
-		dprintk("%s USE DS:ip %x\n", __func__, htonl(ds->ds_ip_addr));
+		dprintk("%s USE DS:ip %x %s\n", __func__,
+			htonl(ds->ds_ip_addr), ds->r_addr);
 
 		/* just try the first data server for the index..*/
 		data->pnfs_client = ds->ds_clp->cl_rpcclient;
@@ -308,6 +316,7 @@ print_ds(struct nfs4_pnfs_ds *ds)
 	dprintk("        ds->ds_port %hu\n", ntohs(ds->ds_port));
 	dprintk("        ds->ds_clp %p\n", ds->ds_clp);
 	dprintk("        ds->ds_count %d\n", atomic_read(&ds->ds_count));
+	dprintk("        %s\n", ds->r_addr);
 }
 
 /* Perform async writes. */
@@ -347,9 +356,10 @@ static int filelayout_write_pagelist(
 		/* use the first multipath data server */
 		ds = dserver.dev->ds_list[0];
 
-		dprintk("%s ino %lu %Zu@%Lu DS:%x:%hu\n",
+		dprintk("%s ino %lu %Zu@%Lu DS:%x:%hu %s\n",
 			__func__, inode->i_ino, count, offset,
-			htonl(ds->ds_ip_addr), ntohs(ds->ds_port));
+			htonl(ds->ds_ip_addr), ntohs(ds->ds_port),
+			ds->r_addr);
 
 		data->pnfs_client = ds->ds_clp->cl_rpcclient;
 		data->ds_nfs_client = ds->ds_clp;
