@@ -452,13 +452,18 @@ nfs4_pnfs_ds_add(struct filelayout_mount_type *mt, struct nfs4_pnfs_ds **dsp,
 	write_lock(&hlist->dev_lock);
 	tmp_ds = _data_server_lookup(hlist, ip_addr, port);
 	if (tmp_ds == NULL) {
+		dprintk("%s add new data server ip 0x%x\n", __func__,
+				ds->ds_ip_addr);
 		_data_server_add(hlist, ds);
 		*dsp = ds;
 	}
 	write_unlock(&hlist->dev_lock);
 	if (tmp_ds != NULL) {
-		dprintk(" data server found, not adding (after creation)\n");
 		destroy_ds(ds);
+		atomic_inc(&tmp_ds->ds_count);
+		dprintk("%s data server found ip 0x%x, inc'ed ds_count to %d\n",
+				__func__, tmp_ds->ds_ip_addr,
+				atomic_read(&tmp_ds->ds_count));
 		*dsp = tmp_ds;
 	}
 }
@@ -516,8 +521,6 @@ decode_and_add_ds(uint32_t **pp, struct filelayout_mount_type *mt)
 		}
 	}
 
-	/* adding ds to stripe */
-	atomic_inc(&ds->ds_count);
 	dprintk("%s: addr:port string = %s\n", __func__, r_addr);
 	return ds;
 out_err:
