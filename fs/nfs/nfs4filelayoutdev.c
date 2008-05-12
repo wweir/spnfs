@@ -447,6 +447,7 @@ nfs4_pnfs_ds_add(struct filelayout_mount_type *mt, struct nfs4_pnfs_ds **dsp,
 	strncpy(ds->r_addr, r_addr, len);
 	atomic_set(&ds->ds_count, 1);
 	INIT_HLIST_NODE(&ds->ds_node);
+	ds->ds_clp = NULL;
 
 	write_lock(&hlist->dev_lock);
 	tmp_ds = _data_server_lookup(hlist, ip_addr, port);
