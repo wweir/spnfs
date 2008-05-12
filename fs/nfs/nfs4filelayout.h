@@ -32,14 +32,17 @@ enum stripetype4 {
 	STRIPE_DENSE = 2
 };
 
+/* Individual ip address */
 struct nfs4_pnfs_ds {
 	struct hlist_node 	ds_node;  /* nfs4_pnfs_dev_hlist dev_dslist */
 	u32 			ds_ip_addr;
 	u32 			ds_port;
 	struct nfs_client	*ds_clp;
 	atomic_t		ds_count;
+	char r_addr[29];
 };
 
+/* Individual data server with list of mutipath ip's*/
 struct nfs4_pnfs_dev {
 	u32 			stripe_index;
 	int 			num_ds;
@@ -60,6 +63,7 @@ struct nfs4_pnfs_dev_hlist {
 	struct hlist_head	dev_dslist[NFS4_PNFS_DEV_HASH_SIZE];
 };
 
+/* Actual file layout device (single devid) */
 struct nfs4_pnfs_dserver {
 	struct nfs_fh        *fh;
 	struct nfs4_pnfs_dev *dev;

@@ -1421,10 +1421,9 @@ pnfs_file_write(struct file *filp, const char __user *buf, size_t count,
 				    *pos,
 				    IOMODE_RW,
 				    NULL);
-	if (status) {
-		dprintk("%s: Unable to get a layout for %Zd@%llu iomode %d)\n",
-					__func__, count, *pos, IOMODE_RW);
-	}
+	if (status)
+		dprintk("%s: Unable to get a layout for %Zu@%llu iomode %d)\n",
+			__func__, count, *pos, IOMODE_RW);
 out:
 	return do_sync_write(filp, buf, count, pos);
 }
@@ -1464,6 +1463,8 @@ pnfs_writepages(struct nfs_write_data *wdata, int how)
 				    IOMODE_RW,
 				    &lseg);
 	if (status) {
+		dprintk("%s: Updating layout failed (%d), retry with NFS \n",
+			__func__, status);
 		status = 1;	/* retry with nfs I/O */
 		goto out;
 	}
