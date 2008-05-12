@@ -292,6 +292,8 @@ static int filelayout_read_pagelist(
 		/* Now get the file offset on the dserver
 		 * Set the read offset to this offset, and
 		 * save the original offset in orig_offset
+		 * In the case of aync reads, the offset will be reset in the
+		 * call_ops->rpc_call_done() routine.
 		 */
 		data->args.offset = filelayout_get_dserver_offset(offset,
 								  flseg);
@@ -301,10 +303,7 @@ static int filelayout_read_pagelist(
 	/* Perform an asynchronous read */
 	nfs_initiate_read(data, data->pnfs_client, &filelayout_read_call_ops);
 
-	/* In the case of aync reads, the offset will be reset in the
-	 * call_ops->rpc_call_done() routine.
-	 */
-	status = 0;
+	data->pnfs_error = 0;
 
 	return status;
 }
@@ -378,6 +377,7 @@ static int filelayout_write_pagelist(
 	nfs_initiate_write(data, data->pnfs_client,
 			   &filelayout_write_call_ops, sync);
 
+	data->pnfs_error = 0;
 	return 0;
 }
 
