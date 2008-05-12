@@ -2166,7 +2166,14 @@ out_acl:
 		}
 		WRITE64(stat.ino);
 	}
-	BUG_ON(bmval2);	/* FIXME: not implemented yet */
+#if defined(CONFIG_NFSD_V4_1)
+	if (bmval2 & FATTR4_WORD2_SUPPATTR_EXCLCREAT) {
+		WRITE32(3);
+		WRITE32(NFSD_SUPPATTR_EXCLCREAT_WORD0);
+		WRITE32(NFSD_SUPPATTR_EXCLCREAT_WORD1);
+		WRITE32(NFSD_SUPPATTR_EXCLCREAT_WORD2);
+	}
+#endif /* CONFIG_NFSD_V4_1 */
 
 	*attrlenp = htonl((char *)p - (char *)attrlenp - 4);
 	*countp = p - buffer;
