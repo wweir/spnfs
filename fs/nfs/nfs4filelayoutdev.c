@@ -81,6 +81,7 @@ print_ds_list(struct nfs4_pnfs_dev *fdev)
 		if (ds->ds_clp)
 			dprintk("        cl_exchange_flags %x\n",
 					    ds->ds_clp->cl_exchange_flags);
+		dprintk("        ip:port %s\n", ds->r_addr);
 		ds++;
 	}
 }
@@ -217,7 +218,8 @@ nfs4_pnfs_ds_create(struct nfs_server *mds_srv, struct nfs4_pnfs_ds *ds)
 	int			addrlen;
 	int err = 0;
 
-	dprintk("--> %s\n", __func__);
+	dprintk("--> %s ip:port %s\n", __func__, ds->r_addr);
+
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = ds->ds_ip_addr;
 	sin.sin_port = ds->ds_port;
@@ -428,7 +430,7 @@ nfs4_pnfs_device_add(struct filelayout_mount_type *mt,
 
 static void
 nfs4_pnfs_ds_add(struct filelayout_mount_type *mt, struct nfs4_pnfs_ds **dsp,
-		 u32 ip_addr, u32 port)
+		 u32 ip_addr, u32 port, char *r_addr, int len)
 {
 	struct nfs4_pnfs_ds *tmp_ds, *ds;
 	struct nfs4_pnfs_dev_hlist *hlist = mt->hlist;
@@ -442,6 +444,7 @@ nfs4_pnfs_ds_add(struct filelayout_mount_type *mt, struct nfs4_pnfs_ds **dsp,
 	/* Initialize ds */
 	ds->ds_ip_addr = ip_addr;
 	ds->ds_port = port;
+	strncpy(ds->r_addr, r_addr, len);
 	atomic_set(&ds->ds_count, 1);
 	INIT_HLIST_NODE(&ds->ds_node);
 
@@ -497,7 +500,7 @@ decode_and_add_ds(uint32_t **pp, struct filelayout_mount_type *mt)
 	ip_addr = htonl((tmp[0]<<24) | (tmp[1]<<16) | (tmp[2]<<8) | (tmp[3]));
 	port = htons((tmp[4] << 8) | (tmp[5]));
 
-	nfs4_pnfs_ds_add(mt, &ds, ip_addr, port);
+	nfs4_pnfs_ds_add(mt, &ds, ip_addr, port, r_addr, len);
 
 	/* XXX: Do we connect to data servers here?
 	 * Don't want a lot of un-used (never used!) connections....
@@ -758,15 +761,19 @@ nfs4_pnfs_dserver_get(struct pnfs_layout_segment *lseg,
 	BUG_ON(stripe_idx >= di->stripe_count);
 
 	dserver->dev = &di->stripe_devs[stripe_idx];
-	if (dserver->dev == NULL)
+	if (dserver->dev == NULL) {
+		printk(KERN_ERR "%s: No data server for device id (%s)!! \n",
+		__func__, deviceid_fmt(&layout->dev_id));
 		return 1;
+	}
 	if (layout->num_fh == 1)
 		dserver->fh = &layout->fh_array[0];
 	else
 		dserver->fh = &layout->fh_array[stripe_idx];
 
-	dprintk("%s: dev_id=%s idx=%u, offset=%Lu, count=%Zu\n",
+	dprintk("%s: dev_id=%s ip:port=%s, idx=%u, offset=%Lu, count=%Zu\n",
 		__func__, deviceid_fmt(&layout->dev_id),
+		dserver->dev->ds_list[0]->r_addr,
 		stripe_idx, offset, count);
 
 	return 0;
