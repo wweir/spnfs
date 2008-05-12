@@ -312,8 +312,6 @@ destroy_ds(struct nfs4_pnfs_ds *ds)
 	if (ds->ds_clp) {
 		nfs4_proc_destroy_session(ds->ds_clp->cl_ds_session,
 					  ds->ds_clp->cl_rpcclient);
-		rpc_shutdown_client(ds->ds_clp->cl_rpcclient);
-		ds->ds_clp->cl_rpcclient = NULL;
 		nfs_put_client(ds->ds_clp);
 	}
 	kfree(ds);
