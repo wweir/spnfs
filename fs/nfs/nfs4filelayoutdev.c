@@ -78,6 +78,7 @@ print_ds_list(struct nfs4_pnfs_dev *fdev)
 		dprintk("        ip_addr %x\n", ntohl(ds->ds_ip_addr));
 		dprintk("        port %hu\n", ntohs(ds->ds_port));
 		dprintk("        client %p\n", ds->ds_clp);
+		dprintk("        ref count %d\n", atomic_read(&ds->ds_count));
 		if (ds->ds_clp)
 			dprintk("        cl_exchange_flags %x\n",
 					    ds->ds_clp->cl_exchange_flags);
@@ -93,6 +94,7 @@ print_stripe_devs(struct nfs4_pnfs_dev_item *dev)
 	int i;
 
 	fdev = &dev->stripe_devs[0];
+	dprintk("%s dev->stripe_count %d\n", __func__, dev->stripe_count);
 	for (i = 0; i < dev->stripe_count; i++) {
 		dprintk("        stripe_index %u\n", fdev->stripe_index);
 		dprintk("        num_ds %d\n", fdev->num_ds);
