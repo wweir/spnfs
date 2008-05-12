@@ -264,6 +264,14 @@ static u32 nfsd_attrmask[] = {
 	NFSD_WRITEABLE_ATTRS_WORD2
 };
 
+#if defined(CONFIG_NFSD_V4_1)
+static u32 nfsd41_ex_attrmask[] = {
+	NFSD_SUPPATTR_EXCLCREAT_WORD0,
+	NFSD_SUPPATTR_EXCLCREAT_WORD1,
+	NFSD_SUPPATTR_EXCLCREAT_WORD2
+};
+#endif /* CONFIG_NFSD_V4_1 */
+
 static __be32
 nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, u32 *writable,
 		   struct iattr *iattr, struct nfs4_acl **acl)
@@ -693,6 +701,19 @@ nfsd4_decode_open(struct nfsd4_compoundargs *argp, struct nfsd4_open *open)
 			READ_BUF(8);
 			COPYMEM(open->op_verf.data, 8);
 			break;
+#if defined(CONFIG_NFSD_V4_1)
+		case NFS4_CREATE_EXCLUSIVE4_1:
+			if (argp->minorversion < 1)
+				goto xdr_error;
+			READ_BUF(8);
+			COPYMEM(open->op_verf.data, 8);
+			status = nfsd4_decode_fattr(argp, open->op_bmval,
+				nfsd41_ex_attrmask, &open->op_iattr,
+				&open->op_acl);
+			if (status)
+				goto out;
+			break;
+#endif /* CONFIG_NFSD_V4_1 */
 		default:
 			goto xdr_error;
 		}
