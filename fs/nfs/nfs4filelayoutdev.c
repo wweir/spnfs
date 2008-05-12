@@ -294,18 +294,6 @@ out_put:
 	goto out;
 }
 
-/* Assumes lock is held */
-int
-unhash_ds(struct nfs4_pnfs_ds *ds)
-{
-
-	if (!atomic_dec_and_test(&ds->ds_count))
-		return 0;
-
-	hlist_del_init(&ds->ds_node);
-	return 1;
-}
-
 static void
 destroy_ds(struct nfs4_pnfs_ds *ds)
 {
@@ -325,7 +313,6 @@ device_destroy(struct nfs4_pnfs_dev_item *dev,
 	struct nfs4_pnfs_dev *fdev;
 	struct nfs4_pnfs_ds *ds;
 	HLIST_HEAD(release);
-	struct hlist_node *np;
 	int i, j;
 
 	if (!dev)
@@ -342,15 +329,22 @@ device_destroy(struct nfs4_pnfs_dev_item *dev,
 	for (i = 0; i < dev->stripe_count; i++) {
 		for (j = 0; j < fdev->num_ds; j++) {
 			ds = fdev->ds_list[j];
-			if (ds != NULL && unhash_ds(ds))
+			if (ds != NULL) {
+				/* move to release list */
+				hlist_del_init(&ds->ds_node);
 				hlist_add_head(&ds->ds_node, &release);
+			}
 		}
 		fdev++;
 	}
 	write_unlock(&hlist->dev_lock);
-	hlist_for_each(np, &release) {
-		ds = hlist_entry(np, struct nfs4_pnfs_ds, ds_node);
+	while (!hlist_empty(&release)) {
+		ds = hlist_entry(release.first, struct nfs4_pnfs_ds, ds_node);
 		hlist_del(&ds->ds_node);
+		/* wait until the last reference to destroy the ds session
+		 * and nfs_put_client on the ds_clp */
+		if (!atomic_dec_and_test(&ds->ds_count))
+			ds->ds_clp = NULL;
 		destroy_ds(ds);
 	}
 	kfree(dev->stripe_devs);
