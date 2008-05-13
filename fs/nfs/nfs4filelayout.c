@@ -599,7 +599,7 @@ filelayout_commit(struct pnfs_layout_type *layoutid, int sync,
 	while (!list_empty(head)) {
 		req = nfs_list_entry(head->next);
 
-		file_offset = req->wb_index << PAGE_CACHE_SHIFT;
+		file_offset = (loff_t)req->wb_index << PAGE_CACHE_SHIFT;
 
 		/* Get dserver for the current page */
 		status = nfs4_pnfs_dserver_get(data->lseg,
@@ -635,7 +635,7 @@ filelayout_commit(struct pnfs_layout_type *layoutid, int sync,
 		 *      and then compare if they are the same. */
 		list_for_each_safe(pos, tmp, head) {
 			reqt = nfs_list_entry(pos);
-			comp_offset = reqt->wb_index << PAGE_CACHE_SHIFT;
+			comp_offset = (loff_t)reqt->wb_index << PAGE_CACHE_SHIFT;
 			idx2 = filelayout_dserver_get_index(comp_offset, di, nfslay);
 			if (idx1 == idx2) {
 				nfs_list_remove_request(reqt);
