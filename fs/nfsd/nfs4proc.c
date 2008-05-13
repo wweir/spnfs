@@ -518,6 +518,7 @@ static __be32
 nfsd4_getattr(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	      struct nfsd4_getattr *getattr)
 {
+	u32 minorversion;
 	__be32 status;
 
 	status = fh_verify(rqstp, &cstate->current_fh, 0, MAY_NOP);
@@ -527,8 +528,10 @@ nfsd4_getattr(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	if (getattr->ga_bmval[1] & NFSD_WRITEONLY_ATTRS_WORD1)
 		return nfserr_inval;
 
-	getattr->ga_bmval[0] &= NFSD_SUPPORTED_ATTRS_WORD0;
-	getattr->ga_bmval[1] &= NFSD_SUPPORTED_ATTRS_WORD1;
+	minorversion = nfsd4_compound_minorversion(cstate);
+	getattr->ga_bmval[0] &= nfsd_suppattrs0(minorversion);
+	getattr->ga_bmval[1] &= nfsd_suppattrs1(minorversion);
+	getattr->ga_bmval[2] &= nfsd_suppattrs2(minorversion);
 
 	getattr->ga_fhp = &cstate->current_fh;
 	return nfs_ok;
@@ -616,6 +619,7 @@ static __be32
 nfsd4_readdir(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	      struct nfsd4_readdir *readdir)
 {
+	u32 minorversion;
 	u64 cookie = readdir->rd_cookie;
 	static const nfs4_verifier zeroverf;
 
@@ -624,8 +628,10 @@ nfsd4_readdir(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	if (readdir->rd_bmval[1] & NFSD_WRITEONLY_ATTRS_WORD1)
 		return nfserr_inval;
 
-	readdir->rd_bmval[0] &= NFSD_SUPPORTED_ATTRS_WORD0;
-	readdir->rd_bmval[1] &= NFSD_SUPPORTED_ATTRS_WORD1;
+	minorversion = nfsd4_compound_minorversion(cstate);
+	readdir->rd_bmval[0] &= nfsd_suppattrs0(minorversion);
+	readdir->rd_bmval[1] &= nfsd_suppattrs1(minorversion);
+	readdir->rd_bmval[2] &= nfsd_suppattrs2(minorversion);
 
 	if ((cookie > ~(u32)0) || (cookie == 1) || (cookie == 2) ||
 	    (cookie == 0 && memcmp(readdir->rd_verf.data, zeroverf.data, NFS4_VERIFIER_SIZE)))
@@ -808,14 +814,17 @@ _nfsd4_verify(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 {
 	__be32 *buf, *p;
 	int count;
+	u32 minorversion;
 	__be32 status;
 
 	status = fh_verify(rqstp, &cstate->current_fh, 0, MAY_NOP);
 	if (status)
 		return status;
 
-	if ((verify->ve_bmval[0] & ~NFSD_SUPPORTED_ATTRS_WORD0)
-	    || (verify->ve_bmval[1] & ~NFSD_SUPPORTED_ATTRS_WORD1))
+	minorversion = nfsd4_compound_minorversion(cstate);
+	if ((verify->ve_bmval[0] & ~nfsd_suppattrs0(minorversion))
+	    || (verify->ve_bmval[1] & ~nfsd_suppattrs1(minorversion))
+	    || (verify->ve_bmval[2] & ~nfsd_suppattrs2(minorversion)))
 		return nfserr_attrnotsupp;
 	if ((verify->ve_bmval[0] & FATTR4_WORD0_RDATTR_ERROR)
 	    || (verify->ve_bmval[1] & NFSD_WRITEONLY_ATTRS_WORD1))
@@ -835,7 +844,7 @@ _nfsd4_verify(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 				    cstate->current_fh.fh_export,
 				    cstate->current_fh.fh_dentry, buf,
 				    &count, verify->ve_bmval,
-				    rqstp, 0);
+				    rqstp, 0, verify->ve_minorversion);
 
 	/* this means that nfsd4_encode_fattr() ran out of space */
 	if (status == nfserr_resource && count == 0)
@@ -970,6 +979,7 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 	resp->tag = args->tag;
 	resp->opcnt = 0;
 	resp->rqstp = rqstp;
+	resp->minorversion = args->minorversion;
 
 	/*
 	 * According to RFC3010, this takes precedence over all other errors.

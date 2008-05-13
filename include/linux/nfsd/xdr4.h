@@ -53,6 +53,15 @@ struct nfsd4_compound_state {
 #endif /* CONFIG_NFSD_V4_1 */
 };
 
+static inline u32 nfsd4_compound_minorversion(struct nfsd4_compound_state *cs)
+{
+#if defined(CONFIG_NFSD_V4_1)
+	return cs->current_ses ? 1 : 0;
+#else  /* CONFIG_NFSD_V4_1 */
+	return 0;
+#endif /* CONFIG_NFSD_V4_1 */
+}
+
 struct nfsd4_change_info {
 	u32		atomic;
 	u32		before_ctime_sec;
@@ -93,7 +102,7 @@ struct nfsd4_create {
 			u32 specdata2;
 		} dev;    /* NF4BLK, NF4CHR */
 	} u;
-	u32		cr_bmval[2];        /* request */
+	u32		cr_bmval[3];        /* request */
 	struct iattr	cr_iattr;           /* request */
 	struct nfsd4_change_info  cr_cinfo; /* response */
 	struct nfs4_acl *cr_acl;
@@ -109,7 +118,7 @@ struct nfsd4_delegreturn {
 };
 
 struct nfsd4_getattr {
-	u32		ga_bmval[2];        /* request */
+	u32		ga_bmval[3];        /* request */
 	struct svc_fh	*ga_fhp;            /* response */
 };
 
@@ -210,7 +219,7 @@ struct nfsd4_open {
 	stateid_t       op_delegate_stateid; /* request - response */
 	u32		op_create;     	    /* request */
 	u32		op_createmode;      /* request */
-	u32		op_bmval[2];        /* request */
+	u32		op_bmval[3];        /* request */
 	union {                             /* request */
 		struct iattr	iattr;                      /* UNCHECKED4,GUARDED4 */
 		nfs4_verifier	verf;                                /* EXCLUSIVE4 */
@@ -265,7 +274,7 @@ struct nfsd4_readdir {
 	nfs4_verifier	rd_verf;            /* request */
 	u32		rd_dircount;        /* request */
 	u32		rd_maxcount;        /* request */
-	u32		rd_bmval[2];        /* request */
+	u32		rd_bmval[3];        /* request */
 	struct svc_rqst *rd_rqstp;          /* response */
 	struct svc_fh * rd_fhp;             /* response */
 
@@ -273,6 +282,7 @@ struct nfsd4_readdir {
 	__be32 *		buffer;
 	int			buflen;
 	__be32 *		offset;
+	u32			minorversion;
 };
 
 struct nfsd4_release_lockowner {
@@ -308,7 +318,7 @@ struct nfsd4_secinfo {
 struct nfsd4_setattr {
 	stateid_t	sa_stateid;         /* request */
 	u32		sa_minorversion;    /* processing */
-	u32		sa_bmval[2];        /* request */
+	u32		sa_bmval[3];        /* request */
 	struct iattr	sa_iattr;           /* request */
 	struct nfs4_acl *sa_acl;
 };
@@ -334,9 +344,10 @@ struct nfsd4_setclientid_confirm {
 
 /* also used for NVERIFY */
 struct nfsd4_verify {
-	u32		ve_bmval[2];        /* request */
+	u32		ve_bmval[3];        /* request */
 	u32		ve_attrlen;         /* request */
 	char *		ve_attrval;         /* request */
+	u32		ve_minorversion;
 };
 
 struct nfsd4_write {
@@ -479,6 +490,7 @@ struct nfsd4_compoundres {
 	char *				tag;
 	u32				opcnt;
 	__be32 *			tagp; /* where to encode tag and  opcount */
+	u32				minorversion;
 };
 
 #define NFS4_SVC_XDRSIZE		sizeof(struct nfsd4_compoundargs)
@@ -502,8 +514,9 @@ int nfs4svc_encode_compoundres(struct svc_rqst *, __be32 *,
 void nfsd4_encode_operation(struct nfsd4_compoundres *, struct nfsd4_op *);
 void nfsd4_encode_replay(struct nfsd4_compoundres *resp, struct nfsd4_op *op);
 __be32 nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
-		       struct dentry *dentry, __be32 *buffer, int *countp,
-		       u32 *bmval, struct svc_rqst *, int ignore_crossmnt);
+			  struct dentry *dentry, __be32 *buffer, int *countp,
+			  u32 *bmval, struct svc_rqst *, int ignore_crossmnt,
+			  u32 minorversion);
 extern __be32 nfsd4_setclientid(struct svc_rqst *rqstp,
 		struct nfsd4_compound_state *,
 		struct nfsd4_setclientid *setclid);

@@ -237,6 +237,7 @@ nfsd4_decode_bitmap(struct nfsd4_compoundargs *argp, u32 *bmval)
 
 	bmval[0] = 0;
 	bmval[1] = 0;
+	bmval[2] = 0;
 
 	READ_BUF(4);
 	READ32(bmlen);
@@ -248,13 +249,19 @@ nfsd4_decode_bitmap(struct nfsd4_compoundargs *argp, u32 *bmval)
 		READ32(bmval[0]);
 	if (bmlen > 1)
 		READ32(bmval[1]);
+#if defined(CONFIG_NFSD_V4_1)
+	if (bmlen > 2) {
+		READ32(bmval[2]);
+	}
+#endif /* CONFIG_NFSD_V4_1 */
 
 	DECODE_TAIL;
 }
 
 static u32 nfsd_attrmask[] = {
 	NFSD_WRITEABLE_ATTRS_WORD0,
-	NFSD_WRITEABLE_ATTRS_WORD1
+	NFSD_WRITEABLE_ATTRS_WORD1,
+	NFSD_WRITEABLE_ATTRS_WORD2
 };
 
 static __be32
@@ -275,9 +282,12 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, u32 *writable,
 	 * According to spec, unsupported attributes return ERR_ATTRNOTSUPP;
 	 * read-only attributes return ERR_INVAL.
 	 */
-	if ((bmval[0] & ~NFSD_SUPPORTED_ATTRS_WORD0) || (bmval[1] & ~NFSD_SUPPORTED_ATTRS_WORD1))
+	if ((bmval[0] & ~nfsd_suppattrs0(argp->minorversion)) ||
+	    (bmval[1] & ~nfsd_suppattrs1(argp->minorversion)) ||
+	    (bmval[2] & ~nfsd_suppattrs2(argp->minorversion)))
 		return nfserr_attrnotsupp;
-	if ((bmval[0] & ~writable[0]) || (bmval[1] & ~writable[1]))
+	if ((bmval[0] & ~writable[0]) || (bmval[1] & ~writable[1]) ||
+	    (bmval[2] & ~writable[2]))
 		return nfserr_inval;
 
 	READ_BUF(4);
@@ -426,6 +436,7 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, u32 *writable,
 			goto xdr_error;
 		}
 	}
+	BUG_ON(bmval[2]);	/* no such writeable attr supported yet */
 	if (len != expected_len)
 		goto xdr_error;
 
@@ -793,6 +804,7 @@ nfsd4_decode_readdir(struct nfsd4_compoundargs *argp, struct nfsd4_readdir *read
 	COPYMEM(readdir->rd_verf.data, sizeof(readdir->rd_verf.data));
 	READ32(readdir->rd_dircount);    /* just in case you needed a useless field... */
 	READ32(readdir->rd_maxcount);
+	readdir->minorversion = argp->minorversion;
 	if ((status = nfsd4_decode_bitmap(argp, readdir->rd_bmval)))
 		goto out;
 
@@ -1171,6 +1183,7 @@ nfsd4_decode_verify(struct nfsd4_compoundargs *argp, struct nfsd4_verify *verify
 	READ32(verify->ve_attrlen);
 	READ_BUF(verify->ve_attrlen);
 	SAVEMEM(verify->ve_attrval, verify->ve_attrlen);
+	verify->ve_minorversion = argp->minorversion;
 
 	DECODE_TAIL;
 }
@@ -1724,10 +1737,11 @@ static __be32 fattr_handle_absent_fs(u32 *bmval0, u32 *bmval1, u32 *rdattr_err)
 __be32
 nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		struct dentry *dentry, __be32 *buffer, int *countp, u32 *bmval,
-		struct svc_rqst *rqstp, int ignore_crossmnt)
+		struct svc_rqst *rqstp, int ignore_crossmnt, u32 minorversion)
 {
 	u32 bmval0 = bmval[0];
 	u32 bmval1 = bmval[1];
+	u32 bmval2 = bmval[2];
 	struct kstat stat;
 	struct svc_fh tempfh;
 	struct kstatfs statfs;
@@ -1743,10 +1757,25 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 	struct nfs4_acl *acl = NULL;
 
 	BUG_ON(bmval1 & NFSD_WRITEONLY_ATTRS_WORD1);
-	BUG_ON(bmval0 & ~NFSD_SUPPORTED_ATTRS_WORD0);
-	BUG_ON(bmval1 & ~NFSD_SUPPORTED_ATTRS_WORD1);
+	/* FIXME: change warnings back into BUG_ON */;
+	if (bmval0 & ~nfsd_suppattrs0(minorversion)) {
+		printk("%s: minorversion=%u bmval0=0x%08x suppattrs0=0x%08x\n",
+			__func__, minorversion, bmval0, nfsd_suppattrs0(minorversion));
+		WARN_ON(1);
+	}
+	if (bmval1 & ~nfsd_suppattrs1(minorversion)) {
+		printk("%s: minorversion=%u bmval1=0x%08x suppattrs1=0x%08x\n",
+			__func__, minorversion, bmval1, nfsd_suppattrs1(minorversion));
+		WARN_ON(1);
+	}
+	if (bmval2 & ~nfsd_suppattrs2(minorversion)) {
+		printk("%s: minorversion=%u bmval2=0x%08x suppattrs2=0x%08x\n",
+			__func__, minorversion, bmval2, nfsd_suppattrs2(minorversion));
+		WARN_ON(1);
+	}
 
 	if (exp->ex_fslocs.migrated) {
+		BUG_ON(bmval[2]);
 		status = fattr_handle_absent_fs(&bmval0, &bmval1, &rdattr_err);
 		if (status)
 			goto out;
@@ -1792,22 +1821,42 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 	if ((buflen -= 16) < 0)
 		goto out_resource;
 
-	WRITE32(2);
-	WRITE32(bmval0);
-	WRITE32(bmval1);
+	if (unlikely(bmval2)) {
+		WRITE32(3);
+		WRITE32(bmval0);
+		WRITE32(bmval1);
+		WRITE32(bmval2);
+	} else if (likely(bmval1)) {
+		WRITE32(2);
+		WRITE32(bmval0);
+		WRITE32(bmval1);
+	} else {
+		WRITE32(1);
+		WRITE32(bmval0);
+	}
 	attrlenp = p++;                /* to be backfilled later */
 
 	if (bmval0 & FATTR4_WORD0_SUPPORTED_ATTRS) {
-		u32 word0 = NFSD_SUPPORTED_ATTRS_WORD0;
+		u32 word0 = nfsd_suppattrs0(minorversion);
+		u32 word1 = nfsd_suppattrs1(minorversion);
+		u32 word2 = nfsd_suppattrs2(minorversion);
+
 		if ((buflen -= 12) < 0)
 			goto out_resource;
 		if (!aclsupport)
 			word0 &= ~FATTR4_WORD0_ACL;
 		if (!exp->ex_fslocs.locations)
 			word0 &= ~FATTR4_WORD0_FS_LOCATIONS;
-		WRITE32(2);
-		WRITE32(word0);
-		WRITE32(NFSD_SUPPORTED_ATTRS_WORD1);
+		if (!word2) {
+			WRITE32(2);
+			WRITE32(word0);
+			WRITE32(word1);
+		} else {
+			WRITE32(3);
+			WRITE32(word0);
+			WRITE32(word1);
+			WRITE32(word2);
+		}
 	}
 	if (bmval0 & FATTR4_WORD0_TYPE) {
 		if ((buflen -= 4) < 0)
@@ -2117,6 +2166,8 @@ out_acl:
 		}
 		WRITE64(stat.ino);
 	}
+	BUG_ON(bmval2);	/* FIXME: not implemented yet */
+
 	*attrlenp = htonl((char *)p - (char *)attrlenp - 4);
 	*countp = p - buffer;
 	status = nfs_ok;
@@ -2182,7 +2233,8 @@ nfsd4_encode_dirent_fattr(struct nfsd4_readdir *cd,
 
 	}
 	nfserr = nfsd4_encode_fattr(NULL, exp, dentry, p, buflen, cd->rd_bmval,
-					cd->rd_rqstp, ignore_crossmnt);
+					cd->rd_rqstp, ignore_crossmnt,
+					cd->minorversion);
 out_put:
 	dput(dentry);
 	exp_put(exp);
@@ -2336,7 +2388,7 @@ nfsd4_encode_getattr(struct nfsd4_compoundres *resp, __be32 nfserr, struct nfsd4
 	buflen = resp->end - resp->p - (COMPOUND_ERR_SLACK_SPACE >> 2);
 	nfserr = nfsd4_encode_fattr(fhp, fhp->fh_export, fhp->fh_dentry,
 				    resp->p, &buflen, getattr->ga_bmval,
-				    resp->rqstp, 0);
+				    resp->rqstp, 0, resp->minorversion);
 	if (!nfserr)
 		resp->p += buflen;
 	return nfserr;
