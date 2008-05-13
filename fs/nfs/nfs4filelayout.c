@@ -694,7 +694,7 @@ int
 filelayout_pg_test(struct nfs_pageio_descriptor *pgio, struct nfs_page *prev,
 		   struct nfs_page *req)
 {
-	u32 p_stripe, r_stripe;
+	u64 p_stripe, r_stripe;
 
 	if (!pgio->pg_iswrite)
 		goto boundary;
@@ -707,12 +707,18 @@ boundary:
 	if (pgio->pg_boundary == 0)
 		return 1;
 	p_stripe = prev->wb_index << PAGE_CACHE_SHIFT;
-	do_div(p_stripe, pgio->pg_boundary);
 	r_stripe = req->wb_index << PAGE_CACHE_SHIFT;
+
+#if 0
+	dprintk("%s p %llu r %llu \n", __func__, p_stripe, r_stripe);
+#endif
+
+	do_div(p_stripe, pgio->pg_boundary);
 	do_div(r_stripe, pgio->pg_boundary);
 
 #if 0
-	dprintk("%s p %u r %u bnd %d bsize %Zu\n",__func__, p_stripe, r_stripe, pgio->pg_boundary, pgio->pg_bsize);
+	dprintk("%s p %llu r %llu bnd %d bsize %Zu\n",
+	__func__, p_stripe, r_stripe, pgio->pg_boundary, pgio->pg_bsize);
 #endif
 
 	return (p_stripe == r_stripe);
