@@ -706,8 +706,8 @@ filelayout_pg_test(struct nfs_pageio_descriptor *pgio, struct nfs_page *prev,
 boundary:
 	if (pgio->pg_boundary == 0)
 		return 1;
-	p_stripe = prev->wb_index << PAGE_CACHE_SHIFT;
-	r_stripe = req->wb_index << PAGE_CACHE_SHIFT;
+	p_stripe = (u64)prev->wb_index << PAGE_CACHE_SHIFT;
+	r_stripe = (u64)req->wb_index << PAGE_CACHE_SHIFT;
 
 #if 0
 	dprintk("%s p %llu r %llu \n", __func__, p_stripe, r_stripe);
