@@ -1649,7 +1649,7 @@ int _pnfs_do_flush(struct inode *inode, struct nfs_page *req,
 {
 	struct nfs_server *nfss = NFS_SERVER(inode);
 	struct pnfs_layout_segment *lseg;
-	loff_t pos = (req->wb_index << PAGE_CACHE_SHIFT) + req->wb_offset;
+	loff_t pos = ((loff_t)req->wb_index << PAGE_CACHE_SHIFT) + req->wb_offset;
 	int status = 0;
 
 	lseg = pnfs_find_get_lseg(inode, pos, req->wb_bytes, IOMODE_RW);
