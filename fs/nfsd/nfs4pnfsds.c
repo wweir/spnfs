@@ -272,6 +272,20 @@ alloc_init_ds_stateid(struct svc_fh *cfh, struct pnfs_get_state *gsp)
 	return dsp;
 }
 
+static void
+update_ds_stateid(struct pnfs_ds_stateid *dsp, struct svc_fh *cfh, struct pnfs_get_state *gsp)
+{
+	dprintk("pNFSD: %s\n", __func__);
+
+	memcpy(&dsp->ds_stid, &gsp->stid, sizeof(stateid_t));
+	dsp->ds_access = gsp->access;
+	dsp->ds_status = 0;
+	dsp->ds_verifier[0] = gsp->verifier[0];
+	dsp->ds_verifier[1] = gsp->verifier[1];
+
+	return;
+}
+
 struct pnfs_ds_stateid *
 nfsv4_ds_get_state(struct svc_fh *cfh, stateid_t *stidp)
 {
@@ -286,8 +300,10 @@ nfsv4_ds_get_state(struct svc_fh *cfh, stateid_t *stidp)
 	dprintk("pNFSD: %s\n", __func__);
 
 	dsp = find_pnfs_ds_stateid(stidp);
-	if (dsp)
-		return dsp;
+	if (dsp) {
+		if (stidp->si_generation == dsp->ds_stid.si_generation)
+			return dsp;
+	}
 	memcpy(&gs.stid, stidp, sizeof(stateid_t));
 	sb = ino->i_sb;
 	if (sb && sb->s_export_op->get_state) {
@@ -298,8 +314,12 @@ nfsv4_ds_get_state(struct svc_fh *cfh, stateid_t *stidp)
 	}
 	if (status)
 		return NULL;
-	/* create new pnfs_ds_stateid */
-	dsp = alloc_init_ds_stateid(cfh, &gs);
+	if (dsp)
+		update_ds_stateid(dsp, cfh, &gs);
+	else
+		/* create new pnfs_ds_stateid */
+		dsp = alloc_init_ds_stateid(cfh, &gs);
+
 	return dsp;
 }
 
