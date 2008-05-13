@@ -1114,7 +1114,7 @@ readahead_range(struct inode *inode, struct list_head *pages, loff_t *offset,
 	first = list_entry((pages)->prev, struct page, lru);
 	last = list_entry((pages)->next, struct page, lru);
 
-	foff = first->index << PAGE_CACHE_SHIFT;
+	foff = (loff_t)first->index << PAGE_CACHE_SHIFT;
 
 	range = (last->index - first->index) * PAGE_CACHE_SIZE;
 	if (last->index == end_index)
