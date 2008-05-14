@@ -2324,6 +2324,11 @@ set_curr_ses:
 	c_ses->cs_slot = slot;
 	nfs41_get_session(slot->sl_session);
 
+	/* FIXME: for now just initialize target_highest_slotid and flags
+	 * response fields */
+	seq->target_maxslots = seq->maxslots;
+	seq->status_flags = 0;
+
 	status = nfs_ok;
 out:
 	dprintk("%s: return %d\n", __func__, ntohl(status));

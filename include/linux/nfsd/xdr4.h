@@ -395,13 +395,13 @@ struct nfsd4_create_session {
 };
 
 struct nfsd4_sequence {
-	nfs41_sessionid		sessionid;
-	u32			seqid;
-	u32			slotid;
-	u32			maxslots;
-	u32			target_maxslots;
-	u32			catchthis;
-	u32			status_flags;
+	nfs41_sessionid		sessionid;		/* request/response */
+	u32			seqid;			/* request/response */
+	u32			slotid;			/* request/response */
+	u32			maxslots;		/* request/response */
+	u32			catchthis;		/* request */
+	u32			target_maxslots;	/* response */
+	u32			status_flags;		/* response */
 };
 
 struct nfsd4_destroy_session {
