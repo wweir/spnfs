@@ -231,22 +231,40 @@ panfs_shim_conv_layout(
 			obj_id->obj_id = oc_obj_id->oid_object_id;
 		}
 
-		if ((obj_id->grp_id != lo_comp->oc_object_id.oid_partition_id) ||
-		    (obj_id->obj_id != lo_comp->oc_object_id.oid_object_id))
+		if (obj_id->grp_id != lo_comp->oc_object_id.oid_partition_id) {
+			dprintk("%s: i=%d grp_id=0x%Lx oid_partition_id=0x%Lx\n",
+				__func__, i, (u64)obj_id->grp_id,
+				lo_comp->oc_object_id.oid_partition_id);
+			status=-EINVAL;
 			goto err;
+		}
+
+		if (obj_id->obj_id != lo_comp->oc_object_id.oid_object_id) {
+			dprintk("%s: i=%d obj_id=0x%Lx oid_object_id=0x%Lx\n",
+				__func__, i, obj_id->obj_id,
+				lo_comp->oc_object_id.oid_object_id);
+			status=-EINVAL;
+			goto err;
+		}
 
 		pan_comp->dev_id = dev_id;
-		if (!pan_stor_is_device_id_an_obsd_id(pan_comp->dev_id))
+		if (!pan_stor_is_device_id_an_obsd_id(pan_comp->dev_id)) {
+			dprintk("%s: i=%d dev_id=0x%Lx not an obsd_id\n",
+				__func__, i, obj_id->dev_id);
+			status=-EINVAL;
 			goto err;
+		}
 		if (lo_comp->oc_osd_version == PNFS_OSD_MISSING) {
 			dprintk("%s: degraded maps not supported yet\n",
 				__func__);
+			status=-ENOTSUPP;
 			goto err;
 		}
 		pan_comp->avail_state = PAN_AGG_COMP_STATE_NORMAL;
 		if (lo_comp->oc_cap_key_sec != PNFS_OSD_CAP_KEY_SEC_NONE) {
 			dprintk("%s: cap key security not supported yet\n",
 				__func__);
+			status=-ENOTSUPP;
 			goto err;
 		}
 
