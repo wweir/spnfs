@@ -4615,8 +4615,8 @@ nfs4_pnfs_get_layout(struct svc_fh *current_fh,
 	if (!lp)
 		goto out;
 
-	dprintk("pNFS %s: pre-export type %d maxcount %d "
-		"iomode %d offset %llu length %lld\n",
+	dprintk("pNFS %s: pre-export type 0x%x maxcount %d "
+		"iomode %u offset %llu length %llu\n",
 		__func__, args->seg.layout_type, args->xdr.maxcount,
 		args->seg.iomode, args->seg.offset, args->seg.length);
 
