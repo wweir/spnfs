@@ -1073,6 +1073,7 @@ static inline int xs_tcp_read_reply(struct rpc_xprt *xprt,
 	return 0;
 }
 
+#if defined(CONFIG_NFS_V4_1)
 /*
  * Obtains an rpc_rqst previously allocated and invokes the common
  * tcp read code to read the data.  The result is placed in the callback
@@ -1121,6 +1122,7 @@ static inline int xs_tcp_read_callback(struct rpc_xprt *xprt,
 
 	return 0;
 }
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Read data off the transport.  This can be either an RPC_CALL or an
@@ -1133,9 +1135,13 @@ static void xs_tcp_read_data(struct rpc_xprt *xprt,
 				container_of(xprt, struct sock_xprt, xprt);
 	int status;
 
+#if defined(CONFIG_NFS_V4_1)
 	status = (transport->tcp_calldir == RPC_REPLY) ?
 		xs_tcp_read_reply(xprt, desc) :
 		xs_tcp_read_callback(xprt, desc);
+#else
+	status = xs_tcp_read_reply(xprt, desc);
+#endif /* CONFIG_NFS_V4_1 */
 
 	if (status == 0)
 		xs_tcp_check_fraghdr(transport);
@@ -2200,7 +2206,9 @@ static struct rpc_xprt_ops xs_tcp_ops = {
 	.buf_free		= rpc_free,
 	.send_request		= xs_tcp_send_request,
 	.set_retrans_timeout	= xprt_set_retrans_timeout_def,
+#if defined(CONFIG_NFS_V4_1)
 	.release_request	= bc_release_request,
+#endif /* CONFIG_NFS_V4_1 */
 	.close			= xs_tcp_shutdown,
 	.destroy		= xs_destroy,
 	.print_stats		= xs_tcp_print_stats,
