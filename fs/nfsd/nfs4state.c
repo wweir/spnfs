@@ -4823,7 +4823,7 @@ int nfs4_pnfs_return_layout(struct super_block *sb, struct svc_fh *current_fh,
 	if (sb->s_export_op->layout_return) {
 		status = sb->s_export_op->layout_return(ino, lrp);
 		if (status)
-			goto out;
+			goto out_unlocked;
 	}
 
 	nfs4_lock_state();
@@ -4871,6 +4871,7 @@ out:
 	if (fp)
 		put_nfs4_file(fp);
 	nfs4_unlock_state();
+out_unlocked:
 	dprintk("pNFS %s: exit status %d \n", __FUNCTION__, status);
 	return status;
 }
