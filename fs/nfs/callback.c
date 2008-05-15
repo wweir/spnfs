@@ -224,13 +224,15 @@ int nfs_callback_up(int minorversion, void *args)
 	int ret = 0;
 #if defined(CONFIG_NFS_V4_1)
 	struct rpc_xprt *xprt = (struct rpc_xprt *)args;
-#endif
+#endif /* CONFIG_NFS_V4_1 */
 
 	lock_kernel();
 	mutex_lock(&nfs_callback_mutex);
 	if (nfs_callback_info.users++ || nfs_callback_info.pid != 0) {
+#if defined(CONFIG_NFS_V4_1)
 		if (minorversion)
 			xprt->bc_serv = nfs_callback_info.serv;
+#endif /* CONFIG_NFS_V4_1 */
 		goto out;
 	}
 	init_completion(&nfs_callback_info.started);
