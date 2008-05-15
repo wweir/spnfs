@@ -374,6 +374,7 @@ spnfs_close(struct inode *inode)
 		recall_inode = NULL;
 
 		lr.cbl_recall_type = RECALL_FILE;
+		lr.cbl_seg.layout_type = LAYOUT_NFSV4_FILES;
 		lr.cbl_seg.clientid = 0;
 		lr.cbl_seg.offset = 0;
 		lr.cbl_seg.length = NFS4_LENGTH_EOF;
