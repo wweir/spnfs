@@ -1103,6 +1103,7 @@ svc_process(struct svc_rqst *rqstp)
 	return svc_send(rqstp);
 }
 
+#if defined(CONFIG_NFS_V4_1)
 /*
  * Process a backchannel RPC request that arrived over an existing
  * outbound connection
@@ -1149,6 +1150,7 @@ bc_svc_process(struct svc_serv *serv, struct rpc_rqst *req,
 	return bc_send(req);
 }
 EXPORT_SYMBOL(bc_svc_process);
+#endif /* CONFIG_NFS_V4_1 */
 
 /*
  * Return (transport-specific) limit on the rpc payload.
