@@ -412,6 +412,7 @@ filelayout_free_layout(struct pnfs_layout_type *layoutid)
  *    is wrong.
  * 2) pattern_offset is ignored and must == 0 which is wrong;
  * 3) the pattern_offset needs to be a mutliple of the stripe unit.
+ * 4) stripe unit is multiple of page size
 */
 
 static int
@@ -421,6 +422,7 @@ filelayout_check_layout(struct pnfs_layout_type *lo,
 	struct nfs4_filelayout_segment *fl = LSEG_LD_DATA(lseg);
 	struct nfs4_pnfs_dev_item *dev;
 	int status = -EINVAL;
+	struct nfs_server *nfss = NFS_SERVER(PNFS_INODE(lo));
 
 	dprintk("--> %s\n", __func__);
 	dev = nfs4_pnfs_device_item_get(FILE_MT(lo->inode), NFS_FH(lo->inode),
@@ -443,6 +445,17 @@ filelayout_check_layout(struct pnfs_layout_type *lo,
 		dprintk("%s Unsupported no-zero pattern_offset %Ld\n",
 				__func__, fl->pattern_offset);
 		goto out;
+	}
+
+	if (fl->stripe_unit % PAGE_SIZE) {
+		dprintk("%s Stripe unit (%u) not page aligned\n",
+			__func__, fl->stripe_unit);
+		goto out;
+	}
+
+	if (fl->stripe_unit % nfss->ds_rsize || fl->stripe_unit % nfss->ds_wsize) {
+		dprintk("%s Stripe unit (%u) not aligned with rsize %u wsize %u\n",
+			__func__, fl->stripe_unit, nfss->ds_rsize, nfss->ds_wsize);
 	}
 	status = 0;
 out:
