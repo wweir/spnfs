@@ -1237,6 +1237,7 @@ nfsd4_getdevinfo(struct svc_rqst *rqstp,
 		goto out;
 	}
 	sb = exp->ex_path.dentry->d_inode->i_sb;
+	exp_put(exp);
 	dprintk("%s: sb %p\n", __func__, sb);
 	if (!sb)
 		goto out;
