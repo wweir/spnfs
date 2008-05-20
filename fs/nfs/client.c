@@ -1190,7 +1190,7 @@ struct nfs_server *nfs4_create_server(const struct nfs_parsed_mount_data *data,
 	/* Probe the root fh to retrieve its FSID */
 	error = nfs4_path_walk(server, mntfh, data->nfs_server.export_path);
 	if (error < 0)
-		goto error_session;
+		goto error;
 
 	dprintk("Server FSID: %llx:%llx\n",
 		(unsigned long long) server->fsid.major,
@@ -1199,7 +1199,7 @@ struct nfs_server *nfs4_create_server(const struct nfs_parsed_mount_data *data,
 
 	error = nfs_probe_fsinfo(server, mntfh, &fattr);
 	if (error < 0)
-		goto error_session;
+		goto error;
 
 	if (server->namelen == 0 || server->namelen > NFS4_MAXNAMLEN)
 		server->namelen = NFS4_MAXNAMLEN;
@@ -1217,11 +1217,6 @@ struct nfs_server *nfs4_create_server(const struct nfs_parsed_mount_data *data,
 	dprintk("<-- nfs4_create_server() = %p\n", server);
 	return server;
 
-error_session:
-#if defined(CONFIG_NFS_V4_1)
-	if (server->session)
-		nfs4_put_session(&server->session);
-#endif /* CONFIG_NFS_V4_1 */
 error:
 	nfs_free_server(server);
 	dprintk("<-- nfs4_create_server() = error %d\n", error);
