@@ -850,14 +850,6 @@ void nfs_free_server(struct nfs_server *server)
 	list_del(&server->master_link);
 	spin_unlock(&nfs_client_lock);
 
-	if (server->destroy != NULL)
-		server->destroy(server);
-
-	if (!IS_ERR(server->client_acl))
-		rpc_shutdown_client(server->client_acl);
-	if (!IS_ERR(server->client))
-		rpc_shutdown_client(server->client);
-
 #ifdef CONFIG_NFS_V4_1
 	if (server->session != NULL) {
 		/*
@@ -867,6 +859,14 @@ void nfs_free_server(struct nfs_server *server)
 		nfs4_put_session(&server->session);
 	}
 #endif /* CONFIG_NFS_V4_1 */
+
+	if (server->destroy != NULL)
+		server->destroy(server);
+
+	if (!IS_ERR(server->client_acl))
+		rpc_shutdown_client(server->client_acl);
+	if (!IS_ERR(server->client))
+		rpc_shutdown_client(server->client);
 
 	nfs_put_client(server->nfs_client);
 

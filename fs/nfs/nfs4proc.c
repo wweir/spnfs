@@ -4611,6 +4611,8 @@ void nfs4_put_session(struct nfs4_session **session)
 {
 	dprintk("--> nfs4_put_session()\n");
 	if (atomic_dec_and_test(&((*session)->ref_count))) {
+		if (!nfs41_test_session_expired(*session))
+			nfs4_proc_destroy_session(*session, (*session)->clnt);
 		nfs4_destroy_slot_table(&((*session)->fore_channel));
 		nfs4_free_session(*session);
 		*session = NULL;
