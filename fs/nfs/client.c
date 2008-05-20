@@ -1341,6 +1341,14 @@ struct nfs_server *nfs_clone_server(struct nfs_server *source,
 	if (!IS_ERR(source->client_acl))
 		nfs_init_server_aclclient(server);
 
+#ifdef CONFIG_NFS_V4_1
+	dprintk("%s init new session\n", __func__);
+	error = nfs4_init_session(server->nfs_client, &server->session,
+			server->client);
+	if (error)
+		goto out_free_server;
+#endif /* CONFIG_NFS_V4_1 */
+
 	/* probe the filesystem info for this server filesystem */
 	error = nfs_probe_fsinfo(server, fh, &fattr_fsinfo);
 	if (error < 0)
