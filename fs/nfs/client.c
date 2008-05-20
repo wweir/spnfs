@@ -1131,7 +1131,7 @@ static int nfs4_init_session(struct nfs_client *clp, struct nfs4_session **spp,
 		 */
 		session = nfs4_alloc_session();
 		if (!session)
-			error = -NFSERR_RESOURCE;
+			error = -ENOMEM;
 		else {
 			session->clnt = clnt;
 
