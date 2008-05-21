@@ -22,6 +22,7 @@
 
 #if defined(CONFIG_PNFS)
 #define CB_OP_LAYOUTRECALL_RES_MAXSZ	(CB_OP_HDR_RES_MAXSZ)
+#define CB_OP_DEVICENOTIFY_RES_MAXSZ	(CB_OP_HDR_RES_MAXSZ)
 #endif /* CONFIG_PNFS */
 
 #if defined(CONFIG_NFS_V4_1)
@@ -276,6 +277,38 @@ static unsigned decode_pnfs_layoutrecall_args(struct svc_rqst *rqstp,
 		args->cbl_layout_type, args->cbl_seg.iomode,
 		args->cbl_layoutchanged, args->cbl_recall_type,
 		args->cbl_fsid.major, args->cbl_fsid.minor);
+out:
+	dprintk("%s: exit with status = %d\n", __func__, ntohl(status));
+	return status;
+}
+
+static unsigned decode_pnfs_devicenotify_args(struct svc_rqst *rqstp,
+					struct xdr_stream *xdr,
+					struct cb_pnfs_devicenotifyargs *args)
+{
+	uint32_t *p;
+	unsigned status = 0;
+
+	args->cbd_addr = svc_addr(rqstp);
+	p = read_buf(xdr, 3 * sizeof(uint32_t) + NFS4_PNFS_DEVICEID4_SIZE);
+	if (unlikely(p == NULL)) {
+		status = __constant_htonl(NFS4ERR_RESOURCE);
+		goto out;
+	}
+
+	args->cbd_notify_type = ntohl(*p++);
+	args->cbd_layout_type = ntohl(*p++);
+
+	COPYMEM(args->cbd_dev_id.data, NFS4_PNFS_DEVICEID4_SIZE);
+
+	if (args->cbd_layout_type == NOTIFY_DEVICEID4_CHANGE)
+		args->cbd_immediate = ntohl(*p++);
+	else
+		args->cbd_immediate = 0;
+
+	dprintk("%s: type %d layout 0x%x immediate %d\n",
+		__func__, args->cbd_notify_type, args->cbd_layout_type,
+		args->cbd_immediate);
 out:
 	dprintk("%s: exit with status = %d\n", __func__, ntohl(status));
 	return status;
@@ -628,6 +661,7 @@ process_op:
 			break;
 
 		case OP_CB_LAYOUTRECALL:
+		case OP_CB_NOTIFY_DEVICEID:
 #if defined(CONFIG_PNFS)
 			goto process_op;
 #else
@@ -640,7 +674,6 @@ process_op:
 		case OP_CB_RECALL_SLOT:
 		case OP_CB_WANTS_CANCELLED:
 		case OP_CB_NOTIFY_LOCK:
-		case OP_CB_NOTIFY_DEVICEID:
 			op = &callback_ops[0];
 			status = htonl(NFS4ERR_NOTSUPP);
 			break;
@@ -749,6 +782,12 @@ static struct callback_op callback_ops[] = {
 		.decode_args =
 			(callback_decode_arg_t)decode_pnfs_layoutrecall_args,
 		.res_maxsize = CB_OP_LAYOUTRECALL_RES_MAXSZ,
+	},
+	[OP_CB_NOTIFY_DEVICEID] = {
+		.process_op = (callback_process_op_t)pnfs_cb_devicenotify,
+		.decode_args =
+			(callback_decode_arg_t)decode_pnfs_devicenotify_args,
+		.res_maxsize = CB_OP_DEVICENOTIFY_RES_MAXSZ,
 	},
 #endif /* CONFIG_PNFS */
 #if defined(CONFIG_NFS_V4_1)
