@@ -299,6 +299,34 @@ out:
 	return res;
 }
 
+unsigned pnfs_cb_devicenotify(struct cb_pnfs_devicenotifyargs *args,
+			      void *dummy)
+{
+	struct nfs_server *server;
+	struct nfs_client *clp;
+	unsigned res;
+
+	res = __constant_htonl(NFS4ERR_INVAL);
+	clp = nfs_find_client(args->cbd_addr, 4);
+	if (clp == NULL) {
+		dprintk("%s: no client for addr %u.%u.%u.%u\n",
+			__func__, NIPQUAD(args->cbd_addr));
+		goto out;
+	}
+
+	/* ??? fix me, until we have a way to find dev_id */
+	list_for_each_entry (server, &clp->cl_superblocks, client_link)
+		if (PNFS_EXISTS_LDIO_OP(server, uninitialize_mountpoint))
+			server->pnfs_curr_ld->ld_io_ops->
+				uninitialize_mountpoint(server->pnfs_mountid);
+
+	res = 0;
+	nfs_put_client(clp);
+out:
+	dprintk("%s: exit with status = %d\n", __func__, ntohl(res));
+	return res;
+}
+
 #endif /* defined(CONFIG_PNFS) */
 
 #if defined(CONFIG_NFS_V4_1)

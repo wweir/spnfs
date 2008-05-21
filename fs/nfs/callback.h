@@ -83,6 +83,14 @@ struct cb_pnfs_layoutrecallargs {
 	uint32_t		cbl_layoutchanged;
 	nfs4_stateid		cbl_stateid;
 };
+
+struct cb_pnfs_devicenotifyargs {
+	struct sockaddr		*cbd_addr;
+	uint32_t		cbd_notify_type;
+	uint32_t		cbd_layout_type;
+	struct pnfs_deviceid	cbd_dev_id;
+	uint32_t		cbd_immediate;
+};
 #endif /* CONFIG_PNFS */
 
 struct referring_call {
@@ -139,6 +147,8 @@ extern void nfs_callback_down(void);
 
 #if defined(CONFIG_PNFS)
 extern unsigned pnfs_cb_layoutrecall(struct cb_pnfs_layoutrecallargs *args,
+				     void *dummy);
+extern unsigned pnfs_cb_devicenotify(struct cb_pnfs_devicenotifyargs *args,
 				     void *dummy);
 #endif /* CONFIG_PNFS */
 extern unsigned nfs4_callback_sequence(struct cb_sequenceargs *args,
