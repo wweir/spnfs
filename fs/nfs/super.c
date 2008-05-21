@@ -1961,7 +1961,8 @@ static int nfs4_get_sb(struct file_system_type *fs_type,
 					NFS41_BC_MIN_CALLBACKS);
 				dprintk("%s Destroy session %p server %p\n",
 					__func__, server->session, server);
-				nfs4_proc_destroy_session(server);
+				nfs4_proc_destroy_session(server->session,
+					server->nfs_client->cl_rpcclient);
 			}
 			break;
 		default:
@@ -2009,6 +2010,7 @@ error_splat_super:
 static void nfs4_kill_super(struct super_block *sb)
 {
 	struct nfs_server *server = NFS_SB(sb);
+	struct rpc_clnt *clnt = server->nfs_client->cl_rpcclient;
 
 	dprintk("--> %s\n", __func__);
 	nfs_return_all_delegations(sb);
@@ -2024,7 +2026,7 @@ static void nfs4_kill_super(struct super_block *sb)
 				NFS41_BC_MIN_CALLBACKS);
 			dprintk("%s Destroy session %p for nfs_server %p\n",
 				__func__, server->session, server);
-			nfs4_proc_destroy_session(server);
+			nfs4_proc_destroy_session(server->session, clnt);
 		}
 		break;
 	default:

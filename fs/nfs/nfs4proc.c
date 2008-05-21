@@ -4769,20 +4769,19 @@ out:
  * Issue the over-the-wire RPC DESTROY_SESSION.
  * The caller must serialize access to this routine.
  */
-int nfs4_proc_destroy_session(struct nfs_server *sp)
+int nfs4_proc_destroy_session(struct nfs4_session *session, struct rpc_clnt *clnt)
 {
 	int status = 0;
 	struct rpc_message msg;
 
 	dprintk("--> nfs4_proc_destroy_session\n");
-	BUG_ON(sp == NULL);
-	BUG_ON(sp->session == NULL);
+	BUG_ON(session == NULL);
 
 	msg.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_DESTROY_SESSION];
-	msg.rpc_argp = sp->session;
+	msg.rpc_argp = session;
 	msg.rpc_resp = NULL;
 	msg.rpc_cred = NULL;
-	status = rpc_call_sync(sp->nfs_client->cl_rpcclient, &msg, 0);
+	status = rpc_call_sync(clnt, &msg, 0);
 
 	if (status)
 		printk(KERN_WARNING
@@ -4792,7 +4791,7 @@ int nfs4_proc_destroy_session(struct nfs_server *sp)
 	 * Since the caller has serialized access to this routine I don't
 	 * grab a lock to modify the expired value.
 	 */
-	nfs41_set_session_expired(sp->session);	/* Mark session as expired */
+	nfs41_set_session_expired(session);	/* Mark session as expired */
 
 	dprintk("<-- nfs4_proc_destroy_session\n");
 	return status;
