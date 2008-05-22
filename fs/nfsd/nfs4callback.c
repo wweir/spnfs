@@ -67,6 +67,7 @@ enum {
 	NFSPROC4_CLNT_CB_SEQUENCE,
 #if defined(CONFIG_PNFSD)
 	NFSPROC4_CLNT_CB_LAYOUT,
+	NFSPROC4_CLNT_CB_DEVICE,
 #endif
 };
 
@@ -74,6 +75,7 @@ enum nfs_cb_opnum4 {
 	OP_CB_RECALL            = 4,
 	OP_CB_LAYOUT            = 5,
 	OP_CB_SEQUENCE          = 11,
+	OP_CB_DEVICE            = 14,
 };
 
 #define NFS4_MAXTAGLEN		20
@@ -113,6 +115,12 @@ enum nfs_cb_opnum4 {
 					1 + 3 +                         \
 					enc_nfs4_fh_sz + 4)
 #define NFS41_dec_cb_layout_sz		(cb_compound_dec_hdr_sz  +      \
+					cb_sequence41_dec_sz +          \
+					op_dec_sz)
+#define NFS41_enc_cb_device_sz		(cb_compound_enc_hdr_sz +       \
+					cb_sequence41_enc_sz +          \
+					1 + 6)
+#define NFS41_dec_cb_device_sz		(cb_compound_dec_hdr_sz  +      \
 					cb_sequence41_dec_sz +          \
 					op_dec_sz)
 
@@ -351,6 +359,30 @@ encode_cb_layout(struct xdr_stream *xdr, struct nfs4_layoutrecall *clr)
 			clr->cb.cbl_recall_type);
 	return 0;
 }
+
+static int
+encode_cb_device(struct xdr_stream *xdr, struct nfs4_notify_device *nd)
+{
+	u32 *p;
+
+	RESERVE_SPACE(28);
+	WRITE32(OP_CB_DEVICE);
+	WRITE32(nd->cbd.cbd_notify_type);
+	WRITE32(nd->cbd.cbd_layout_type);
+	WRITE64(nd->cbd.cbd_devid.pnfs_fsid);
+	WRITE64(nd->cbd.cbd_devid.pnfs_devid);
+
+	if (nd->cbd.cbd_notify_type == NOTIFY_DEVICEID4_CHANGE) {
+		RESERVE_SPACE(4);
+		WRITE32(nd->cbd.cbd_immediate);
+	}
+	dprintk("%s: notify_type %d layout_type 0x%x devid x%llx-x%llx\n",
+			__func__, nd->cbd.cbd_notify_type,
+			nd->cbd.cbd_layout_type,
+			nd->cbd.cbd_devid.pnfs_fsid,
+			nd->cbd.cbd_devid.pnfs_devid);
+	return 0;
+}
 #endif /* CONFIG_PNFSD */
 #endif /* defined(CONFIG_NFSD_V4_1) */
 
@@ -425,6 +457,23 @@ nfs41_xdr_enc_cb_layout(struct rpc_rqst *req, u32 *p,
 	encode_cb_compound41_hdr(&xdr, &hdr);
 	encode_cb_sequence(&xdr, rpc_args->args_seq);
 	return (encode_cb_layout(&xdr, args));
+}
+
+static int
+nfs41_xdr_enc_cb_device(struct rpc_rqst *req, u32 *p,
+			struct nfs41_rpc_args *rpc_args)
+{
+	struct xdr_stream xdr;
+	struct nfs4_notify_device *args = rpc_args->args_op;
+	struct nfs4_cb_compound_hdr hdr = {
+		.ident = 0,
+		.nops   = 2,
+	};
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_cb_compound41_hdr(&xdr, &hdr);
+	encode_cb_sequence(&xdr, rpc_args->args_seq);
+	return (encode_cb_device(&xdr, args));
 }
 #endif /* CONFIG_PNFSD */
 #endif /* defined(CONFIG_NFSD_V4_1) */
@@ -545,6 +594,26 @@ nfs41_xdr_dec_cb_layout(struct rpc_rqst *rqstp, u32 *p,
 out:
 	return status;
 }
+
+static int
+nfs41_xdr_dec_cb_device(struct rpc_rqst *rqstp, u32 *p,
+			struct nfs41_rpc_res *rpc_res)
+{
+	struct xdr_stream xdr;
+	struct nfs4_cb_compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_cb_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_cb_sequence(&xdr, rpc_res->res_seq);
+	if (status)
+		goto out;
+	status = decode_cb_op_hdr(&xdr, OP_CB_DEVICE);
+out:
+	return status;
+}
 #endif /* CONFIG_PNFSD */
 #endif /* defined(CONFIG_NFSD_V4_1) */
 
@@ -595,6 +664,7 @@ static struct rpc_procinfo     nfs41_cb_procedures[] = {
 	PROC41(CB_RECALL,    COMPOUND,   enc_cb_recall,      dec_cb_recall),
 #if defined(CONFIG_PNFSD)
 	PROC41(CB_LAYOUT,    COMPOUND,   enc_cb_layout,      dec_cb_layout),
+	PROC41(CB_DEVICE,    COMPOUND,   enc_cb_device,      dec_cb_device),
 #endif
 };
 
@@ -910,5 +980,46 @@ out:
 	   or layout_return. */
 	dprintk("NFSD: nfsd4_cb_layout: status %d\n", clr->clr_status);
 	return clr->clr_status;
+}
+
+/*
+ * called with dp->dl_count inc'ed.
+ * nfs4_lock_state() may or may not have been called.
+ */
+int
+nfsd4_cb_notify_device(struct nfs4_notify_device *cbnd)
+{
+	struct nfs4_client *clp = cbnd->cbd_client;
+	struct rpc_clnt *clnt = NULL;
+	struct nfs41_cb_sequence seq;
+	struct nfs41_rpc_args args = {
+		.args_op = cbnd,
+		.args_seq = &seq
+	};
+	struct nfs41_rpc_res res = {
+		.res_seq = &seq
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs41_cb_procedures[NFSPROC4_CLNT_CB_DEVICE],
+		.rpc_argp = &args,
+		.rpc_resp = &res,
+	};
+
+	if (clp)
+		clnt = clp->cl_callback.cb_client;
+
+	cbnd->cbd_status = -EIO;
+	if ((!atomic_read(&clp->cl_callback.cb_set)) || !clnt)
+		goto out;
+
+	nfs41_cb_sequence_setup(clp, &seq);
+	cbnd->cbd_status = rpc_call_sync(clnt, &msg, RPC_TASK_SOFT);
+	nfs41_cb_sequence_done(clp, &seq);
+
+	if (cbnd->cbd_status == -EIO)
+		atomic_set(&clp->cl_callback.cb_set, 0);
+out:
+	dprintk("NFSD %s: status %d\n", __func__, cbnd->cbd_status);
+	return cbnd->cbd_status;
 }
 #endif /* CONFIG_PNFSD */

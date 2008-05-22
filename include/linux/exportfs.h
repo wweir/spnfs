@@ -231,6 +231,7 @@ struct export_operations {
 		/* callback from fs on MDS only */
 	int (*cb_get_state) (struct super_block *sb, void *state);
 	int (*cb_layout_recall) (struct super_block *sb, struct inode *inode, void *p);
+	int (*cb_device_notify) (struct super_block *sb, void *p);
 		/* call fs on DS only */
 	int (*get_state) (struct inode *inode, void *fh, void *state);
 		/* callback from fs on DS only */
