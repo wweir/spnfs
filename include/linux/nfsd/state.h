@@ -287,6 +287,13 @@ struct nfs4_layoutrecall {
 	struct timespec			clr_time;	/* last activity */
 };
 
+/* notify device request (from exported filesystem) */
+struct nfs4_notify_device {
+	struct nfsd4_pnfs_cb_device	cbd;
+	struct nfs4_client	       *cbd_client;
+	int				cbd_status;
+};
+
 #endif /* CONFIG_PNFSD */
 
 /* struct nfs4_client_reset
@@ -468,6 +475,7 @@ extern void nfsd4_probe_callback(struct nfs4_client *clp);
 extern void nfsd4_cb_recall(struct nfs4_delegation *dp);
 #if defined(CONFIG_PNFSD)
 extern int nfsd4_cb_layout(struct nfs4_layoutrecall *lp);
+extern int nfsd4_cb_notify_device(struct nfs4_notify_device *cbnd);
 #endif /* CONFIG_PNFSD */
 extern void nfs4_put_delegation(struct nfs4_delegation *dp);
 extern __be32 nfs4_make_rec_clidname(char *clidname, struct xdr_netobj *clname);

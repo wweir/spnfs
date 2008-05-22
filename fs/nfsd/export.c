@@ -390,6 +390,16 @@ static int cb_layout_recall(struct super_block *sb, struct inode *inode,
 	return nfsd_layout_recall_cb(sb, inode, lr);
 }
 EXPORT_SYMBOL(cb_layout_recall);
+
+static int cb_device_notify(struct super_block *sb, void *p)
+{
+	struct nfsd4_pnfs_cb_device *nd = p;
+
+	dprintk("NFSD %s: nd %p\n", __func__, nd);
+
+	return nfsd_device_notify_cb(sb, nd);
+}
+EXPORT_SYMBOL(cb_device_notify);
 #endif /* CONFIG_PNFSD */
 
 static struct svc_export *svc_export_update(struct svc_export *new,
@@ -434,6 +444,8 @@ static int check_export(struct inode *inode, int flags, unsigned char *uuid)
 		inode->i_sb->s_export_op->cb_change_state = cb_change_state;
 	if (!inode->i_sb->s_export_op->cb_layout_recall)
 		inode->i_sb->s_export_op->cb_layout_recall = cb_layout_recall;
+	if (!inode->i_sb->s_export_op->cb_device_notify)
+		inode->i_sb->s_export_op->cb_device_notify = cb_device_notify;
 #endif /* CONFIG_PNFSD */
 
 	return 0;

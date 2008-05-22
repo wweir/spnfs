@@ -107,6 +107,13 @@ struct nfsd4_pnfs_cb_layout {
 	struct nfs4_fsid	cbl_fsid;
 };
 
+struct nfsd4_pnfs_cb_device {
+	u32			cbd_notify_type;	/* request */
+	u32			cbd_layout_type;	/* request */
+	deviceid_t		cbd_devid;		/* request */
+	u32			cbd_immediate;		/* request */
+};
+
 #endif /* CONFIG_PNFSD */
 
 #endif /* _LINUX_NFSD_NFSD4_PNFS_H */
