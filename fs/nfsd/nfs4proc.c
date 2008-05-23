@@ -877,22 +877,28 @@ nfsd4_write(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	*p++ = nfssvc_boot.tv_usec;
 	}
 #if defined(CONFIG_SPNFS)
-	status = spnfs_write(current_fh->fh_dentry->d_inode->i_ino,
-		write->wr_offset, write->wr_buflen, write->wr_vlen, rqstp);
-	if (status < 0)
-		status = nfserr_io;
-	else {
-		/* DMXXX: HACK to get filesize set */
-		/* write one byte at offset+length-1 */
-		struct kvec k[1];
-		char zero = 0;
+	if (spnfs_enabled()) {
+		status = spnfs_write(current_fh->fh_dentry->d_inode->i_ino,
+			write->wr_offset, write->wr_buflen, write->wr_vlen,
+			rqstp);
+		if (status < 0)
+			status = nfserr_io;
+		else {
+			/* DMXXX: HACK to get filesize set */
+			/* write one byte at offset+length-1 */
+			struct kvec k[1];
+			char zero = 0;
 
-		k[0].iov_base = (void *)&zero;
-		k[0].iov_len = 1;
-		nfsd_write(rqstp, &cstate->current_fh, filp,
-			   write->wr_offset+write->wr_buflen-1, k, 1,
-			   1, &write->wr_how_written);
-	}
+			k[0].iov_base = (void *)&zero;
+			k[0].iov_len = 1;
+			nfsd_write(rqstp, &cstate->current_fh, filp,
+				   write->wr_offset+write->wr_buflen-1, k, 1,
+				   1, &write->wr_how_written);
+		}
+	} else /* we're not an MDS */
+		status =  nfsd_write(rqstp, &cstate->current_fh, filp,
+			     write->wr_offset, rqstp->rq_vec, write->wr_vlen,
+			     write->wr_buflen, &write->wr_how_written);
 #else
 	status =  nfsd_write(rqstp, &cstate->current_fh, filp,
 			     write->wr_offset, rqstp->rq_vec, write->wr_vlen,

@@ -2866,11 +2866,16 @@ nfsd4_encode_read(struct nfsd4_compoundres *resp, __be32 nfserr,
 	read->rd_vlen = v;
 
 #if defined(CONFIG_SPNFS)
-	nfserr = spnfs_read(read->rd_fhp->fh_dentry->d_inode->i_ino,
-			    read->rd_offset, &maxcount, read->rd_vlen,
-			    resp->rqstp);
-	if (nfserr < 0)
-		nfserr = nfserr_io;
+	if (spnfs_enabled()) {
+		nfserr = spnfs_read(read->rd_fhp->fh_dentry->d_inode->i_ino,
+				    read->rd_offset, &maxcount, read->rd_vlen,
+				    resp->rqstp);
+		if (nfserr < 0)
+			nfserr = nfserr_io;
+	} else /* we're not an MDS */
+		nfserr = nfsd_read(read->rd_rqstp, read->rd_fhp, read->rd_filp,
+			read->rd_offset, resp->rqstp->rq_vec, read->rd_vlen,
+			&maxcount);
 #else
 	nfserr = nfsd_read(read->rd_rqstp, read->rd_fhp, read->rd_filp,
 			read->rd_offset, resp->rqstp->rq_vec, read->rd_vlen,
