@@ -157,6 +157,9 @@ struct nfs4_state {
 struct nfs4_exception {
 	long timeout;
 	int retry;
+#ifdef CONFIG_NFS_V4_1
+	int num_tries;
+#endif /* CONFIG_NFS_V4_1 */
 };
 
 struct nfs4_state_recovery_ops {

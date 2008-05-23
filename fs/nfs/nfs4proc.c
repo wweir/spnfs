@@ -3416,9 +3416,11 @@ static int nfs4_handle_exception(struct nfs_server *server, int errorcode, struc
 		case -NFS4ERR_RETRY_UNCACHED_REP:
 		case -NFS4ERR_TOO_MANY_OPS:
 		case -NFS4ERR_OP_NOT_IN_SESSION:
-
+			if (exception->num_tries  > NFS41_MAX_SESSION_RECOVER)
+				break;
 			ret = nfs41_new_session(server);
 			if (!ret) {
+				exception->num_tries++;
 				exception->retry = 1;
 				break;
 			}

@@ -11,6 +11,9 @@
 
 #if defined(CONFIG_NFS_V4_1)
 
+/* How many new sessions do we try upon error? */
+#define NFS41_MAX_SESSION_RECOVER		4
+
 /*
  * Session state bits
  */
