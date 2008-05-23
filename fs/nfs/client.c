@@ -1179,12 +1179,10 @@ struct nfs_server *nfs4_create_server(const struct nfs_parsed_mount_data *data,
 	BUG_ON(!server->nfs_client->rpc_ops->file_inode_ops);
 
 #if defined(CONFIG_NFS_V4_1)
-	if (server->minorversion == 1) {
-		error = nfs4_init_session(server->nfs_client, &server->session,
-					  server->client);
-		if (error)
-			goto error;
-	}
+	error = nfs4_init_session(server->nfs_client, &server->session,
+		server->client);
+	if (error)
+		goto error;
 #endif /* CONFIG_NFS_V4_1 */
 
 	/* Probe the root fh to retrieve its FSID */
