@@ -66,6 +66,10 @@ struct nfs_parsed_mount_data {
 };
 
 /* client.c */
+#ifdef CONFIG_NFS_V4_1
+extern int nfs4_init_session(struct nfs_client *, struct nfs4_session **,
+					struct rpc_clnt *);
+#endif /* CONFIG_NFS_V4_1 */
 extern struct rpc_program nfs_program;
 
 extern void nfs_put_client(struct nfs_client *);

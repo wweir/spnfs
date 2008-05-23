@@ -22,6 +22,7 @@
 #include <linux/nfs_fs_sb.h>
 #include <linux/nfs41_session_recovery.h>
 #include "nfs4_fs.h"
+#include "internal.h"
 
 #define NFSDBG_FACILITY		NFSDBG_PROC
 
@@ -190,5 +191,29 @@ int nfs41_recover_session_sync(struct rpc_clnt *clnt, struct nfs_client *clp,
 	return ret;
 }
 EXPORT_SYMBOL(nfs41_recover_session_sync);
+
+/*
+ * nfs41_new_session()
+ *
+ * Big Hammer. Destroy existing session and create a new session
+ */
+int nfs41_new_session(struct nfs_server *server)
+{
+	int ret;
+
+	dprintk(" --> %s\n", __func__);
+
+	nfs4_put_session(&server->session);
+	ret = nfs4_init_session(server->nfs_client, &server->session,
+				server->client);
+	if (ret)
+		goto out;
+	ret = nfs41_recover_session_sync(server->client, server->nfs_client,
+				server->session);
+out:
+	dprintk(" <-- %s returns %d\n", __func__, ret);
+	return ret;
+}
+EXPORT_SYMBOL(nfs41_new_session);
 
 #endif /* CONFIG_NFS_V4_1 */

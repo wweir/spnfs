@@ -36,6 +36,7 @@ int nfs41_set_session_valid(struct nfs4_session *);
 int nfs41_recover_session(struct nfs_client *, struct nfs4_session *);
 int nfs41_recover_session_sync(struct rpc_clnt *, struct nfs_client *,
 			       struct nfs4_session *);
+int nfs41_new_session(struct nfs_server *);
 
 #endif	/* CONFIG_NFS_V4_1 */
 #endif	/* __NFS41_SESSION_RECOVERY_H__ */
