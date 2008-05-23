@@ -4710,6 +4710,7 @@ static int _nfs4_proc_create_session(struct nfs_client *clp,
 					&session->fore_channel.chan_attrs);
 		nfs4_adjust_channel_attrs(&args.bc_attrs,
 					&session->back_channel.chan_attrs);
+		nfs41_set_session_valid(session);	/* Activate session */
 	}
 
 	/* Increment the clientid slot sequence id */
@@ -4759,7 +4760,6 @@ int nfs4_proc_create_session(struct nfs_client *clp,
 		clear_bit(NFS4CLNT_LEASE_EXPIRED, &clp->cl_state);
 		spin_unlock(&clp->cl_lock);
 
-		nfs41_set_session_valid(session);	/* Activate session */
 		nfs4_schedule_state_renewal(clp);
 	}
 out:

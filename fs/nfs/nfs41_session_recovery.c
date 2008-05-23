@@ -98,7 +98,6 @@ out:
 out_error:
 	printk(KERN_WARNING "Error: session recovery failed on "
 		"NFSv4.1 server with error %d\n", ret);
-	nfs41_set_session_expired(rec->session);
 
 	switch (ret) {
 	case -NFS4ERR_STALE_CLIENTID:
