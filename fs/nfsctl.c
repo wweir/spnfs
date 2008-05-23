@@ -83,7 +83,7 @@ static struct {
 	},
 };
 
-#if defined(CONFIG_PNFSD)
+#if defined(CONFIG_SPNFS)
 int (*spnfs_init)(void);
 int (*spnfs_test)(void);
 void (*spnfs_delete)(void);
@@ -92,7 +92,7 @@ EXPORT_SYMBOL(spnfs_init);
 EXPORT_SYMBOL(spnfs_test);
 EXPORT_SYMBOL(spnfs_delete);
 EXPORT_SYMBOL(spnfs_getfh_vec);
-#endif /* CONFIG_PNFSD */
+#endif /* CONFIG_SPNFS */
 
 long
 asmlinkage sys_nfsservctl(int cmd, struct nfsctl_arg __user *arg, void __user *res)
@@ -103,7 +103,7 @@ asmlinkage sys_nfsservctl(int cmd, struct nfsctl_arg __user *arg, void __user *r
 	int err;
 	int fd;
 
-#if defined(CONFIG_PNFSD)
+#if defined(CONFIG_SPNFS)
 	struct nfs_fh fh;
 	extern int *spnfs_getfh(int, struct nfs_fh *);
 
@@ -156,7 +156,7 @@ asmlinkage sys_nfsservctl(int cmd, struct nfsctl_arg __user *arg, void __user *r
 
 		return 0;
 	}
-#endif /* CONFIG_PNFSD */
+#endif /* CONFIG_SPNFS */
 
 	if (copy_from_user(&version, &arg->ca_version, sizeof(int)))
 		return -EFAULT;

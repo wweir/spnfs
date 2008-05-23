@@ -52,7 +52,9 @@
 #include <linux/nfsd/stats.h>
 #include <linux/nfsd/pnfsd.h>
 #include <linux/exportfs.h>
+#if defined(CONFIG_SPNFS)
 #include <linux/nfsd4_spnfs.h>
+#endif /* CONFIG_SPNFS */
 #endif /* CONFIG_PNFSD */
 
 #define NFSDDBG_FACILITY		NFSDDBG_PROC
@@ -256,7 +258,7 @@ nfsd4_open(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	struct current_session *current_ses = cstate->current_ses;
 #endif
 	__be32 status;
-#if defined(CONFIG_PNFSD)
+#if defined(CONFIG_SPNFS)
 	__be32 pstatus;
 	struct super_block *sb;
 #endif
@@ -355,11 +357,11 @@ nfsd4_open(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	 * set, (2) sets open->op_stateid, (3) sets open->op_delegation.
 	 */
 	status = nfsd4_process_open2(rqstp, &cstate->current_fh, open);
-#if defined(CONFIG_PNFSD)
+#if defined(CONFIG_SPNFS)
 	if (!status) {
 		sb = cstate->current_fh.fh_dentry->d_inode->i_sb;
 		if (sb->s_export_op->propagate_open) {
-			pstatus = nfs4_pnfs_propagate_open(sb,
+			pstatus = nfs4_spnfs_propagate_open(sb,
 				&cstate->current_fh, open);
 			if (pstatus) {
 				dprintk(
@@ -375,7 +377,7 @@ nfsd4_open(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 			}
 		}
 	}
-#endif /* CONFIG_PNFSD */
+#endif /* CONFIG_SPNFS */
 out:
 	if (open->op_stateowner) {
 		nfs4_get_stateowner(open->op_stateowner);
@@ -826,7 +828,7 @@ nfsd4_write(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	struct file *filp = NULL;
 	u32 *p;
 	__be32 status = nfs_ok, flags = 0;
-#if defined(CONFIG_PNFSD)
+#if defined(CONFIG_SPNFS)
 	struct super_block *sb;
 	struct svc_fh *current_fh = &cstate->current_fh;
 #endif
@@ -855,7 +857,7 @@ nfsd4_write(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	write->wr_how_written = write->wr_stable_how;
 	p = (u32 *)write->wr_verifier.data;
 
-#if defined(CONFIG_PNFSD)
+#if defined(CONFIG_SPNFS)
 	sb = current_fh->fh_dentry->d_inode->i_sb;
 	if (sb->s_export_op->get_verifier) {
 		struct pnfs_ds_stateid *dsp = find_pnfs_ds_stateid(stateid);
@@ -869,12 +871,12 @@ nfsd4_write(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 			p += 2;
 		}
 	} else
-#endif /* CONFIG_PNFSD */
+#endif /* CONFIG_SPNFS */
 	{
 	*p++ = nfssvc_boot.tv_sec;
 	*p++ = nfssvc_boot.tv_usec;
 	}
-#if defined(CONFIG_PNFSD)
+#if defined(CONFIG_SPNFS)
 	status = spnfs_write(current_fh->fh_dentry->d_inode->i_ino,
 		write->wr_offset, write->wr_buflen, write->wr_vlen, rqstp);
 	if (status < 0)
@@ -895,7 +897,7 @@ nfsd4_write(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 	status =  nfsd_write(rqstp, &cstate->current_fh, filp,
 			     write->wr_offset, rqstp->rq_vec, write->wr_vlen,
 			     write->wr_buflen, &write->wr_how_written);
-#endif /* CONFIG_PNFSD */
+#endif /* CONFIG_SPNFS */
 
 	if (filp)
 		fput(filp);

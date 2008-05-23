@@ -308,6 +308,7 @@ int nfsd_spnfs_new(void);
 void nfsd_spnfs_delete(void);
 int spnfs_upcall(struct spnfs *, struct spnfs_msg *, union spnfs_msg_res *);
 int spnfs_enabled(void);
+int nfs4_spnfs_propagate_open(struct super_block *, struct svc_fh *, void *);
 
 #endif /* __KERNEL__ */
 

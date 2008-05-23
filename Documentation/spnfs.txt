@@ -29,6 +29,7 @@ add these options to your .config file
 	CONFIG_NFSD_V4_1=y
 	CONFIG_PNFS=y
 	CONFIG_PNFSD=y
+	CONFIG_SPNFS=y
 
 Building and installation of kernel+modules is as usual.
 This kernel should be installed and booted on the client, MDS and DSs.
