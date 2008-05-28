@@ -551,6 +551,8 @@ free_client(struct nfs4_client *clp)
 	BUG_ON(!list_empty(&clp->cl_delegations));
 	BUG_ON(!list_empty(&clp->cl_openowners));
 	shutdown_callback_client(clp);
+	if (clp->cl_cb_xprt)
+		svc_xprt_put(clp->cl_cb_xprt);
 	if (clp->cl_cred.cr_group_info)
 		put_group_info(clp->cl_cred.cr_group_info);
 	kfree(clp->cl_name.data);
@@ -1303,6 +1305,7 @@ __be32 nfsd4_create_session(struct svc_rqst *rqstp,
 
 		if (session->flags & SESSION4_BACK_CHAN) {
 			unconf->cl_cb_xprt = rqstp->rq_xprt;
+			svc_xprt_get(unconf->cl_cb_xprt);
 			unconf->cl_callback.cb_minorversion = 1;
 			unconf->cl_callback.cb_prog = session->callback_prog;
 			nfsd4_probe_callback(unconf);
