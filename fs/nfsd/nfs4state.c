@@ -2700,7 +2700,7 @@ nfs4_preprocess_stateid_op(struct svc_fh *current_fh, stateid_t *stateid, int fl
 		return check_special_stateids(current_fh, stateid, flags);
 
 #if defined(CONFIG_PNFSD)
-	if (current_fh->fh_handle.fh_fsid_type >= FSID_MAX) {
+	if (pnfs_fh_is_ds(&current_fh->fh_handle)) {
 		/* PNFS FH */
 		status = nfs4_preprocess_pnfs_ds_stateid(current_fh, stateid);
 		goto out;

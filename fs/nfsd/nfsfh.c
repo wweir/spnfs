@@ -24,6 +24,11 @@
 #include <linux/nfsd/nfsd.h>
 #include "auth.h"
 
+#if defined(CONFIG_PNFSD)
+#include <linux/nfsd/state.h>
+#include <linux/nfsd/nfsd4_pnfs.h>
+#endif /* CONFIG_PNFSD */
+
 #define NFSDDBG_FACILITY		NFSDDBG_FH
 
 
@@ -151,11 +156,10 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 			default: goto out;
 			}
 #if defined(CONFIG_PNFSD)
-			if  (fh->fh_fsid_type >= FSID_MAX) /* pNFS */
-				fsid_type = fh->fh_fsid_type - FSID_MAX;
-			else
+			fsid_type = pnfs_fh_fsid_type(fh);
+#else /* !CONFIG_PNFSD */
+			fsid_type = fh->fh_fsid_type;
 #endif /* CONFIG_PNFSD */
-				fsid_type = fh->fh_fsid_type;
 			len = key_len(fsid_type) / 4;
 			if (len == 0) goto out;
 			if  (fh->fh_fsid_type == FSID_MAJOR_MINOR) {
