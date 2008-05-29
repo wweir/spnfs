@@ -41,6 +41,7 @@
 #include <linux/nfs.h>
 #include <linux/nfs_xdr.h>
 #include <linux/exportfs.h>
+#include <linux/nfsd/nfsfh.h>
 
 /* pNFS structs */
 
@@ -114,6 +115,32 @@ struct nfsd4_pnfs_cb_device {
 	u32			cbd_immediate;		/* request */
 };
 
+/*
+ * fh_fsid_type is overloaded to indicate whether a filehandle was one supplied
+ * to a DS by LAYOUTGET.  nfs4_preprocess_stateid_op() uses this to decide how
+ * to handle a given stateid.
+ */
+static inline int pnfs_fh_is_ds(struct knfsd_fh *fh)
+{
+	return fh->fh_fsid_type >= FSID_MAX;
+}
+
+static inline void pnfs_fh_mark_ds(struct knfsd_fh *fh)
+{
+	BUG_ON(fh->fh_version != 1);
+	BUG_ON(pnfs_fh_is_ds(fh));
+	fh->fh_fsid_type += FSID_MAX;
+}
+
+/* allows fh_verify() to check the real fsid_type (i.e., not overloaded). */
+static inline int pnfs_fh_fsid_type(struct knfsd_fh *fh)
+{
+	int fsid_type = fh->fh_fsid_type;
+
+	if (pnfs_fh_is_ds(fh))
+		return fsid_type - FSID_MAX;
+	return fsid_type;
+}
 #endif /* CONFIG_PNFSD */
 
 #endif /* _LINUX_NFSD_NFSD4_PNFS_H */
