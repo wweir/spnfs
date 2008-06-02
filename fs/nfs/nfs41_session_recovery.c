@@ -186,6 +186,7 @@ int nfs41_recover_session_sync(struct rpc_clnt *clnt, struct nfs_client *clp,
 	dprintk("<-- %s: status=%d\n", __func__, ret);
 	return ret;
 }
+EXPORT_SYMBOL(nfs41_recover_session_sync);
 
 /*
  * nfs41_new_session()
