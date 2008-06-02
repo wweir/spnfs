@@ -568,9 +568,18 @@ static int _nfs4_call_sync(struct nfs_server *server,
 #define nfs4_call_sync(server, clnt, msg, args, res, cache_reply) \
 	_nfs4_call_sync((server), (clnt), (msg), &(args)->seq_args, \
 			&(res)->seq_res, (cache_reply))
+
 #else /* CONFIG_NFS_V4_1 */
-#define nfs4_call_sync(server, clnt, msg, args, res, cache_reply) \
-	rpc_call_sync((clnt), (msg), 0);
+
+static inline int nfs4_call_sync(struct nfs_server *server,
+				 struct rpc_clnt *clnt,
+				 struct rpc_message *msg,
+				 void *args, void *res,
+				 int cache_reply)
+{
+	return rpc_call_sync(clnt, msg, 0);
+}
+
 #endif /* CONFIG_NFS_V4_1 */
 
 static void update_changeattr(struct inode *dir, struct nfs4_change_info *cinfo)
@@ -2286,9 +2295,7 @@ static int nfs4_proc_access(struct inode *inode, struct nfs_access_entry *entry)
 static int _nfs4_proc_readlink(struct inode *inode, struct page *page,
 		unsigned int pgbase, unsigned int pglen)
 {
-#if defined(CONFIG_NFS_V4_1)
 	struct nfs_server *server = NFS_SERVER(inode);
-#endif /* CONFIG_NFS_V4_1 */
 	struct nfs4_readlink args = {
 		.fh       = NFS_FH(inode),
 		.pgbase	  = pgbase,
@@ -2663,9 +2670,7 @@ static int _nfs4_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
                   u64 cookie, struct page *page, unsigned int count, int plus)
 {
 	struct inode		*dir = dentry->d_inode;
-#if defined(CONFIG_NFS_V4_1)
 	struct nfs_server	*server = NFS_SERVER(dir);
-#endif /* CONFIG_NFS_V4_1 */
 	struct nfs4_readdir_arg args = {
 		.fh = NFS_FH(dir),
 		.pages = &page,
@@ -3177,9 +3182,7 @@ static ssize_t __nfs4_get_acl_uncached(struct inode *inode, void *buf, size_t bu
 	};
 	struct page *localpage = NULL;
 	int status;
-#if defined(CONFIG_NFS_V4_1)
 	struct nfs_server *server = NFS_SERVER(inode);
-#endif /* CONFIG_NFS_V4_1 */
 
 	if (buflen < PAGE_SIZE) {
 		/* As long as we're doing a round trip to the server anyway,
