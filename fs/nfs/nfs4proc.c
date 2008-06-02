@@ -443,7 +443,7 @@ int nfs4_setup_sequence(struct nfs_client *clp,
 			int cache_reply,
 			struct rpc_task *task)
 {
-	int ret;
+	int ret = 0;
 
 	dprintk("--> %s clp %p session %p cl_minorversion %d\n",
 		__func__, clp, session, clp->cl_minorversion);
@@ -459,7 +459,6 @@ int nfs4_setup_sequence(struct nfs_client *clp,
 				res, cache_reply, task);
 		break;
 	case 0:
-		ret = 0;
 		break;
 	default:
 		BUG();
