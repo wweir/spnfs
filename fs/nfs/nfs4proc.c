@@ -2936,8 +2936,8 @@ static int nfs4_read_done(struct rpc_task *task, struct nfs_read_data *data)
 	nfs_invalidate_atime(data->inode);
 	if (task->tk_status > 0)
 		renew_lease(server, data->timestamp);
-	dprintk("<-- %s status= 0\n", __func__);
-	return status;
+	dprintk("<-- %s status= %d. returning 0\n", __func__, status);
+	return 0;
 }
 
 static void nfs4_proc_read_setup(struct nfs_read_data *data, struct rpc_message *msg)
