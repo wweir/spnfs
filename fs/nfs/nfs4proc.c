@@ -2950,7 +2950,7 @@ static int nfs4_write_done(struct rpc_task *task, struct nfs_write_data *data)
 {
 	struct inode *inode = data->inode;
 	struct nfs_server *server = NFS_SERVER(inode);
-	
+
 #if defined(CONFIG_NFS_V4_1)
 	nfs4_sequence_done(server, &data->res.seq_res, task->tk_status);
 #endif
@@ -2982,7 +2982,7 @@ static int nfs4_commit_done(struct rpc_task *task, struct nfs_write_data *data)
 {
 	struct inode *inode = data->inode;
 	struct nfs_server *server = NFS_SERVER(inode);
-	
+
 #if defined(CONFIG_NFS_V4_1)
 	nfs4_sequence_done(server, &data->res.seq_res, task->tk_status);
 #endif

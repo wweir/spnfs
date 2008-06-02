@@ -620,6 +620,8 @@ nfsd4_probe_callback(struct nfs4_client *clp)
 
 	if (IS_ERR(t))
 		atomic_dec(&clp->cl_count);
+
+	return;
 }
 
 #if defined(CONFIG_NFSD_V4_1)

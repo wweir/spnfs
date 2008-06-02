@@ -43,4 +43,3 @@ int nfs41_new_session(struct nfs_server *);
 
 #endif	/* CONFIG_NFS_V4_1 */
 #endif	/* __NFS41_SESSION_RECOVERY_H__ */
-

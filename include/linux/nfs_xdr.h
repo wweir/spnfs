@@ -179,7 +179,7 @@ struct nfs_openargs {
 		int		delegation_type;	/* CLAIM_PREVIOUS */
 	} u;
 	const struct qstr *	name;
-	struct nfs_server *server;	 /* Needed for ID mapping */
+	struct nfs_server *	server;	 /* Needed for ID mapping */
 	const u32 *		bitmask;
 	__u32			claim;
 #if defined(CONFIG_NFS_V4_1)
@@ -494,7 +494,6 @@ struct nfs_setattrres {
 	struct nfs41_sequence_res	seq_res;
 #endif
 };
-
 
 struct nfs_linkargs {
 	struct nfs_fh *		fromfh;

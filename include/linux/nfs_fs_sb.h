@@ -72,7 +72,7 @@ struct nfs_client {
 	char			cl_ipaddr[48];
 	unsigned char		cl_id_uniquifier;
 	u32			cl_minorversion;
-#endif
+#endif /* CONFIG_NFS_V4 */
 
 #ifdef CONFIG_NFS_V4_1
 	/* The sequence id to use for the next CREATE_SESSION */
@@ -80,7 +80,7 @@ struct nfs_client {
 	/* The flags used for obtaining the clientid during EXCHANGE_ID */
 	u32			cl_exchange_flags;
 	struct rpc_cred		*cl_ex_cred;	/* exchange_id credential */
-#endif
+#endif /* CONFIG_NFS_V4_1 */
 };
 
 /*
