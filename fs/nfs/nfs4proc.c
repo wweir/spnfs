@@ -4505,7 +4505,7 @@ int nfs4_proc_get_lease_time(struct nfs_client *clp,
 }
 
 /* Initialize a slot table */
-int nfs4_init_slot_table(struct nfs4_channel *channel)
+static int nfs4_init_slot_table(struct nfs4_channel *channel)
 {
 	struct nfs4_slot_table *tbl = &channel->slot_table;
 	int i, max_slots = channel->chan_attrs.max_reqs;
