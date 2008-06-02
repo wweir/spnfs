@@ -760,9 +760,6 @@ void nfs_increment_lock_seqid(int status, struct nfs_seqid *seqid)
 	nfs_increment_seqid(status, seqid);
 }
 
-/*
- * XXX: Server bug!! needs to set counter to 0, not increment
- */
 #if defined(CONFIG_NFS_V4_1)
 void nfs41_increment_lock_seqid(int status, struct nfs_seqid *seqid)
 {
