@@ -435,26 +435,19 @@ int nfs4_setup_sequence(struct nfs_client *clp,
 
 	dprintk("--> %s clp %p session %p cl_minorversion %d\n",
 		__func__, clp, session, clp->cl_minorversion);
-	switch (clp->cl_minorversion) {
-	case 1:
-		if (nfs41_test_session_expired(session)) {
-			ret = nfs41_recover_session_sync(task->tk_client, clp,
-							 session);
-			if (ret)
-				break;
-		}
-		ret = nfs41_setup_sequence(session, args,
-				res, cache_reply, task);
-		break;
-	case 0:
-		break;
-	default:
-		BUG();
-	}
 
+	if (clp->cl_minorversion == 0)
+		goto out;
+	BUG_ON(clp->cl_minorversion != 1);
+	if (nfs41_test_session_expired(session))
+		ret = nfs41_recover_session_sync(task->tk_client, clp,
+						 session);
+	if (!ret)
+		ret = nfs41_setup_sequence(session, args, res,
+					    cache_reply, task);
 	if (ret)
 		memset(res, 0, sizeof(*res));
-
+out:
 	dprintk("<-- %s status=%d\n", __func__, ret);
 	return ret;
 }
