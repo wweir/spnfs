@@ -975,11 +975,6 @@ static int nfs4_init_client(struct nfs_client *clp,
 		return 0;
 	}
 
-	if (clp->cl_minorversion == 1) {
-		clp->cl_boot_time = CURRENT_TIME;
-		clp->cl_state = 1 << NFS4CLNT_LEASE_EXPIRED;
-	}
-
 	/* Check NFS protocol revision and initialize RPC op vector */
 	clp->rpc_ops = nfsv4_minorversion_clientops[clp->cl_minorversion];
 	nfs4_procedures = nfs4_minorversion_procedures[clp->cl_minorversion];
