@@ -74,9 +74,6 @@ static int nfs41_wait_session_recover_sync(struct rpc_clnt *clnt,
 			   nfs4_wait_bit_killable, TASK_KILLABLE);
 }
 
-int nfs4_proc_create_session(struct nfs_client *clp,
-			     struct nfs4_session *session);
-
 static int session_reclaimer(void *arg)
 {
 	int ret;
