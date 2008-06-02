@@ -727,7 +727,7 @@ static void nfs_increment_seqid(int status, struct nfs_seqid *seqid)
 	seqid->sequence->counter++;
 }
 
-void __nfs_increment_open_seqid(int status, struct nfs_seqid *seqid)
+static void nfs_handle_open_seqid_error(int status, struct nfs_seqid *seqid)
 {
 	if (status == -NFS4ERR_BAD_SEQID) {
 		struct nfs4_state_owner *sp = container_of(seqid->sequence,
@@ -735,9 +735,10 @@ void __nfs_increment_open_seqid(int status, struct nfs_seqid *seqid)
 		nfs4_drop_state_owner(sp);
 	}
 }
+
 void nfs_increment_open_seqid(int status, struct nfs_seqid *seqid)
 {
-	__nfs_increment_open_seqid(status, seqid);
+	nfs_handle_open_seqid_error(status, seqid);
 
 	nfs_increment_seqid(status, seqid);
 }
@@ -745,7 +746,7 @@ void nfs_increment_open_seqid(int status, struct nfs_seqid *seqid)
 #if defined(CONFIG_NFS_V4_1)
 void nfs41_increment_open_seqid(int status, struct nfs_seqid *seqid)
 {
-	__nfs_increment_open_seqid(status, seqid);
+	nfs_handle_open_seqid_error(status, seqid);
 }
 #endif
 
