@@ -205,9 +205,6 @@ extern int nfs4_proc_fs_locations(struct inode *dir, const struct qstr *name,
 extern struct nfs4_state_recovery_ops *nfs4_reboot_recovery_ops[];
 extern struct nfs4_state_recovery_ops *nfs4_network_partition_recovery_ops[];
 #if defined(CONFIG_NFS_V4_1)
-extern int nfs41_call_validate_seq_args(struct nfs_server *server,
-	struct nfs4_session *session, void *args, void *res, int cache_this,
-	struct rpc_task *task);
 extern int nfs4_setup_sequence(struct nfs_client *clp,
 	struct nfs4_session *session, struct nfs41_sequence_args *args,
 	struct nfs41_sequence_res *res, int cache_reply, struct rpc_task *task);

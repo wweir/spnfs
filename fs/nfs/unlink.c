@@ -108,10 +108,9 @@ int nfs_unlink_validate(struct rpc_task *task, void *calldata)
 	struct nfs_unlinkdata *data = calldata;
 	struct nfs_server *server = NFS_SERVER(data->dir);
 
-	return nfs41_call_validate_seq_args(server, server->session,
-					    &data->args.seq_args,
-					    &data->res.seq_res,
-					    1, task);
+	return nfs4_setup_sequence(server->nfs_client, server->session,
+				   &data->args.seq_args, &data->res.seq_res,
+				   1, task);
 }
 #endif /* CONFIG_NFS_V4_1 */
 static const struct rpc_call_ops nfs_unlink_ops = {

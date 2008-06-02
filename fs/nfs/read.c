@@ -399,12 +399,10 @@ int nfs_read_validate(struct rpc_task *task, void *calldata)
 {
 	struct nfs_read_data *data = calldata;
 	struct nfs_server *server = data->args.server;
-	struct nfs4_session *session = server->session;
 
-	return nfs41_call_validate_seq_args(server, session,
-					    &data->args.seq_args,
-					    &data->res.seq_res,
-					    0, task);
+	return nfs4_setup_sequence(server->nfs_client, server->session,
+				   &data->args.seq_args, &data->res.seq_res,
+				   0, task);
 }
 #endif /* CONFIG_NFS_V4_1 */
 

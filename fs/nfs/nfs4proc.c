@@ -424,17 +424,6 @@ static int nfs41_setup_sequence(struct nfs4_session *session,
 	return 0;
 }
 
-static int nfs41_validate_seq_args(struct nfs4_session *session,
-					void *args,
-					void *res,
-					int cache_this,
-					struct rpc_task *task)
-{
-	return nfs41_setup_sequence(session,
-					args, res,
-					cache_this, task);
-}
-
 int nfs4_setup_sequence(struct nfs_client *clp,
 			struct nfs4_session *session,
 			struct nfs41_sequence_args *args,
@@ -468,23 +457,6 @@ int nfs4_setup_sequence(struct nfs_client *clp,
 
 	dprintk("<-- %s status=%d\n", __func__, ret);
 	return ret;
-}
-
-int nfs41_call_validate_seq_args(struct nfs_server *server,
-				 struct nfs4_session *session,
-				 void *args,
-				 void *res,
-				 int cache_this,
-				 struct rpc_task *task)
-{
-	int (*setup_sequence)(struct nfs4_session *,
-				void *, void *, int, struct rpc_task *);
-
-	setup_sequence = server->nfs_client->rpc_ops->validate_sequence_args;
-	if (!setup_sequence)
-		return 0;
-
-	return setup_sequence(session, args, res, cache_this, task);
 }
 
 struct nfs41_call_sync_data {
@@ -5085,7 +5057,6 @@ const struct nfs_rpc_ops nfs_v41_clientops = {
 	.file_release   = nfs_release,
 	.lock		= nfs4_proc_lock,
 	.clear_acl_cache = nfs4_zap_acl_attr,
-	.validate_sequence_args = nfs41_validate_seq_args,
 	.increment_open_seqid = nfs41_increment_open_seqid,
 	.increment_lock_seqid = nfs41_increment_lock_seqid,
 	.nfs4_clientid	= nfs41_clientid,
