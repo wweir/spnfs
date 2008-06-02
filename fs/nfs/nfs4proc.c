@@ -4331,7 +4331,7 @@ int nfs4_proc_fs_locations(struct inode *dir, const struct qstr *name,
 }
 
 #ifdef CONFIG_NFS_V4_1
-int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
+static int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
 {
 	nfs4_verifier verifier;
 	struct nfs41_exchange_id_args args = {
@@ -4405,9 +4405,8 @@ int _nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
 	dprintk("<-- %s status= %d\n", __func__, status);
 	return status;
 }
-EXPORT_SYMBOL(_nfs4_proc_exchange_id);
 
-int nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
+static int nfs4_proc_exchange_id(struct nfs_client *clp, struct rpc_cred *cred)
 {
 	struct nfs_server *server;
 
