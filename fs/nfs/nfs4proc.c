@@ -3317,11 +3317,6 @@ nfs4_async_handle_error(struct rpc_task *task, const struct nfs_server *server,
 		case -NFS4ERR_RETRY_UNCACHED_REP:
 		case -NFS4ERR_TOO_MANY_OPS:
 		case -NFS4ERR_OP_NOT_IN_SESSION:
-			/* FIXME:
-			ret = nfs41_recover_session_async(task, server);
-			if (ret)
-				return ret;
-			*/
 			nfs41_set_session_expired(server->session);
 			task->tk_status = 0;
 			return -EAGAIN;
