@@ -71,7 +71,6 @@ static int nfs4_handle_exception(struct nfs_server *server, int errorcode, struc
 static int nfs4_wait_clnt_recover(struct rpc_clnt *clnt, struct nfs_client *clp);
 static int _nfs4_proc_lookup(struct inode *dir, const struct qstr *name, struct nfs_fh *fhandle, struct nfs_fattr *fattr);
 static int _nfs4_proc_getattr(struct nfs_server *server, struct nfs_fh *fhandle, struct nfs_fattr *fattr);
-static int nfs4_recover_expired_lease(struct nfs_server *server);
 
 /* Prevent leaks of NFSv4 errors into userland */
 int nfs4_map_errors(int err)
