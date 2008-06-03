@@ -206,7 +206,7 @@ filelayout_encode_layout(struct pnfs_xdr_info *resp, void *layout)
 
 	/* Ensure file system added at least one file handle */
 	if (flp->lg_fh_length <= 0) {
-		printk("%s: File Layout has no file handles!!\n", __FUNCTION__);
+		printk("%s: File Layout has no file handles!!\n", __func__);
 		error = -NFSERR_LAYOUTUNAVAILABLE;
 		goto out;
 	}

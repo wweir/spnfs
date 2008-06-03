@@ -950,7 +950,7 @@ nfsd4_layout_verify(struct super_block *sb, unsigned int layout_type)
 	status = nfserr_layoutunavailable;
 	if (!sb->s_export_op->layout_type) {
 		printk(KERN_INFO "pNFS %s: Underlying file system "
-		       "does not support pNFS\n", __FUNCTION__);
+		       "does not support pNFS\n", __func__);
 		goto out;
 	}
 
@@ -959,7 +959,7 @@ nfsd4_layout_verify(struct super_block *sb, unsigned int layout_type)
 	if (type != layout_type) {
 		printk(KERN_INFO "pNFS %s: requested layout type %d "
 		       "does not match suppored type %d\n",
-			__FUNCTION__, layout_type, type);
+			__func__, layout_type, type);
 		goto out;
 	}
 
@@ -984,7 +984,7 @@ nfsd4_getdevlist(struct svc_rqst *rqstp,
 
 	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
 	if (status) {
-		printk("pNFS %s: verify filehandle failed\n", __FUNCTION__);
+		printk("pNFS %s: verify filehandle failed\n", __func__);
 		goto out;
 	}
 
@@ -1028,7 +1028,7 @@ nfsd4_layoutget(struct svc_rqst *rqstp,
 
 	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
 	if (status) {
-		printk("pNFS %s: verify filehandle failed\n", __FUNCTION__);
+		printk("pNFS %s: verify filehandle failed\n", __func__);
 		goto out;
 	}
 
@@ -1048,7 +1048,7 @@ nfsd4_layoutget(struct svc_rqst *rqstp,
 	status = nfserr_layoutunavailable;
 	if (!sb->s_export_op->layout_get) {
 		printk(KERN_INFO "pNFS %s: Underlying file system "
-		       "does not support layout_get\n", __FUNCTION__);
+		       "does not support layout_get\n", __func__);
 		goto out;
 	}
 
@@ -1056,14 +1056,14 @@ nfsd4_layoutget(struct svc_rqst *rqstp,
 	if (lgp->lg_seg.iomode != IOMODE_READ &&
 	    lgp->lg_seg.iomode != IOMODE_RW &&
 	    lgp->lg_seg.iomode != IOMODE_ANY) {
-		dprintk("pNFS %s: invalid iomode %d\n", __FUNCTION__,
+		dprintk("pNFS %s: invalid iomode %d\n", __func__,
 			lgp->lg_seg.iomode);
 		goto out;
 	}
 
 	status = nfserr_badiomode;
 	if (lgp->lg_seg.iomode == IOMODE_ANY) {
-		dprintk("pNFS %s: IOMODE_ANY is not allowed\n", __FUNCTION__);
+		dprintk("pNFS %s: IOMODE_ANY is not allowed\n", __func__);
 		goto out;
 	}
 
@@ -1171,7 +1171,7 @@ nfsd4_layoutreturn(struct svc_rqst *rqstp,
 
 	status = fh_verify(rqstp, current_fh, 0, MAY_NOP);
 	if (status) {
-		printk("pNFS %s: verify filehandle failed\n", __FUNCTION__);
+		printk("pNFS %s: verify filehandle failed\n", __func__);
 		goto out;
 	}
 
@@ -1191,7 +1191,7 @@ nfsd4_layoutreturn(struct svc_rqst *rqstp,
 	if (lrp->lr_return_type != RETURN_FILE &&
 	    lrp->lr_return_type != RETURN_FSID &&
 	    lrp->lr_return_type != RETURN_ALL) {
-		dprintk("pNFS %s: invalid return_type %d\n", __FUNCTION__,
+		dprintk("pNFS %s: invalid return_type %d\n", __func__,
 			lrp->lr_return_type);
 		goto out;
 	}
@@ -1200,7 +1200,7 @@ nfsd4_layoutreturn(struct svc_rqst *rqstp,
 	if (lrp->lr_seg.iomode != IOMODE_READ &&
 	    lrp->lr_seg.iomode != IOMODE_RW &&
 	    lrp->lr_seg.iomode != IOMODE_ANY) {
-		dprintk("pNFS %s: invalid iomode %d\n", __FUNCTION__,
+		dprintk("pNFS %s: invalid iomode %d\n", __func__,
 			lrp->lr_seg.iomode);
 		goto out;
 	}
@@ -1211,7 +1211,7 @@ nfsd4_layoutreturn(struct svc_rqst *rqstp,
 	status = nfs4_pnfs_return_layout(sb, current_fh, lrp);
 out:
 	dprintk("pNFS %s: status %d layout_type 0x%x\n",
-		__FUNCTION__, status, lrp->lr_seg.layout_type);
+		__func__, status, lrp->lr_seg.layout_type);
 	return status;
 }
 
