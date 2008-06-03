@@ -1858,7 +1858,7 @@ static int encode_pnfs_layoutget(struct xdr_stream *xdr,
 	WRITE32(args->maxcount);
 
 	dprintk("%s: 1st type:0x%x iomode:%d off:%lu len:%lu mc:%d\n",
-		__FUNCTION__,
+		__func__,
 		args->type,
 		args->lseg.iomode,
 		(unsigned long)args->lseg.offset,
@@ -5555,7 +5555,7 @@ static int decode_pnfs_layoutget(struct xdr_stream *xdr, struct rpc_rqst *req,
 	READ32(res->layout.len);
 
 	dprintk("%s roff:%lu rlen:%lu riomode:%d, lo_type:0x%x, lo.len:%d\n",
-		__FUNCTION__,
+		__func__,
 		(unsigned long)res->lseg.offset,
 		(unsigned long)res->lseg.length,
 		res->lseg.iomode,

@@ -2971,7 +2971,7 @@ static int pnfs4_read_done(struct rpc_task *task, struct nfs_read_data *data)
 
 	if (nfs4_async_handle_error(task, mds_svr, client) == -EAGAIN) {
 		rpc_restart_call(task);
-		dprintk("<-- %s status= %d\n", __FUNCTION__, -EAGAIN);
+		dprintk("<-- %s status= %d\n", __func__, -EAGAIN);
 		return -EAGAIN;
 	}
 
@@ -3011,7 +3011,7 @@ static int pnfs4_write_done(struct rpc_task *task, struct nfs_write_data *data)
 	*/
 	if (nfs4_async_handle_error(task, mds_svr, client) == -EAGAIN) {
 			rpc_restart_call(task);
-			dprintk("<-- %s status= %d\n", __FUNCTION__, -EAGAIN);
+			dprintk("<-- %s status= %d\n", __func__, -EAGAIN);
 			return -EAGAIN;
 	}
 
