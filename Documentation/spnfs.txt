@@ -98,7 +98,10 @@ contain:
 	172.17.84.122:/pnfs /spnfs/172.17.84.122 nfs    defaults        1 2
 
 The DS mounts must be performed manually or via fstab at this time (automatic
-mounting, directory creation, etc. are on the todo list).
+mounting, directory creation, etc. are on the todo list).  To perform I/O
+through the MDS, the DS mounts MUST use NFSv3 at this time (this restriction
+will eventually be removed).
+
 
 On the MDS, choose a file system to use with spNFS and export it, e.g.:
 
@@ -136,6 +139,10 @@ On the client, make sure the nfslayoutdriver module is loaded:
 Then mount the file system from the MDS:
 
 	mount -t nfs4 mds:/ /mnt
+
+I/O through the MDS is now supported.  To use it, do not load the
+nfslayoutdriver on the client, and mount the MDS using NFSv4 or 4.1
+(NFSv2 and v3 are not yet supported).
 
 You may now use spNFS by performing file system activities in /mnt.
 If you create files in /mnt, you should see stripe files corresponding to
