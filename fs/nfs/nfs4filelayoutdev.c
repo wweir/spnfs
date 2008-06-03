@@ -761,7 +761,7 @@ nfs4_pnfs_dserver_get(struct pnfs_layout_segment *lseg,
 	dserver->dev = &di->stripe_devs[stripe_idx];
 	if (dserver->dev == NULL) {
 		printk(KERN_ERR "%s: No data server for device id (%s)!! \n",
-		__func__, deviceid_fmt(&layout->dev_id));
+			__func__, deviceid_fmt(&layout->dev_id));
 		return 1;
 	}
 	if (layout->num_fh == 1)
@@ -769,7 +769,7 @@ nfs4_pnfs_dserver_get(struct pnfs_layout_segment *lseg,
 	else
 		dserver->fh = &layout->fh_array[stripe_idx];
 
-	dprintk("%s: dev_id=%s ip:port=%s, idx=%u, offset=%Lu, count=%Zu\n",
+	dprintk("%s: dev_id=%s, ip:port=%s, idx=%u, offset=%Lu, count=%Zu\n",
 		__func__, deviceid_fmt(&layout->dev_id),
 		dserver->dev->ds_list[0]->r_addr,
 		stripe_idx, offset, count);

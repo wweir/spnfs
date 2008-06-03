@@ -730,8 +730,8 @@ boundary:
 	do_div(r_stripe, pgio->pg_boundary);
 
 #if 0
-	dprintk("%s p %llu r %llu bnd %d bsize %Zu\n",
-	__func__, p_stripe, r_stripe, pgio->pg_boundary, pgio->pg_bsize);
+	dprintk("%s p %llu r %llu bnd %d bsize %Zu\n", __func__,
+		p_stripe, r_stripe, pgio->pg_boundary, pgio->pg_bsize);
 #endif
 
 	return (p_stripe == r_stripe);

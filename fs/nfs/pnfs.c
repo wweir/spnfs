@@ -47,7 +47,6 @@
 #include <linux/nfs4_pnfs.h>
 
 #include "internal.h"
-
 #include "nfs4_fs.h"
 #include "pnfs.h"
 
@@ -253,8 +252,8 @@ pnfs_register_layoutdriver(struct pnfs_layoutdriver_type *ld_type)
 	struct layoutdriver_io_operations *io_ops = ld_type->ld_io_ops;
 
 	if (!pnfs_initialized) {
-		printk(KERN_ERR "%s Registration failure."
-		       "  pNFS not initialized.\n", __func__);
+		printk(KERN_ERR "%s Registration failure. "
+		       "pNFS not initialized.\n", __func__);
 		return NULL;
 	}
 
